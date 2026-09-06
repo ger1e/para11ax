@@ -190,9 +190,24 @@ Other Guidance content can include:
 
 Guidance remains an explanation/projection layer, not a new evidence source.
 
+#### Operator context is not Evidence v2
+
+Specialist analyst utilities use separate output contracts. User Scanner, native Shodan, and GreyNoise Project Swarm session/pivot results are **operator context, not Evidence v2**. Their presence in a terminal or Investigation Workspace does not create an Evidence v2 item, provider fingerprint, corroboration vote, maliciousness, ATT&CK mapping, attribution fact or analyst disposition.
+
+GreyNoise has two distinct surfaces:
+
+- canonical `gn`/GreyNoise provider execution can return normalized Evidence v2 from the fixed authenticated v3 IP lookup under provider semantics;
+- `swarm search`, `swarm get`, `swarm unique`, and `swarm timeseries` return bounded session operator records through `/api/para11ax/swarm`.
+
+A compatible Swarm read result may be explicitly recorded by `investigation capture operator`. That action preserves the operator-context authority label. `swarm export` returns one explicit bounded PCAP/raw download and does not replace the current operator result or become automatic Evidence v2/investigation evidence.
+
+Session presence, GreyNoise classification/tags, source/destination pivots, JA3/JA4, Suricata fields, counts/trends and packet/raw bytes remain contextual source material. They require analyst interpretation and do not automatically prove compromise, exploitability, protected-environment relevance or attribution.
+
 #### Browser-local case graph
 
 Browser-local cases are not part of the server Evidence v2 schema. Cases can retain bounded snapshots/diffs, build exact typed cross-case sightings, and project a local graph from pins/snapshots/supported facts. Free-form notes are not parsed into entities. IndexedDB does not create server-side case persistence or IOC history.
+
+Investigation Workspace v2 can separately retain explicitly captured operator context with its own authority label. It does not rewrite that context into the Evidence v2 schema.
 
 #### Caching semantics
 
@@ -206,7 +221,7 @@ Batch results preserve original input order. Canonically duplicated inputs reuse
 
 #### STIX export
 
-STIX export is derived only from gateway-generated Evidence v2. It does not turn Intelligence Kernel conclusions into new evidence, threat confidence or attribution. MITRE source STIX IDs are preserved when available; object count is capped at 100.
+STIX export is derived only from gateway-generated Evidence v2. It does not turn Intelligence Kernel conclusions or specialist operator context (including GreyNoise Project Swarm) into new evidence, threat confidence or attribution. MITRE source STIX IDs are preserved when available; object count is capped at 100.
 
 There is no universal maliciousness score anywhere in Evidence v2, Intelligence Kernel v1.0, Evidence Graph v1.0 or Guidance v1.0.
 
