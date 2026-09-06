@@ -8,6 +8,8 @@ const PIVOT_FIELDS = new Set([
   'tls.ja3', 'tls.ja4', 'tcp.ja4t', 'suricata.signature', 'suricata.category', 'suricata.severity',
 ]);
 const TIMESERIES_INTERVALS = new Set(['auto', '1s', '1m', '1h', '1d']);
+const DIFF_WORKSPACES = new Set(['personal', 'community', 'greynoise']);
+const DIFF_MODES = new Set(['source-only', 'both', 'all']);
 const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
 const ISO8601 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
 
@@ -19,10 +21,54 @@ function validRange(startTime, endTime) {
 function validQuery(value) {
   return Boolean(value && value.length <= 2048 && !/[\u0000-\u001f\u007f]/.test(value));
 }
+function validOpaque(value, max = 4096) {
+  return Boolean(value && value.length <= max && !/[\u0000-\u001f\u007f]/.test(value));
+}
 
 export function parseSwarmArgs(args) {
   const command = String(args[0] ?? '').toLowerCase();
-  if (!['search', 'get', 'export', 'unique', 'timeseries'].includes(command)) fail('usage: swarm <search|get|export|unique|timeseries> ...');
+  if (!['search', 'get', 'export', 'unique', 'timeseries', 'diff'].includes(command)) fail('usage: swarm <search|get|export|unique|timeseries|diff> ...');
+
+  if (command === 'diff') {
+    let query = null;
+    let sourceWorkspace = 'personal';
+    let targetWorkspace = 'greynoise';
+    let mode = 'source-only';
+    let size = 10;
+    let nextToken = null;
+    const valueFlags = new Set(['--query', '--source', '--target', '--mode', '--size', '--next-token']);
+    for (let index = 1; index < args.length; index += 1) {
+      const flag = String(args[index]);
+      if (!valueFlags.has(flag)) fail(`unsupported swarm option: ${flag}`);
+      const raw = args[index + 1];
+      if (raw === undefined || String(raw).startsWith('--')) fail(`${flag} requires a value`);
+      const value = String(raw).trim();
+      if (flag === '--query') {
+        if (!validQuery(value)) fail('swarm diff query must be 1..2048 printable characters');
+        query = value;
+      } else if (flag === '--source') {
+        sourceWorkspace = value.toLowerCase();
+        if (!DIFF_WORKSPACES.has(sourceWorkspace)) fail('swarm diff workspace must be personal, community, or greynoise');
+      } else if (flag === '--target') {
+        targetWorkspace = value.toLowerCase();
+        if (!DIFF_WORKSPACES.has(targetWorkspace)) fail('swarm diff workspace must be personal, community, or greynoise');
+      } else if (flag === '--mode') {
+        mode = value.toLowerCase();
+        if (!DIFF_MODES.has(mode)) fail('swarm diff mode must be source-only, both, or all');
+      } else if (flag === '--size') {
+        size = Number(value);
+        if (!Number.isSafeInteger(size) || size < 1 || size > 100) fail('swarm diff size must be 1..100');
+      } else if (flag === '--next-token') {
+        if (!validOpaque(value)) fail('swarm diff next-token must be 1..4096 printable characters');
+        nextToken = value;
+      }
+      index += 1;
+    }
+    if (!query) fail('swarm diff requires --query');
+    if (sourceWorkspace === targetWorkspace) fail('swarm diff source and target must differ');
+    return { command, query, sourceWorkspace, targetWorkspace, mode, size, nextToken };
+  }
+
   let scope = 'workspace';
 
   if (command === 'get') {
@@ -104,4 +150,4 @@ export function parseSwarmArgs(args) {
   return { command, sessionId: null, scope, startTime, endTime, query, page: null, pageSize: null, exportType: null, field, includeCounts: null, interval, size };
 }
 
-export const SWARM_COMPLETIONS = Object.freeze(['search', 'get', 'export', 'unique', 'timeseries']);
+export const SWARM_COMPLETIONS = Object.freeze(['search', 'get', 'export', 'unique', 'timeseries', 'diff']);
