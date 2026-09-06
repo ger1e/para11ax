@@ -1,7 +1,16 @@
 const PROFILES = new Set(['fast', 'standard', 'full']);
 const SHODAN_COMMANDS = new Set(['host', 'search', 'count', 'stats', 'domain', 'info']);
-const SWARM_COMMANDS = new Set(['search', 'get', 'export']);
+const SWARM_COMMANDS = new Set(['search', 'get', 'export', 'unique', 'timeseries']);
+const SWARM_READ_COMMANDS = new Set(['search', 'get', 'unique', 'timeseries']);
 const SWARM_EXPORT_TYPES = new Set(['pcap', 'rawSource', 'rawDestination']);
+const SWARM_PIVOT_FIELDS = new Set([
+  'source.ip', 'destination.ip', 'source.port', 'destination.port', 'classification', 'protocol', 'ipProtocol',
+  'sourceMetadata.asn', 'sourceMetadata.org', 'sourceMetadata.country_code',
+  'destinationMetadata.asn', 'destinationMetadata.org', 'destinationMetadata.country_code',
+  'gnTagMetadata.name', 'gnTagMetadata.slug', 'gnTagMetadata.category', 'gnTagMetadata.intention', 'gnTagMetadata.cves',
+  'tls.ja3', 'tls.ja4', 'tcp.ja4t', 'suricata.signature', 'suricata.category', 'suricata.severity',
+]);
+const SWARM_TIMESERIES_INTERVALS = new Set(['auto', '1s', '1m', '1h', '1d']);
 const PROVIDER_NAME_RE = /^[a-z0-9-]{1,64}$/;
 const ENRICHMENT_OBSERVERS = new Set();
 const MAX_SWARM_EXPORT_BYTES = 4 * 1024 * 1024;
@@ -114,9 +123,9 @@ function validSwarm(value) {
     typeof value === 'object' &&
     typeof value.requestId === 'string' &&
     value.source === 'greynoise-swarm' &&
-    ['search', 'get'].includes(value.command) &&
+    SWARM_READ_COMMANDS.has(value.command) &&
     value.input && typeof value.input === 'object' && !Array.isArray(value.input) &&
-    value.data && typeof value.data === 'object' && !Array.isArray(value.data) &&
+    value.data && typeof value.data === 'object' &&
     Number.isFinite(value.durationMs) && value.durationMs >= 0
   );
 }
@@ -248,15 +257,39 @@ export function createGatewayClient({ fetchImpl = fetch, getToken }) {
     const scope = input.scope === undefined || input.scope === null ? 'workspace' : String(input.scope).trim().toLowerCase();
     if (!['workspace', 'demo'].includes(scope)) throw new TypeError('invalid Swarm scope');
     const payload = { command, scope };
-    if (command === 'search') {
+
+    if (command === 'search' || command === 'unique' || command === 'timeseries') {
       const startTime = String(input.startTime || '').trim();
       const endTime = String(input.endTime || '').trim();
-      if (!startTime || !endTime) throw new TypeError('Swarm search time range required');
+      if (!startTime || !endTime) throw new TypeError(`Swarm ${command} time range required`);
       payload.startTime = startTime;
       payload.endTime = endTime;
-      if (input.query !== undefined && input.query !== null) payload.query = String(input.query);
-      payload.page = Number(input.page ?? 1);
-      payload.pageSize = Number(input.pageSize ?? 25);
+      if (input.query !== undefined && input.query !== null) {
+        const query = String(input.query).trim();
+        if (!query || query.length > 2048 || /[\u0000-\u001f\u007f]/.test(query)) throw new TypeError('invalid Swarm query');
+        payload.query = query;
+      }
+      if (command === 'search') {
+        payload.page = Number(input.page ?? 1);
+        payload.pageSize = Number(input.pageSize ?? 25);
+      } else if (command === 'unique') {
+        const field = String(input.field || '').trim();
+        if (!SWARM_PIVOT_FIELDS.has(field)) throw new TypeError('invalid Swarm field');
+        payload.field = field;
+        payload.includeCounts = input.includeCounts === true;
+      } else {
+        if (input.field !== undefined && input.field !== null) {
+          const field = String(input.field).trim();
+          if (!SWARM_PIVOT_FIELDS.has(field)) throw new TypeError('invalid Swarm field');
+          payload.field = field;
+        }
+        const size = Number(input.size ?? 10);
+        if (!Number.isSafeInteger(size) || size < 1 || size > 100) throw new TypeError('invalid Swarm timeseries size');
+        const interval = input.interval === undefined || input.interval === null ? 'auto' : String(input.interval).trim();
+        if (!SWARM_TIMESERIES_INTERVALS.has(interval)) throw new TypeError('invalid Swarm timeseries interval');
+        payload.size = size;
+        payload.interval = interval;
+      }
     } else {
       const sessionId = String(input.sessionId || '').trim();
       if (!sessionId) throw new TypeError('Swarm session id required');
