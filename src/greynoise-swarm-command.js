@@ -10,9 +10,19 @@ const MAX_QUERY_LENGTH = 2048;
 const MAX_PAGE = 10_000;
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 25;
+const MAX_TIMESERIES_SIZE = 100;
+const DEFAULT_TIMESERIES_SIZE = 10;
 const SCOPES = new Set(['workspace', 'demo']);
-const COMMANDS = new Set(['search', 'get', 'export']);
+const COMMANDS = new Set(['search', 'get', 'export', 'unique', 'timeseries']);
 const EXPORT_TYPES = new Set(['pcap', 'rawSource', 'rawDestination']);
+const PIVOT_FIELDS = new Set([
+  'source.ip', 'destination.ip', 'source.port', 'destination.port', 'classification', 'protocol', 'ipProtocol',
+  'sourceMetadata.asn', 'sourceMetadata.org', 'sourceMetadata.country_code',
+  'destinationMetadata.asn', 'destinationMetadata.org', 'destinationMetadata.country_code',
+  'gnTagMetadata.name', 'gnTagMetadata.slug', 'gnTagMetadata.category', 'gnTagMetadata.intention', 'gnTagMetadata.cves',
+  'tls.ja3', 'tls.ja4', 'tcp.ja4t', 'suricata.signature', 'suricata.category', 'suricata.severity',
+]);
+const TIMESERIES_INTERVALS = new Set(['auto', '1s', '1m', '1h', '1d']);
 const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
 const ISO8601 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
 const CONTROL = /[\u0000-\u001f\u007f]/g;
@@ -55,8 +65,11 @@ function parseBody(request) {
 }
 
 function validTimestamp(value) {
-  if (typeof value !== 'string' || !ISO8601.test(value) || !Number.isFinite(Date.parse(value))) return false;
-  return true;
+  return typeof value === 'string' && ISO8601.test(value) && Number.isFinite(Date.parse(value));
+}
+
+function validRange(startTime, endTime) {
+  return validTimestamp(startTime) && validTimestamp(endTime) && Date.parse(startTime) < Date.parse(endTime);
 }
 
 function cleanString(value, max = 4096) {
@@ -80,7 +93,10 @@ function sanitize(value, depth = 0) {
 }
 
 function validateRequest(body) {
-  const allowed = new Set(['command', 'sessionId', 'scope', 'startTime', 'endTime', 'query', 'page', 'pageSize', 'exportType']);
+  const allowed = new Set([
+    'command', 'sessionId', 'scope', 'startTime', 'endTime', 'query', 'page', 'pageSize', 'exportType',
+    'field', 'includeCounts', 'interval', 'size',
+  ]);
   if (Object.keys(body).some(key => !allowed.has(key))) throw new Error('unsupported_request_field');
 
   const command = typeof body.command === 'string' ? body.command.trim().toLowerCase() : '';
@@ -94,35 +110,64 @@ function validateRequest(body) {
   const page = body.page === undefined || body.page === null ? 1 : Number(body.page);
   const pageSize = body.pageSize === undefined || body.pageSize === null ? DEFAULT_PAGE_SIZE : Number(body.pageSize);
   const exportType = body.exportType === undefined || body.exportType === null ? null : String(body.exportType).trim();
+  const field = body.field === undefined || body.field === null ? null : String(body.field).trim();
+  const includeCounts = body.includeCounts === undefined || body.includeCounts === null ? false : body.includeCounts;
+  const interval = body.interval === undefined || body.interval === null ? 'auto' : String(body.interval).trim();
+  const size = body.size === undefined || body.size === null ? DEFAULT_TIMESERIES_SIZE : Number(body.size);
 
   if (sessionId && !SESSION_ID.test(sessionId)) throw new Error('invalid_swarm_session_id');
   if (query && (query.length > MAX_QUERY_LENGTH || /[\u0000-\u001f\u007f]/.test(query))) throw new Error('invalid_swarm_query');
-  if (!Number.isSafeInteger(page) || page < 1 || page > MAX_PAGE) throw new Error('invalid_swarm_page');
-  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > MAX_PAGE_SIZE) throw new Error('invalid_swarm_page_size');
 
   if (command === 'search') {
-    if (sessionId || exportType || !validTimestamp(startTime) || !validTimestamp(endTime) || Date.parse(startTime) >= Date.parse(endTime)) throw new Error('invalid_swarm_search_request');
+    if (sessionId || exportType || field || body.includeCounts !== undefined || body.interval !== undefined || body.size !== undefined || !validRange(startTime, endTime)) throw new Error('invalid_swarm_search_request');
+    if (!Number.isSafeInteger(page) || page < 1 || page > MAX_PAGE) throw new Error('invalid_swarm_page');
+    if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > MAX_PAGE_SIZE) throw new Error('invalid_swarm_page_size');
   } else if (command === 'get') {
-    if (!sessionId || startTime || endTime || query || body.page !== undefined || body.pageSize !== undefined || exportType) throw new Error('invalid_swarm_get_request');
-  } else {
-    if (!sessionId || startTime || endTime || query || body.page !== undefined || body.pageSize !== undefined || !EXPORT_TYPES.has(exportType)) throw new Error('invalid_swarm_export_request');
+    if (!sessionId || startTime || endTime || query || body.page !== undefined || body.pageSize !== undefined || exportType || field || body.includeCounts !== undefined || body.interval !== undefined || body.size !== undefined) throw new Error('invalid_swarm_get_request');
+  } else if (command === 'export') {
+    if (!sessionId || startTime || endTime || query || body.page !== undefined || body.pageSize !== undefined || !EXPORT_TYPES.has(exportType) || field || body.includeCounts !== undefined || body.interval !== undefined || body.size !== undefined) throw new Error('invalid_swarm_export_request');
     if (scope === 'demo') throw new Error('swarm_demo_export_unsupported');
+  } else if (command === 'unique') {
+    if (sessionId || exportType || body.page !== undefined || body.pageSize !== undefined || body.interval !== undefined || body.size !== undefined || !validRange(startTime, endTime)) throw new Error('invalid_swarm_unique_request');
+    if (!field || !PIVOT_FIELDS.has(field)) throw new Error('invalid_swarm_field');
+    if (typeof includeCounts !== 'boolean') throw new Error('invalid_swarm_include_counts');
+  } else {
+    if (sessionId || exportType || body.page !== undefined || body.pageSize !== undefined || body.includeCounts !== undefined || !validRange(startTime, endTime)) throw new Error('invalid_swarm_timeseries_request');
+    if (field && !PIVOT_FIELDS.has(field)) throw new Error('invalid_swarm_field');
+    if (!Number.isSafeInteger(size) || size < 1 || size > MAX_TIMESERIES_SIZE) throw new Error('invalid_swarm_size');
+    if (!TIMESERIES_INTERVALS.has(interval)) throw new Error('invalid_swarm_interval');
   }
-  return { command, sessionId, scope, startTime, endTime, query, page, pageSize, exportType };
+
+  return { command, sessionId, scope, startTime, endTime, query, page, pageSize, exportType, field, includeCounts, interval, size };
+}
+
+function addRangeQuery(url, scan) {
+  url.searchParams.set('scope', scan.scope);
+  url.searchParams.set('start_time', scan.startTime);
+  url.searchParams.set('end_time', scan.endTime);
+  if (scan.query) url.searchParams.set('query', scan.query);
 }
 
 function buildUpstream(scan) {
   const url = new URL('https://api.greynoise.io');
   if (scan.command === 'search') {
     url.pathname = '/v3/sessions';
-    url.searchParams.set('scope', scan.scope);
-    url.searchParams.set('start_time', scan.startTime);
-    url.searchParams.set('end_time', scan.endTime);
-    if (scan.query) url.searchParams.set('query', scan.query);
+    addRangeQuery(url, scan);
     url.searchParams.set('page', String(scan.page));
     url.searchParams.set('page_size', String(scan.pageSize));
     url.searchParams.set('sort_by', 'lastPacket');
     url.searchParams.set('sort_desc', 'true');
+  } else if (scan.command === 'unique') {
+    url.pathname = '/v3/sessions/unique';
+    addRangeQuery(url, scan);
+    url.searchParams.set('field', scan.field);
+    url.searchParams.set('include_counts', String(scan.includeCounts));
+  } else if (scan.command === 'timeseries') {
+    url.pathname = '/v3/sessions/timeseries';
+    addRangeQuery(url, scan);
+    if (scan.field) url.searchParams.set('field', scan.field);
+    url.searchParams.set('size', String(scan.size));
+    url.searchParams.set('interval', scan.interval);
   } else {
     url.pathname = `/v3/sessions/${encodeURIComponent(scan.sessionId)}${scan.command === 'export' ? '/export' : ''}`;
     url.searchParams.set('scope', scan.scope);
@@ -229,6 +274,9 @@ export function createGreyNoiseSwarmCommandHandler({
           ...(scan.startTime ? { startTime: scan.startTime, endTime: scan.endTime } : {}),
           ...(scan.query ? { query: scan.query } : {}),
           ...(scan.command === 'search' ? { page: scan.page, pageSize: scan.pageSize } : {}),
+          ...(scan.field ? { field: scan.field } : {}),
+          ...(scan.command === 'unique' ? { includeCounts: scan.includeCounts } : {}),
+          ...(scan.command === 'timeseries' ? { size: scan.size, interval: scan.interval } : {}),
         },
         data,
         durationMs,
