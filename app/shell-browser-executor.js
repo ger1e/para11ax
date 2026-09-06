@@ -24,6 +24,7 @@ import {
   projectBrowserReport,
   renderBrowserReportText,
 } from './shell-report-browser.js';
+import { parseSwarmArgs } from './swarm-command.js';
 import { MISSION_HANDLERS, executeMissionCommand } from '../src/core/mission/command-adapter.js';
 import { importMissionWorkspace } from '../src/core/mission/workspace.js';
 
@@ -472,6 +473,18 @@ export function createBrowserShellExecutor({
     if (handler === 'shodan') {
       const value = await client.shodan(parseShodanArgs(args), signal);
       state.currentOperatorResult = { kind: 'shodan', source: 'current-result', summary: JSON.stringify(value).slice(0, 4000), references: [] };
+      return record(value);
+    }
+    if (handler === 'swarm') {
+      let request;
+      try { request = parseSwarmArgs(args); }
+      catch (error) { invalid(error?.message || 'invalid swarm command'); }
+      const value = await client.swarm(request, signal);
+      if (value?.command === 'export') {
+        downloads.save(value.data, value.mediaType, value.filename);
+        const { data: _data, ...receipt } = value;
+        return record(receipt);
+      }
       return record(value);
     }
     if (handler === 'user-scanner') {
