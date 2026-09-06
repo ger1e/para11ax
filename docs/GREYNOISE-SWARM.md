@@ -147,8 +147,8 @@ Vendor references:
 
 - https://docs.greynoise.io/reference/getsessions
 - https://docs.greynoise.io/reference/getsessionbyid
-- https://docs.greynoise.io/reference/getuniquevalues
-- https://docs.greynoise.io/reference/gettimeseries
+- https://docs.greynoise.io/reference/getsessionuniquevalues
+- https://docs.greynoise.io/reference/getsessiontimeseries
 - https://docs.greynoise.io/reference/exportsessiondata
 
 ## Failure semantics
