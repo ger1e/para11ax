@@ -7,7 +7,7 @@ function json(value, status = 200) {
   return new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } });
 }
 
-test('GreyNoise Community uses the configured key header', async () => {
+test('GreyNoise queries Project Swarm datasets through v3 IP Lookup', async () => {
   let request;
   const output = await greynoiseProvider.run(
     { type: 'ip', value: '8.8.8.8' },
@@ -15,13 +15,70 @@ test('GreyNoise Community uses the configured key header', async () => {
       env: { GREYNOISE_API_KEY: 'test-key' },
       fetchImpl: async (url, init) => {
         request = { url: String(url), init };
-        return json({ ip: '8.8.8.8', noise: false, riot: true, classification: 'benign', name: 'Google Public DNS' });
+        return json({
+          ip: '8.8.8.8',
+          classification: 'suspicious',
+          actor: 'example-actor',
+          first_seen: '2026-09-01',
+          last_seen: '2026-09-06',
+          spoofable: false,
+          tags: ['SSH Scanner'],
+          cve: ['CVE-2026-1234'],
+          metadata: {
+            asn: 'AS15169',
+            organization: 'Google LLC',
+            rdns: 'dns.google',
+            source_country_code: 'US',
+          },
+          raw_data: { scan: [{ port: 22, protocol: 'TCP' }, { port: 443, protocol: 'TCP' }] },
+        });
       },
     },
   );
-  assert.equal(new URL(request.url).pathname, '/v3/community/8.8.8.8');
+
+  const url = new URL(request.url);
+  assert.equal(url.pathname, '/v3/ip/8.8.8.8');
+  assert.equal(url.searchParams.get('workspace_labels'), 'greynoise,community,personal');
   assert.equal(request.init.headers.key, 'test-key');
-  assert.equal(output.verdict, 'benign');
+  assert.equal(output.verdict, 'suspicious');
+  assert.deepEqual(output.attributes.datasetScopes, ['greynoise', 'community', 'personal']);
+  assert.equal(output.attributes.actor, 'example-actor');
+  assert.deepEqual(output.attributes.cves, ['CVE-2026-1234']);
+  assert.deepEqual(output.attributes.scannedPorts, ['22/TCP', '443/TCP']);
+});
+
+test('GreyNoise allows a restricted Project Swarm dataset scope list', async () => {
+  let requestUrl;
+  const output = await greynoiseProvider.run(
+    { type: 'ip', value: '1.1.1.1' },
+    {
+      env: {
+        GREYNOISE_API_KEY: 'test-key',
+        GREYNOISE_WORKSPACE_LABELS: 'personal, community,invalid,personal',
+      },
+      fetchImpl: async url => {
+        requestUrl = String(url);
+        return json({ ip: '1.1.1.1', seen: false });
+      },
+    },
+  );
+
+  assert.equal(new URL(requestUrl).searchParams.get('workspace_labels'), 'personal,community');
+  assert.deepEqual(output.attributes.datasetScopes, ['personal', 'community']);
+});
+
+test('GreyNoise normalizes an explicit v3 no-result response', async () => {
+  const output = await greynoiseProvider.run(
+    { type: 'ip', value: '203.0.113.8' },
+    {
+      env: { GREYNOISE_API_KEY: 'test-key' },
+      fetchImpl: async () => json({ ip: '203.0.113.8', seen: false }),
+    },
+  );
+
+  assert.equal(output.verdict, 'no_result');
+  assert.equal(output.attributes.noise, false);
+  assert.deepEqual(output.attributes.datasetScopes, ['greynoise', 'community', 'personal']);
 });
 
 test('GreyNoise adapter fails closed without revealing credential identifiers', async () => {
