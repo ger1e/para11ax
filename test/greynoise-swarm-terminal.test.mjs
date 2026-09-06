@@ -1,24 +1,108 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { COMMANDS, interpretCommand } from '../app/shell.js';
+import { createGatewayClient } from '../app/api-client.js';
+import { createBrowserShellExecutor } from '../app/shell-browser-executor.js';
+import { COMMAND_DESCRIPTORS } from '../app/shell-core/catalog.js';
+import { parseSwarmArgs } from '../app/swarm-command.js';
+
+const descriptor = COMMAND_DESCRIPTORS.find(item => item.id === 'osint.greynoise-swarm');
 
 test('terminal exposes a bounded GreyNoise Swarm session surface', () => {
-  const names = new Set(COMMANDS.map(item => item.name));
-  assert.ok(names.has('swarm'));
+  assert.ok(descriptor);
+  assert.deepEqual(descriptor.tokens, ['swarm']);
+  assert.deepEqual(descriptor.surfaces, ['web']);
+  assert.equal(descriptor.auth, 'required');
+  assert.equal(descriptor.egressClass, 'gateway');
+  assert.equal(descriptor.handler, 'swarm');
 
   assert.deepEqual(
-    interpretCommand('swarm get session-123 --scope demo', { authenticated: true }),
-    { action: 'swarm', command: 'get', sessionId: 'session-123', scope: 'demo', startTime: null, endTime: null, query: null, page: null, pageSize: null, exportType: null, historySafe: true },
+    parseSwarmArgs(['get', 'session-123', '--scope', 'demo']),
+    { command: 'get', sessionId: 'session-123', scope: 'demo', startTime: null, endTime: null, query: null, page: null, pageSize: null, exportType: null },
   );
-
   assert.deepEqual(
-    interpretCommand('swarm search --from 2026-09-05T00:00:00Z --to 2026-09-06T00:00:00Z --scope workspace --query "classification:malicious" --page-size 50', { authenticated: true }),
-    { action: 'swarm', command: 'search', sessionId: null, scope: 'workspace', startTime: '2026-09-05T00:00:00Z', endTime: '2026-09-06T00:00:00Z', query: 'classification:malicious', page: 1, pageSize: 50, exportType: null, historySafe: true },
+    parseSwarmArgs(['search', '--from', '2026-09-05T00:00:00Z', '--to', '2026-09-06T00:00:00Z', '--scope', 'workspace', '--query', 'classification:malicious', '--page-size', '50']),
+    { command: 'search', sessionId: null, scope: 'workspace', startTime: '2026-09-05T00:00:00Z', endTime: '2026-09-06T00:00:00Z', query: 'classification:malicious', page: 1, pageSize: 50, exportType: null },
   );
-
   assert.deepEqual(
-    interpretCommand('swarm export session-123 raw-source', { authenticated: true }),
-    { action: 'swarm', command: 'export', sessionId: 'session-123', scope: 'workspace', startTime: null, endTime: null, query: null, page: null, pageSize: null, exportType: 'rawSource', historySafe: true },
+    parseSwarmArgs(['export', 'session-123', 'raw-source']),
+    { command: 'export', sessionId: 'session-123', scope: 'workspace', startTime: null, endTime: null, query: null, page: null, pageSize: null, exportType: 'rawSource' },
   );
+  assert.throws(() => parseSwarmArgs(['export', '../escape', 'pcap']));
+});
+
+test('browser executor delegates Swarm search and explicitly downloads one export', async () => {
+  const calls = [];
+  const downloads = [];
+  const executor = createBrowserShellExecutor({
+    client: {
+      swarm: async input => {
+        calls.push(input);
+        if (input.command === 'export') return {
+          requestId: 'r2', source: 'greynoise-swarm', command: 'export', input: { scope: 'workspace', sessionId: input.sessionId },
+          exportType: input.exportType, filename: `${input.sessionId}.pcap`, mediaType: 'application/octet-stream', bytes: 3, durationMs: 1,
+          data: new Uint8Array([1, 2, 3]),
+        };
+        return { requestId: 'r1', source: 'greynoise-swarm', command: 'search', input, data: { sessions: [] }, durationMs: 1 };
+      },
+    },
+    session: {},
+    downloads: { save: (...args) => downloads.push(args) },
+  });
+
+  const search = await executor.execute({
+    descriptor,
+    args: ['search', '--from', '2026-09-05T00:00:00Z', '--to', '2026-09-06T00:00:00Z'],
+    context: { surface: 'web' },
+  });
+  assert.equal(search.type, 'record');
+  assert.equal(search.value.command, 'search');
+
+  const exported = await executor.execute({ descriptor, args: ['export', 'session-123', 'pcap'], context: { surface: 'web' } });
+  assert.equal(exported.type, 'record');
+  assert.equal(exported.value.command, 'export');
+  assert.equal(Object.hasOwn(exported.value, 'data'), false);
+  assert.equal(downloads.length, 1);
+  assert.deepEqual([...downloads[0][0]], [1, 2, 3]);
+  assert.equal(downloads[0][2], 'session-123.pcap');
+  assert.equal(calls.length, 2);
+});
+
+test('gateway client sends Swarm search to the same-origin authenticated route', async () => {
+  let captured;
+  const client = createGatewayClient({
+    getToken: () => 'bearer-secret',
+    fetchImpl: async (path, init) => {
+      captured = { path, init };
+      return new Response(JSON.stringify({
+        requestId: 'r1', source: 'greynoise-swarm', command: 'search', input: { scope: 'workspace' }, data: { sessions: [] }, durationMs: 2,
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    },
+  });
+  const result = await client.swarm({ command: 'search', scope: 'workspace', startTime: '2026-09-05T00:00:00Z', endTime: '2026-09-06T00:00:00Z', page: 1, pageSize: 25 });
+  assert.equal(captured.path, '/api/para11ax/swarm');
+  assert.equal(captured.init.method, 'POST');
+  assert.equal(captured.init.headers.Authorization, 'Bearer bearer-secret');
+  assert.equal(JSON.parse(captured.init.body).command, 'search');
+  assert.equal(result.source, 'greynoise-swarm');
+});
+
+test('gateway client accepts only bounded binary Swarm export responses', async () => {
+  const client = createGatewayClient({
+    getToken: () => 'bearer-secret',
+    fetchImpl: async () => new Response(new Uint8Array([4, 5, 6]), {
+      status: 200,
+      headers: {
+        'content-type': 'application/octet-stream',
+        'content-disposition': 'attachment; filename="session-123.pcap"',
+        'x-para11ax-request-id': 'r2',
+        'x-para11ax-duration-ms': '3',
+      },
+    }),
+  });
+  const result = await client.swarm({ command: 'export', scope: 'workspace', sessionId: 'session-123', exportType: 'pcap' });
+  assert.equal(result.command, 'export');
+  assert.equal(result.filename, 'session-123.pcap');
+  assert.deepEqual([...result.data], [4, 5, 6]);
+  assert.throws(() => client.swarm({ command: 'export', scope: 'demo', sessionId: 'session-123', exportType: 'pcap' }));
 });
