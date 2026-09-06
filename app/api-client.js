@@ -1,7 +1,10 @@
 const PROFILES = new Set(['fast', 'standard', 'full']);
 const SHODAN_COMMANDS = new Set(['host', 'search', 'count', 'stats', 'domain', 'info']);
+const SWARM_COMMANDS = new Set(['search', 'get', 'export']);
+const SWARM_EXPORT_TYPES = new Set(['pcap', 'rawSource', 'rawDestination']);
 const PROVIDER_NAME_RE = /^[a-z0-9-]{1,64}$/;
 const ENRICHMENT_OBSERVERS = new Set();
+const MAX_SWARM_EXPORT_BYTES = 4 * 1024 * 1024;
 let latestGatewayClient = null;
 
 export class GatewayHttpError extends Error {
@@ -105,6 +108,19 @@ function validShodan(value) {
   );
 }
 
+function validSwarm(value) {
+  return Boolean(
+    value &&
+    typeof value === 'object' &&
+    typeof value.requestId === 'string' &&
+    value.source === 'greynoise-swarm' &&
+    ['search', 'get'].includes(value.command) &&
+    value.input && typeof value.input === 'object' && !Array.isArray(value.input) &&
+    value.data && typeof value.data === 'object' && !Array.isArray(value.data) &&
+    Number.isFinite(value.durationMs) && value.durationMs >= 0
+  );
+}
+
 export function createGatewayClient({ fetchImpl = fetch, getToken }) {
   if (typeof getToken !== 'function') throw new TypeError('getToken must be a function');
   if (typeof fetchImpl !== 'function') throw new TypeError('fetchImpl must be a function');
@@ -127,7 +143,8 @@ export function createGatewayClient({ fetchImpl = fetch, getToken }) {
           : path === '/api/para11ax/meta' ? 'invalid_meta_envelope'
             : path === '/api/para11ax/user-scanner' ? 'invalid_user_scanner_envelope'
               : path === '/api/para11ax/shodan' ? 'invalid_shodan_envelope'
-                : 'invalid_envelope';
+                : path === '/api/para11ax/swarm' ? 'invalid_swarm_envelope'
+                  : 'invalid_envelope';
       throw new GatewayHttpError(502, code);
     }
     return payload;
@@ -224,6 +241,75 @@ export function createGatewayClient({ fetchImpl = fetch, getToken }) {
     return payload;
   }
 
+  function swarmPayload(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('Swarm request required');
+    const command = String(input.command || '').trim().toLowerCase();
+    if (!SWARM_COMMANDS.has(command)) throw new TypeError('invalid Swarm command');
+    const scope = input.scope === undefined || input.scope === null ? 'workspace' : String(input.scope).trim().toLowerCase();
+    if (!['workspace', 'demo'].includes(scope)) throw new TypeError('invalid Swarm scope');
+    const payload = { command, scope };
+    if (command === 'search') {
+      const startTime = String(input.startTime || '').trim();
+      const endTime = String(input.endTime || '').trim();
+      if (!startTime || !endTime) throw new TypeError('Swarm search time range required');
+      payload.startTime = startTime;
+      payload.endTime = endTime;
+      if (input.query !== undefined && input.query !== null) payload.query = String(input.query);
+      payload.page = Number(input.page ?? 1);
+      payload.pageSize = Number(input.pageSize ?? 25);
+    } else {
+      const sessionId = String(input.sessionId || '').trim();
+      if (!sessionId) throw new TypeError('Swarm session id required');
+      payload.sessionId = sessionId;
+      if (command === 'export') {
+        if (scope === 'demo') throw new TypeError('Swarm demo export unsupported');
+        const exportType = String(input.exportType || '');
+        if (!SWARM_EXPORT_TYPES.has(exportType)) throw new TypeError('invalid Swarm export type');
+        payload.exportType = exportType;
+      }
+    }
+    return payload;
+  }
+
+  async function swarmRequest(input, signal) {
+    const body = swarmPayload(input);
+    const path = '/api/para11ax/swarm';
+    const token = getToken();
+    if (!token) throw new GatewayHttpError(401, 'unauthorized');
+    const response = await fetchImpl(path, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal,
+      body: JSON.stringify(body),
+    });
+    const contentType = response.headers.get('content-type') || '';
+    if (!response.ok) return readJsonResponse(path, response, null);
+    if (body.command !== 'export') return readJsonResponse(path, response, validSwarm);
+    if (!contentType.includes('application/octet-stream')) throw new GatewayHttpError(502, 'invalid_swarm_export');
+    const declared = Number(response.headers.get('content-length'));
+    if (Number.isFinite(declared) && declared > MAX_SWARM_EXPORT_BYTES) throw new GatewayHttpError(502, 'swarm_export_too_large');
+    const data = new Uint8Array(await response.arrayBuffer());
+    if (data.byteLength > MAX_SWARM_EXPORT_BYTES) throw new GatewayHttpError(502, 'swarm_export_too_large');
+    const rawDisposition = response.headers.get('content-disposition') || '';
+    const filenameMatch = rawDisposition.match(/filename="([A-Za-z0-9._-]{1,300})"/);
+    const fallback = body.exportType === 'pcap' ? `${body.sessionId}.pcap` : `${body.sessionId}.bin`;
+    const durationMs = Number(response.headers.get('x-para11ax-duration-ms'));
+    return {
+      requestId: response.headers.get('x-para11ax-request-id') || null,
+      source: 'greynoise-swarm',
+      command: 'export',
+      input: { scope: body.scope, sessionId: body.sessionId },
+      exportType: body.exportType,
+      filename: filenameMatch?.[1] ?? fallback,
+      mediaType: 'application/octet-stream',
+      bytes: data.byteLength,
+      durationMs: Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : null,
+      data,
+    };
+  }
+
   const client = Object.freeze({
     meta: (signal) => publicRequest('/api/para11ax/meta', { signal, validate: validMeta }),
     health: (signal) => request('/api/para11ax/health', { signal }),
@@ -272,6 +358,7 @@ export function createGatewayClient({ fetchImpl = fetch, getToken }) {
       signal,
       validate: validShodan,
     }),
+    swarm: swarmRequest,
   });
 
   latestGatewayClient = client;
