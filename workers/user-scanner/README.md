@@ -36,6 +36,16 @@ user-scanner email analyst@example.com
 
 Aliases: `osint`, `identity`.
 
+## Platform boundary
+
+User Scanner is one specialist operator surface in the unified PARA11AX shell. Native Shodan and GreyNoise Project Swarm are separate gateway handlers with separate credentials, upstream destinations, request grammars, bounds, and vendor semantics. This worker does not proxy, call, share credentials with, or provide fallback for either service.
+
+GreyNoise Project Swarm commands are `swarm search`, `swarm get`, `swarm unique`, `swarm timeseries`, and `swarm export`; they are handled by the main gateway's fixed `/api/para11ax/swarm` route, not by this worker. Likewise, Shodan commands use `/api/para11ax/shodan` and never pass through this worker.
+
+User Scanner results remain contextual active-OSINT operator material rather than automatic Evidence v2. Compatible results may be explicitly captured into Investigation Workspace with `investigation capture operator`, preserving the operator-context authority label. The same authority rule applies to compatible Shodan and GreyNoise Swarm read results; Swarm PCAP/raw exports remain explicit browser downloads outside automatic capture.
+
+See [`../../docs/SHELL.md`](../../docs/SHELL.md), [`../../docs/GREYNOISE-SWARM.md`](../../docs/GREYNOISE-SWARM.md), and [`../../docs/SHODAN-SHELL.md`](../../docs/SHODAN-SHELL.md).
+
 ---
 
 <p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
