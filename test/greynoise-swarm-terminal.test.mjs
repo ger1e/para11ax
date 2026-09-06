@@ -104,5 +104,8 @@ test('gateway client accepts only bounded binary Swarm export responses', async 
   assert.equal(result.command, 'export');
   assert.equal(result.filename, 'session-123.pcap');
   assert.deepEqual([...result.data], [4, 5, 6]);
-  assert.throws(() => client.swarm({ command: 'export', scope: 'demo', sessionId: 'session-123', exportType: 'pcap' }));
+  await assert.rejects(
+    client.swarm({ command: 'export', scope: 'demo', sessionId: 'session-123', exportType: 'pcap' }),
+    /Swarm demo export unsupported/,
+  );
 });
