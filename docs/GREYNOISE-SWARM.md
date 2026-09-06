@@ -78,7 +78,7 @@ Vendor references:
 
 - https://docs.greynoise.io/reference/getsessions
 - https://docs.greynoise.io/reference/getsessionbyid
-- https://docs.greynoise.io/reference/exportsession
+- https://docs.greynoise.io/reference/exportsessiondata
 
 ## Failure semantics
 
