@@ -17,7 +17,7 @@ explicit client profile
   -> ServiceNow-ready projection
 ```
 
-The mission layer never upgrades imported result rows into Evidence v2 and never treats an empty result set as proof of benign state.
+The mission layer never upgrades imported result rows or specialist operator records into Evidence v2 and never treats an empty result set as proof of benign state.
 
 ## Public mission core
 
@@ -153,9 +153,13 @@ Mission Workspace v1 remains a compatible standalone, volatile workflow for one 
 
 Existing compatible case v1.0 records migrate in memory on first Investigation v2 access. Identity, title, timestamps, pins, notes, Evidence v2 snapshots, and semantic diffs are preserved within Investigation v2 bounds. Oversized legacy cases fail closed without truncation or replacement.
 
+Investigation v2 also owns a separate **operator context** authority layer. Compatible User Scanner, Shodan, and GreyNoise Project Swarm read results can be explicitly captured with `investigation capture operator`. This does not convert them into Evidence v2 or mission result rows. In particular, `swarm search`, `swarm get`, `swarm unique`, and `swarm timeseries` can provide contextual investigation material; `swarm export` PCAP/raw downloads remain outside automatic capture. See `GREYNOISE-SWARM.md` and `SHELL.md`.
+
+Mission relevance and hunt construction must continue to distinguish authoritative Evidence v2 fingerprints from contextual operator material. If operator context informs analyst reasoning, the resulting hypothesis/limitations should say so explicitly rather than inventing provider corroboration.
+
 ## Security boundary
 
-Mission v1 adds no runtime dependency and no egress. It contains no `fetch`, provider execution, secret access, dynamic evaluation, child-process execution, file write, or server-side persistence path. Existing Evidence v2 and Intelligence Kernel semantics remain authoritative; mission objects are downstream analyst-support projections.
+Mission v1 adds no runtime dependency and no egress. It contains no `fetch`, provider execution, secret access, dynamic evaluation, child-process execution, file write, or server-side persistence path. Existing Evidence v2 and Intelligence Kernel semantics remain authoritative; mission objects are downstream analyst-support projections. GreyNoise Swarm, Shodan and User Scanner remain separate bounded operator routes and do not expand Mission Workspace egress.
 
 ---
 
