@@ -5,6 +5,12 @@ PARA11AX exposes GreyNoise Project Swarm sessions as a bounded Web-terminal spec
 
 The browser never receives `GREYNOISE_API_KEY`. Every Swarm operation crosses the authenticated same-origin PARA11AX gateway and the server contacts only `https://api.greynoise.io` with redirects disabled.
 
+## Entitlements and scope
+
+GreyNoise entitlement is evaluated upstream and remains distinct from PARA11AX authentication. `scope=workspace` uses the sensor-backed workspace dataset and requires the applicable **Sensors entitlement**. `scope=demo` uses the GreyNoise demo session dataset and requires the applicable **Swarm entitlement**. PARA11AX does not infer entitlement from account state and does not claim that a configured key has either entitlement until GreyNoise accepts the request.
+
+`scope=demo` is read-only in PARA11AX. Single-session PCAP/raw export is workspace-only and a demo export request is rejected before egress.
+
 ## Commands
 
 Search sessions within an explicit time range:

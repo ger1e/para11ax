@@ -55,8 +55,50 @@ test('current evidence projection versions are first-class documented contracts'
 
 test('API docs cover canonical public and protected route names', () => {
   const api = read('docs/API.md');
-  for (const route of ['meta', 'health', 'status', 'enrich', 'batch', 'stix']) {
+  for (const route of ['meta', 'health', 'status', 'enrich', 'batch', 'stix', 'swarm']) {
     assert.ok(api.includes(`/api/para11ax/${route}`), `API docs missing ${route}`);
+  }
+});
+
+test('authoritative docs expose the current GreyNoise Swarm operator contract', () => {
+  const shell = read('docs/SHELL.md');
+  const swarm = read('docs/GREYNOISE-SWARM.md');
+  const readme = read('README.md');
+  const architecture = read('docs/ARCHITECTURE.md');
+  const operations = read('docs/OPERATIONS.md');
+  const providers = read('docs/PROVIDERS.md');
+  const controls = read('docs/SECURITY-CONTROLS.md');
+  const threatModel = read('docs/THREAT-MODEL.md');
+  const endToEnd = read('docs/END-TO-END-EXAMPLE.md');
+
+  for (const text of [shell, swarm, readme]) {
+    requireTokens(text, [
+      'swarm search',
+      'swarm get',
+      'swarm unique',
+      'swarm timeseries',
+      'swarm export',
+    ], 'Swarm shell contract');
+  }
+
+  requireTokens(swarm, [
+    'scope=workspace',
+    'scope=demo',
+    'Sensors entitlement',
+    'Swarm entitlement',
+    '4 MiB',
+    'Evidence v2',
+  ], 'Swarm boundary contract');
+
+  for (const [label, text] of [
+    ['architecture', architecture],
+    ['operations', operations],
+    ['providers', providers],
+    ['security controls', controls],
+    ['threat model', threatModel],
+    ['end-to-end example', endToEnd],
+  ]) {
+    assert.match(text, /GreyNoise(?: Project)? Swarm/i, `${label}: missing GreyNoise Swarm coverage`);
   }
 });
 

@@ -17,11 +17,12 @@
   <a href="docs/SHELL.md">SHELL</a> ·
   <a href="docs/ANALYST-MISSION-PACK.md">MISSION</a> ·
   <a href="docs/SHODAN-SHELL.md">SHODAN SHELL</a> ·
+  <a href="docs/GREYNOISE-SWARM.md">GREYNOISE SWARM</a> ·
   <a href="SECURITY.md">SECURITY</a>
 </sub></p>
 
 > [!IMPORTANT]
-> Personal research / lab surface. Do not send commercial-client, internal-enterprise, restricted, or otherwise sensitive data without explicit authorization and suitable data handling. User Scanner is active OSINT and Shodan operator commands can consume account query credits; use both only for authorized defensive research.
+> Personal research / lab surface. Do not send commercial-client, internal-enterprise, restricted, or otherwise sensitive data without explicit authorization and suitable data handling. User Scanner is active OSINT; Shodan operator commands can consume account query credits; GreyNoise Project Swarm can expose sensor/demo session metadata and explicit workspace packet/raw exports according to account entitlement. Use these operator surfaces only for authorized defensive research.
 
 <sub><strong>01 // SYSTEM PROFILE</strong></sub>
 
@@ -38,6 +39,7 @@ The Kernel does not fetch, mutate or manufacture evidence. Raw **Evidence v2 rem
 <strong>INTELLIGENCE</strong> — Intelligence Kernel v1.0 on IP · deterministic derived context · no LLM · no synthetic threat score<br/>
 <strong>IDENTITY OSINT</strong> — `user-scanner email|username &lt;target&gt;` · aliases `osint` / `identity`<br/>
 <strong>SHODAN OPS</strong> — `shodan host|search|count|stats|domain|info` · fixed upstream · server-side key · explicit credit impact<br/>
+<strong>GREYNOISE SWARM</strong> — `swarm search|get|unique|timeseries|export` · Web-only · fixed upstream · server-side key · bounded session/pivot/export surface<br/>
 <strong>MISSION</strong> — deterministic local workspace · relevance · hunt · KQL validation · result analysis · ServiceNow projection<br/>
 <strong>PROFILES</strong> — `fast` · `standard` · `full`; callers cannot select arbitrary Evidence v2 providers<br/>
 <strong>OUTPUT</strong> — Evidence v2 · `intelligence` · Decision Support · Evidence Graph v1.0 · Guidance v1.0 · JSON · batch · STIX 2.1 · deterministic reports<br/>
@@ -73,12 +75,13 @@ caller
 
 The current 24-provider IP workflow keeps its **48-call ceiling** (24 providers × maximum two attempts). Provider execution priority is static and inspectable; evidence never changes which admitted source is allowed to run.
 
-Two operator paths remain intentionally separate from Evidence v2 and Intelligence Kernel reasoning:
+Three operator paths remain intentionally separate from automatic Evidence v2 and Intelligence Kernel reasoning:
 
 - User Scanner: same-origin authenticated route to the server-configured isolated Python worker.
 - Shodan shell: same-origin authenticated route to a bounded server-side Shodan command handler using only `https://api.shodan.io` and `SHODAN_API_KEY`.
+- GreyNoise Project Swarm: same-origin authenticated Web-only route to fixed `https://api.greynoise.io` session search/detail/pivots and explicit single-session exports using server-side `GREYNOISE_API_KEY`.
 
-Neither operator path silently replaces, mutates or promotes output into the current Evidence v2 result or top-level `intelligence` projection.
+None of these operator paths silently replaces, mutates or promotes output into the current Evidence v2 result or top-level `intelligence` projection. Compatible Swarm read results, Shodan results and User Scanner results may be explicitly captured as Investigation Workspace operator context; that explicit contextual capture is still not Evidence v2. Swarm binary export remains an explicit download only.
 
 <details>
 <summary><strong>API surface</strong></summary>
@@ -91,6 +94,7 @@ Neither operator path silently replaces, mutates or promotes output into the cur
 - `POST /api/para11ax/stix` — enrich then export STIX 2.1; max 100 objects.
 - `POST /api/para11ax/user-scanner` — bounded email/username active OSINT through the configured worker.
 - `POST /api/para11ax/shodan` — bounded native Shodan operator commands; authenticated; fixed upstream; separate result envelope.
+- `POST /api/para11ax/swarm` — bounded GreyNoise Swarm session search/detail/pivots and explicit single-session binary export.
 - Unknown `/api/para11ax/*` — controlled fail-closed API 404.
 
 Evidence v2 example:
@@ -105,7 +109,13 @@ Shodan request example:
 {"command":"stats","query":"product:nginx","facets":"country:20,org:10"}
 ```
 
-Complete contracts: [`docs/API.md`](docs/API.md), [`docs/SHELL.md`](docs/SHELL.md) and [`docs/SHODAN-SHELL.md`](docs/SHODAN-SHELL.md).
+Swarm request example:
+
+```json
+{"command":"unique","scope":"workspace","startTime":"2026-09-05T00:00:00Z","endTime":"2026-09-06T00:00:00Z","field":"source.ip","includeCounts":true}
+```
+
+Complete contracts: [`docs/API.md`](docs/API.md), [`docs/SHELL.md`](docs/SHELL.md), [`docs/SHODAN-SHELL.md`](docs/SHODAN-SHELL.md), and [`docs/GREYNOISE-SWARM.md`](docs/GREYNOISE-SWARM.md).
 
 </details>
 
@@ -169,10 +179,23 @@ shodan info
 
 Shodan behavior is deliberately bounded. `host`, `count`, `stats` and `info` are classified as no-query-credit operations by PARA11AX; `domain` consumes a query credit; `search` is first-page only and may consume a query credit. Search/service output is capped and large raw banners are removed. `shodan download`, arbitrary paging, caller-selected URLs and arbitrary Shodan operations are disabled.
 
+GreyNoise Project Swarm commands:
+
+```text
+swarm search --from 2026-09-05T00:00:00Z --to 2026-09-06T00:00:00Z --scope workspace --query "classification:malicious"
+swarm get <session-id> --scope workspace
+swarm unique --from 2026-09-05T00:00:00Z --to 2026-09-06T00:00:00Z --field source.ip --include-counts
+swarm timeseries --from 2026-09-05T00:00:00Z --to 2026-09-06T00:00:00Z --field classification --size 20 --interval 1h
+swarm export <session-id> pcap
+```
+
+Swarm search/pivot data is bounded to explicit time ranges, vetted pivot fields and fixed GreyNoise session endpoints. `scope=workspace` and `scope=demo` depend on the corresponding upstream GreyNoise entitlement; demo export is rejected before egress. JSON results and individual exports are capped at 4 MiB. See [`docs/GREYNOISE-SWARM.md`](docs/GREYNOISE-SWARM.md).
+
 <sub><strong>PROMPT</strong> — `analyst@para11ax:~$`<br/>
 <strong>WORKSPACE</strong> — local cases · pins · snapshots · semantic diffs · exact sightings · case graph<br/>
 <strong>ACTIVE OSINT</strong> — User Scanner email/username enumeration, separate from Evidence v2<br/>
 <strong>SHODAN</strong> — bounded infrastructure/exposure operator lookups, separate from Evidence v2<br/>
+<strong>GREYNOISE SWARM</strong> — bounded Web-only session search/detail/pivots/export; read results are explicit operator context, not automatic Evidence v2<br/>
 <strong>BOUNDARY</strong> — not a general-purpose shell or arbitrary network client</sub>
 
 <details>
@@ -199,11 +222,12 @@ para11ax mission import --file mission.json '|' mission show
 **OBSERVED ≠ INFERRED ≠ CONTEXTUAL.** These states remain explicit across evidence, deterministic derived context and infrastructure/knowledge surfaces.
 
 <sub><strong>DERIVED CONTEXT ≠ EVIDENCE</strong> — Intelligence Kernel output never becomes a new Evidence v2 observation<br/>
+<strong>OPERATOR CONTEXT ≠ EVIDENCE</strong> — Shodan, User Scanner and GreyNoise Swarm read results remain contextual unless an explicit Evidence-v2 workflow independently observes the same fact<br/>
 <strong>ABSENCE ≠ BENIGN</strong> — `not_listed`, `not_found`, `no_result` and `no_association` remain source-scoped absence semantics<br/>
-<strong>CONTEXT ≠ REPUTATION</strong> — routing, registration, Tor, scanners, Shodan exposure, certificates and ATT&CK cannot vote an IOC malicious<br/>
+<strong>CONTEXT ≠ REPUTATION</strong> — routing, registration, Tor, scanners, Shodan exposure, GreyNoise session activity, certificates and ATT&CK cannot vote an IOC malicious<br/>
 <strong>IDENTITY HIT ≠ IDENTITY PROOF</strong> — matching usernames or registration signals do not prove same-person identity, ownership or compromise<br/>
 <strong>CLAIMS ≠ COMPROMISE PROOF</strong> — community and ransomware reporting remain claim/report evidence<br/>
-<strong>INFRASTRUCTURE ≠ ATTRIBUTION</strong> — hosting, ASN, DNS, Shodan services, certificates and malware proximity do not manufacture actor attribution<br/>
+<strong>INFRASTRUCTURE ≠ ATTRIBUTION</strong> — hosting, ASN, DNS, Shodan services, GreyNoise session metadata, certificates and malware proximity do not manufacture actor attribution<br/>
 <strong>KEV ≠ EPSS ≠ CVSS</strong> — exploitation status, probability and severity remain separate axes<br/>
 <strong>FAILURE ≠ NEGATIVE EVIDENCE</strong> — timeout, 429, 5xx, parser/module failure and circuit-open states remain explicit coverage failures</sub>
 
@@ -211,7 +235,7 @@ para11ax mission import --file mission.json '|' mission show
 
 <sub><strong>05 // PROVIDER FABRIC</strong></sub>
 
-PARA11AX has **38 configured sources** (upstream APIs and feeds) in the canonical Evidence v2 provider fabric. Shodan is one fixed provider for canonical enrichment, while the native Shodan shell route is a distinct explicit operator surface and does not increase the provider count.
+PARA11AX has **38 configured sources** (upstream APIs and feeds) in the canonical Evidence v2 provider fabric. Shodan and GreyNoise are fixed providers for canonical enrichment; their specialist operator routes are distinct explicit surfaces and do not increase the provider count.
 
 <details>
 <summary><strong>38 upstream APIs and feeds</strong></summary>
@@ -228,24 +252,24 @@ PARA11AX has **38 configured sources** (upstream APIs and feeds) in the canonica
 
 </details>
 
-[`config/providers.json`](config/providers.json) is the machine-readable Evidence v2 provider policy. Scheduler descriptors are declarative execution metadata; they do not change provider admission, credentials, fixed hosts or evidence semantics.
+[`config/providers.json`](config/providers.json) is the machine-readable Evidence v2 provider policy. Scheduler descriptors are declarative execution metadata; they do not change provider admission, credentials, fixed hosts or evidence semantics. GreyNoise canonical IP enrichment can use configured Project Swarm workspace labels through the v3 IP lookup, while session enumeration/pivots/export stay on the separate authenticated Swarm operator route.
 
 <sub><strong>06 // SECURITY & VERIFICATION</strong></sub>
 
-<sub><strong>AUTH</strong> — bearer protects private API surfaces including User Scanner and Shodan shell; `/api/para11ax/meta` is intentionally public<br/>
-<strong>EGRESS</strong> — exact declared provider hosts; Kernel/Scheduler add no new egress; Shodan shell uses exact `https://api.shodan.io`; User Scanner uses its configured worker only<br/>
-<strong>SECRETS</strong> — `SHODAN_API_KEY` and all provider/worker credentials remain server-side<br/>
-<strong>STATE</strong> — operator utilities do not silently mutate Evidence v2 or Intelligence Kernel state<br/>
+<sub><strong>AUTH</strong> — bearer protects private API surfaces including User Scanner, Shodan shell and GreyNoise Swarm; `/api/para11ax/meta` is intentionally public<br/>
+<strong>EGRESS</strong> — exact declared provider hosts; Kernel/Scheduler add no new egress; Shodan shell uses exact `https://api.shodan.io`; Swarm uses exact `https://api.greynoise.io`; User Scanner uses its configured worker only<br/>
+<strong>SECRETS</strong> — `SHODAN_API_KEY`, `GREYNOISE_API_KEY` and all provider/worker credentials remain server-side<br/>
+<strong>STATE</strong> — operator utilities do not silently mutate Evidence v2 or Intelligence Kernel state; compatible read results require explicit `investigation capture operator` for contextual capture<br/>
 <strong>CI</strong> — protected `main` requires Tooling smoke; CodeQL runs alongside it<br/>
 <strong>DEPLOY</strong> — repository/CI proof and production deployment proof remain separate; see Operations/QA for exact current state</sub>
 
-<sub><strong>INVESTIGATION WORKSPACE V2</strong> — one browser-local, deterministic lifecycle now connects scope, pinned observables, Evidence v2 capture, relevance, hunt construction, conservative KQL validation, bounded result import, explicit analyst disposition, reporting, and ServiceNow-ready projection. Start with `investigation new "title"`, inspect with `investigation status`, and discover all 22 commands with `commands investigation`. Alias: `inv`.</sub>
+<sub><strong>INVESTIGATION WORKSPACE V2</strong> — one browser-local, deterministic lifecycle now connects scope, pinned observables, Evidence v2 capture, explicit operator-context capture, relevance, hunt construction, conservative KQL validation, bounded result import, explicit analyst disposition, reporting, and ServiceNow-ready projection. Start with `investigation new "title"`, inspect with `investigation status`, and discover the current commands with `commands investigation`. Alias: `inv`.</sub>
 
-<sub>Evidence v2 remains authoritative. Shodan/User Scanner captures are operator context, imported rows are result-analysis input, and disposition is analyst judgment. No-results is not benign; stale dependencies block report and ticket projection.</sub>
+<sub>Evidence v2 remains authoritative. Shodan/User Scanner/GreyNoise Swarm read captures are operator context, Swarm packet/raw exports are explicit downloads, imported rows are result-analysis input, and disposition is analyst judgment. No-results is not benign; stale dependencies block report and ticket projection.</sub>
 
 <sub><strong>07 // DEEP DOCS</strong></sub>
 
-<sub>[BRAND](docs/BRAND.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) · [END-TO-END](docs/END-TO-END-EXAMPLE.md) · [EVIDENCE](docs/EVIDENCE-SCHEMA.md) · [PROVIDERS](docs/PROVIDERS.md) · [API](docs/API.md) · [SHELL](docs/SHELL.md) · [MISSION](docs/ANALYST-MISSION-PACK.md) · [SHODAN SHELL](docs/SHODAN-SHELL.md) · [THREAT MODEL](docs/THREAT-MODEL.md) · [SECURITY CONTROLS](docs/SECURITY-CONTROLS.md) · [OPERATIONS](docs/OPERATIONS.md) · [QA](docs/QA-REPORT.md) · [PUBLIC RELEASE](docs/PUBLIC-RELEASE-CHECKLIST.md) · [MANIFEST](release-manifest.json)</sub>
+<sub>[BRAND](docs/BRAND.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) · [END-TO-END](docs/END-TO-END-EXAMPLE.md) · [EVIDENCE](docs/EVIDENCE-SCHEMA.md) · [PROVIDERS](docs/PROVIDERS.md) · [API](docs/API.md) · [SHELL](docs/SHELL.md) · [MISSION](docs/ANALYST-MISSION-PACK.md) · [SHODAN SHELL](docs/SHODAN-SHELL.md) · [GREYNOISE SWARM](docs/GREYNOISE-SWARM.md) · [THREAT MODEL](docs/THREAT-MODEL.md) · [SECURITY CONTROLS](docs/SECURITY-CONTROLS.md) · [OPERATIONS](docs/OPERATIONS.md) · [QA](docs/QA-REPORT.md) · [PUBLIC RELEASE](docs/PUBLIC-RELEASE-CHECKLIST.md) · [MANIFEST](release-manifest.json)</sub>
 
 <p align="center"><img src="assets/brand/para11ax-readme-footer-v2.svg" alt="PARA11AX operating principles — Per Aspera Ad Astra" width="100%"></p>
 

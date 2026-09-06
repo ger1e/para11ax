@@ -9,7 +9,7 @@ Supported indicator types are `ip`, `domain`, `url`, `hash`, `cve`, `attack`, `a
 
 Profile admission and execution priority are separate. Admitted providers are ordered by **Provider Value Scheduler v1.0**. For the current IP reference workflow, 24 admitted providers retain a 48-call ceiling (maximum two attempts per provider), maximum concurrency 4, and the 20-second request deadline. Scheduler ordering does not add or suppress providers based on returned evidence.
 
-Email/username User Scanner operations and native Shodan commands are separate analyst utilities. They do not become canonical Evidence v2 workflow types and do not replace the current Evidence v2 result.
+Email/username User Scanner operations, native Shodan commands, and GreyNoise Project Swarm session operations are separate analyst utilities. They do not become canonical Evidence v2 workflow types and do not automatically replace or promote into the current Evidence v2 result.
 
 #### Route inventory
 
@@ -21,6 +21,7 @@ Email/username User Scanner operations and native Shodan commands are separate a
 - `POST /api/para11ax/stix` — enrich then export bounded STIX 2.1.
 - `POST /api/para11ax/user-scanner` — isolated bounded email/username active OSINT.
 - `POST /api/para11ax/shodan` — bounded authenticated native Shodan operator commands.
+- `POST /api/para11ax/swarm` — bounded authenticated GreyNoise Project Swarm search, session detail, pivots, and explicit single-session export.
 
 Unknown `/api/para11ax/*` paths fail closed.
 
@@ -149,19 +150,62 @@ Response envelope:
 
 Search is first-page only. Search results and host-service lists are bounded; large raw banners/service bodies are removed before the response reaches the browser. Shodan operator output is terminal/operator context and leaves the current Evidence v2 enrichment and `intelligence` projection unchanged.
 
+#### `POST /api/para11ax/swarm`
+
+Bearer required. The browser sends only normalized Swarm operations to the same-origin route. The gateway reads `GREYNOISE_API_KEY` server-side, contacts only `https://api.greynoise.io`, refuses redirects, and does not accept caller-selected URLs, methods, headers, credentials, or arbitrary GreyNoise operations.
+
+Approved operations and representative request shapes:
+
+```text
+swarm search --from <ISO-8601> --to <ISO-8601> [--scope workspace|demo] [--query <lucene>] [--page <1..10000>] [--page-size <1..100>]
+swarm get <session-id> [--scope workspace|demo]
+swarm unique --from <ISO-8601> --to <ISO-8601> --field <field> [--scope workspace|demo] [--query <lucene>] [--include-counts]
+swarm timeseries --from <ISO-8601> --to <ISO-8601> [--scope workspace|demo] [--query <lucene>] [--field <field>] [--size <1..100>] [--interval <auto|1s|1m|1h|1d>]
+swarm export <session-id> <pcap|raw-source|raw-destination>
+```
+
+```json
+{"command":"search","scope":"workspace","startTime":"2026-09-05T00:00:00Z","endTime":"2026-09-06T00:00:00Z","query":"classification:malicious","page":1,"pageSize":25}
+```
+
+```json
+{"command":"get","scope":"demo","sessionId":"<session-id>"}
+```
+
+```json
+{"command":"unique","scope":"workspace","startTime":"2026-09-05T00:00:00Z","endTime":"2026-09-06T00:00:00Z","field":"source.ip","includeCounts":true}
+```
+
+```json
+{"command":"timeseries","scope":"workspace","startTime":"2026-09-05T00:00:00Z","endTime":"2026-09-06T00:00:00Z","query":"destination.port:443","field":"classification","size":10,"interval":"1h"}
+```
+
+```json
+{"command":"export","scope":"workspace","sessionId":"<session-id>","type":"pcap"}
+```
+
+Search/pivot ranges must be valid explicit ISO-8601 intervals with `startTime < endTime`. Query text is capped at 2,048 printable characters. Search page size is 1..100, page number is 1..10,000, timeseries group size is 1..100, and pivot fields/intervals come from fixed allowlists. JSON results and each single-session binary export are capped at 4 MiB. Bulk session export is not exposed.
+
+`scope=workspace` uses the sensor-backed workspace session dataset and requires the applicable GreyNoise Sensors entitlement. `scope=demo` uses the GreyNoise demo session dataset and requires the applicable Swarm entitlement. Demo export is rejected locally before upstream egress. PARA11AX does not infer or advertise a production entitlement merely because a key is configured.
+
+Successful `search`, `get`, `unique`, and `timeseries` responses are bounded operator context. They can be explicitly captured with `investigation capture operator`; that capture does not manufacture or modify Evidence v2, provider corroboration, ATT&CK mapping, maliciousness, or analyst disposition. `export` is an explicit browser download and does not replace the current operator result.
+
+Full operator contract: [`GREYNOISE-SWARM.md`](GREYNOISE-SWARM.md).
+
 #### Common errors
 
-- `400` — invalid request/indicator/profile/batch or invalid Shodan command/target/query/facets.
+- `400` — invalid request/indicator/profile/batch, invalid Shodan command/target/query/facets, or rejected Swarm command/range/query/pivot/export shape.
 - `401 unauthorized`.
 - `405 method_not_allowed`.
 - `413 payload_too_large`.
 - `415 unsupported_media_type`.
 - User Scanner uses controlled `502`/`503`/`504` worker errors.
 - Shodan missing configuration fails closed with controlled `503`; upstream rate limiting is returned explicitly rather than converted into empty/negative evidence.
+- Swarm missing configuration, authentication/entitlement rejection, rate limiting, missing session, malformed/oversized upstream data, timeout, or transport failure remains an explicit operational error and is never converted into threat evidence.
 
 #### Security invariants
 
-Caller input never selects arbitrary provider hosts, Shodan hosts, worker hosts, methods, provider secrets, `SHODAN_API_KEY`, or arbitrary adapters. Evidence v2 provider egress remains fixed through `safeFetch`. Provider Value Scheduler v1.0 and Intelligence Kernel v1.0 add no new egress, credential, persistence or dependency surface and use no LLM. User Scanner and Shodan use separate bounded authenticated routes with server-configured destinations. See `THREAT-MODEL.md`, `SECURITY-CONTROLS.md`, and `SHODAN-SHELL.md`.
+Caller input never selects arbitrary provider hosts, Shodan hosts, GreyNoise hosts, worker hosts, methods, provider secrets, `SHODAN_API_KEY`, `GREYNOISE_API_KEY`, or arbitrary adapters. Evidence v2 provider egress remains fixed through `safeFetch`. Provider Value Scheduler v1.0 and Intelligence Kernel v1.0 add no new egress, credential, persistence or dependency surface and use no LLM. User Scanner, Shodan, and GreyNoise Swarm use separate bounded authenticated routes with server-configured fixed destinations. See `THREAT-MODEL.md`, `SECURITY-CONTROLS.md`, `SHODAN-SHELL.md`, and `GREYNOISE-SWARM.md`.
 
 ---
 

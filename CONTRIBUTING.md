@@ -5,11 +5,11 @@ This repository is a public personal-research/lab PARA11AX project. Changes shou
 
 #### Before changing code
 
-Read `SECURITY.md`, `docs/ARCHITECTURE.md`, `docs/EVIDENCE-SCHEMA.md`, and `docs/PROVIDERS.md`.
+Read `SECURITY.md`, `docs/ARCHITECTURE.md`, `docs/EVIDENCE-SCHEMA.md`, `docs/PROVIDERS.md`, `docs/SHELL.md`, and, for GreyNoise session work, `docs/GREYNOISE-SWARM.md`.
 
 Do not commit or add workflows that expose API keys, tokens, credentials, private keys, certificates, `.env` files, packet captures, malware samples, generated MTZ packages, or sensitive analysis material.
 
-Do not broaden provider integrations into submission, scanning, detonation, malware/sample download, arbitrary proxying, shell execution, secret retrieval, LLM/autonomous analysis, or other write-capable behavior without an explicit security/design review.
+Do not broaden provider integrations or specialist operator routes into submission, arbitrary scanning, detonation, malware/sample download, arbitrary proxying, shell execution, secret retrieval, LLM/autonomous analysis, bulk packet/payload collection, or other write-capable behavior without an explicit security/design review.
 
 #### Canonical analytical boundary
 
@@ -21,6 +21,27 @@ Do not broaden provider integrations into submission, scanning, detonation, malw
 
 The current IP reference contract is 24 providers, 48-call ceiling, max 4 concurrent providers, maximum two attempts/provider and a 20-second deadline. Kernel relationship pivots are explicit one-hop only and failures/skips remain coverage state.
 
+**Specialist operator context is not Evidence v2.** User Scanner, native Shodan and GreyNoise Project Swarm read results remain separate operator material. Compatible read results can be explicitly recorded by Investigation Workspace, but the capture must preserve the operator-context authority label rather than manufacturing provider evidence, corroboration, maliciousness, ATT&CK mapping or disposition. GreyNoise `swarm export` remains explicit browser download-only.
+
+#### GreyNoise Project Swarm contract
+
+Swarm changes must preserve the fixed Web-only boundary unless a separately reviewed design changes it:
+
+- same-origin bearer-authenticated `/api/para11ax/swarm`;
+- server-side `GREYNOISE_API_KEY`;
+- fixed `https://api.greynoise.io` destination and redirect refusal;
+- approved operations only: `search`, `get`, `unique`, `timeseries`, `export`;
+- explicit ISO-8601 search/pivot ranges with `from < to`;
+- max 2,048 printable Lucene query characters;
+- page size max 100, page max 10,000;
+- allowlisted pivot fields and timeseries intervals/size;
+- JSON and individual single-session binary export max 4 MiB;
+- no bulk `/v3/sessions/export`, arbitrary endpoint/field/method/header/credential override, or demo export;
+- `scope=workspace` and `scope=demo` remain explicit upstream entitlement states, not claims inferred from a configured key;
+- read results can be explicit Investigation Workspace operator context; binary export cannot silently replace/capture/promote into Evidence v2.
+
+The canonical GreyNoise Evidence v2 IP provider and the Swarm session route are distinct surfaces and must stay documented/tested as such.
+
 #### Development workflow
 
 1. Branch from an up-to-date `main`.
@@ -31,7 +52,7 @@ The current IP reference contract is 24 providers, 48-call ceiling, max 4 concur
 6. Run the repository gates before opening a ready-for-review PR.
 7. Before completion, verify the exact current head rather than relying on an earlier green run.
 
-Canonical contract changes include workflow/indicator types, provider inventory/count, scheduler policy/order/descriptors, schema/projection versions, Intelligence Kernel policy/rules, API routes, Maltego workflow coverage, production identity, README sizing, security boundaries and release/CI claims.
+Canonical contract changes include workflow/indicator types, provider inventory/count, scheduler policy/order/descriptors, schema/projection versions, Intelligence Kernel policy/rules, API routes, specialist operator grammar/bounds/entitlement semantics, Maltego workflow coverage, production identity, README sizing, security boundaries and release/CI claims.
 
 ```bash
 npm run bootstrap
@@ -83,13 +104,15 @@ Call out a security impact explicitly when a change touches any of the following
 
 - authentication or authorization
 - secret handling or environment variables
-- outbound provider hosts, redirects, headers, request construction
+- outbound provider/operator hosts, redirects, headers, request construction
 - provider admission or Provider Value Scheduler metadata/order
 - Intelligence Kernel policy/rules, evidence traceability or relationship/pivot behavior
+- User Scanner, Shodan, or GreyNoise Swarm command grammar/entitlement/credit/export semantics
 - input validation/canonicalization
 - response-size, timeout, retry, call-budget or rate-limit behavior
+- packet/raw export or other binary handling
 - cache or persistence semantics
-- browser-local case storage/bundles/indexing
+- browser-local case/investigation storage/bundles/indexing
 - Evidence Graph / Guidance / Decision Support projection semantics
 - logging, Sentry, or error reflection
 - GitHub Actions, dependency pinning, or deployment/bootstrap logic
@@ -101,12 +124,12 @@ Call out a security impact explicitly when a change touches any of the following
 PRs should explain:
 
 - what changed and why
-- affected indicator/workflow/provider/scheduler/Kernel surfaces
+- affected indicator/workflow/provider/scheduler/Kernel/operator surfaces
 - RED/GREEN evidence or tests used to validate the change
 - documentation-contract impact where applicable
-- security/privacy/licensing impact
+- security/privacy/licensing/entitlement impact
 - expected degraded modes, false positives or provider/telemetry limitations
-- what is repository/CI-proven versus what still requires authenticated deployment/provider verification
+- what is repository/CI-proven versus what still requires authenticated deployment/provider/vendor-entitlement verification
 
 Prefer small PRs. Avoid drive-by formatting mixed with functional changes. If a broad QA/docs pass uncovers a runtime defect, split the behavior fix into a focused PR rather than hiding it inside documentation churn.
 

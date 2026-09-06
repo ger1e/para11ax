@@ -65,7 +65,9 @@ A successful response uses Evidence Schema v2. The trimmed example below is illu
 }
 ```
 
-Evidence v2 is authoritative. Provider failures/skips remain coverage facts, never negative reputation evidence. Routing/registration context, Shodan/Censys exposure, certificate metadata, scanner activity, Tor-exit status, reputation, ransomware claims and ATT&CK knowledge are not collapsed into a universal maliciousness score.
+Evidence v2 is authoritative. Provider failures/skips remain coverage facts, never negative reputation evidence. Routing/registration context, Shodan/Censys exposure, GreyNoise scanner/noise context, certificate metadata, scanner activity, Tor-exit status, reputation, ransomware claims and ATT&CK knowledge are not collapsed into a universal maliciousness score.
+
+Canonical GreyNoise IP enrichment is one Evidence v2 provider operation. It is separate from the Project Swarm session operator surface described later in this example.
 
 #### 5. Intelligence Kernel v1.0 — IP reference
 
@@ -125,11 +127,11 @@ Generated KQL or `hunt_now` guidance is a hunting hypothesis, not proof of compr
 
 If the Kernel projection fails, usable enrichment is not discarded. Evidence v2, correlation and existing downstream fallbacks remain available, and `intelligence_projection_unavailable` is surfaced as a limitation. Missing timestamps remain unknown; failed/skipped sources remain unknown rather than benign.
 
-#### 8. Browser-local case workspace
+#### 8. Browser-local case and investigation workspaces
 
-The analyst UI can capture successful Evidence v2 results into a local case. Case snapshots, semantic diffs, exact typed cross-case sightings and `.para11ax` bundles live in browser-local IndexedDB. The gateway does not become a server-side case database.
+The analyst UI can capture successful Evidence v2 results into a local case/investigation. Case snapshots, semantic diffs, exact typed cross-case sightings and `.para11ax` bundles live in browser-local IndexedDB. The gateway does not become a server-side case database.
 
-User Scanner and native Shodan analyst-shell output are terminal/operator surfaces and are **not** automatically persisted into Evidence v2 case evidence or Intelligence Kernel input.
+User Scanner, native Shodan analyst-shell output and GreyNoise Project Swarm read output are operator surfaces and are **not** automatically persisted into Evidence v2 case evidence or Intelligence Kernel input. Compatible operator read results require explicit `investigation capture operator`; this records contextual operator material, not Evidence v2.
 
 #### 9. Native Shodan operator path
 
@@ -178,7 +180,59 @@ shodan info
 
 A Shodan-visible service remains exposure context rather than proof of compromise, exploitability, ownership or attribution.
 
-#### 10. Optional STIX export
+#### 10. GreyNoise Project Swarm operator path
+
+The Web analyst can search bounded GreyNoise session observations without converting the result into canonical evidence:
+
+```text
+analyst@para11ax:~$ swarm search --from 2026-09-05T00:00:00Z --to 2026-09-06T00:00:00Z --scope workspace --query "source.ip:203.0.113.10"
+```
+
+Equivalent request shape:
+
+```bash
+curl --fail-with-body \
+  -H 'Authorization: Bearer <PARA11AX_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"search","scope":"workspace","startTime":"2026-09-05T00:00:00Z","endTime":"2026-09-06T00:00:00Z","query":"source.ip:203.0.113.10","page":1,"pageSize":25}' \
+  https://<gateway>/api/para11ax/swarm
+```
+
+Request path:
+
+```text
+Web analyst shell
+  -> same-origin /api/para11ax/swarm
+  -> bearer authentication
+  -> fixed command/scope/range/query/pivot validation
+  -> server-side GREYNOISE_API_KEY
+  -> fixed https://api.greynoise.io
+  -> bounded session JSON or explicit one-session binary download
+  -> read result = operator context; export = download only
+  -> Evidence v2 / intelligence state unchanged
+```
+
+The live Swarm grammar is:
+
+```text
+swarm search --from <ISO-8601> --to <ISO-8601> [--scope workspace|demo] [--query <lucene>] [--page <1..10000>] [--page-size <1..100>]
+swarm get <session-id> [--scope workspace|demo]
+swarm unique --from <ISO-8601> --to <ISO-8601> --field <allowlisted-field> [--scope workspace|demo] [--query <lucene>] [--include-counts]
+swarm timeseries --from <ISO-8601> --to <ISO-8601> [--scope workspace|demo] [--query <lucene>] [--field <allowlisted-field>] [--size <1..100>] [--interval <auto|1s|1m|1h|1d>]
+swarm export <session-id> <pcap|raw-source|raw-destination>
+```
+
+`scope=workspace` relies on the applicable upstream Sensors entitlement; `scope=demo` relies on the applicable Swarm entitlement. Demo export is rejected locally. Query text, page/size values and pivot fields are bounded before egress. JSON read results and each single-session PCAP/raw export are capped at 4 MiB; bulk session export is not exposed.
+
+After a successful `search`, `get`, `unique`, or `timeseries`, the analyst may explicitly preserve the contextual result:
+
+```text
+investigation capture operator
+```
+
+That capture does not create Evidence v2, maliciousness, ATT&CK mapping, corroboration or analyst disposition. `swarm export` never replaces the current operator result and is not automatically attached to the investigation. Full contract: `GREYNOISE-SWARM.md`.
+
+#### 11. Optional STIX export
 
 ```bash
 curl --fail-with-body \
@@ -188,9 +242,9 @@ curl --fail-with-body \
   https://<gateway>/api/para11ax/stix
 ```
 
-The gateway enriches first and maps only defensible Evidence v2 into a STIX 2.1 Bundle. Native Shodan shell output and Intelligence Kernel derived conclusions are not silently converted into new STIX evidence or attribution.
+The gateway enriches first and maps only defensible Evidence v2 into a STIX 2.1 Bundle. Native Shodan shell output, GreyNoise Swarm operator output and Intelligence Kernel derived conclusions are not silently converted into new STIX evidence or attribution.
 
-#### 11. Offline report path
+#### 12. Offline report path
 
 A frozen Evidence v2 response can be compiled without provider/network calls:
 
@@ -209,8 +263,10 @@ canonical indicator
   -> Intelligence Kernel v1.0 (IP reference)
   -> Decision / Evidence Graph / Guidance / report
 
-explicit User Scanner command -> isolated active OSINT -> terminal only
-explicit Shodan command -> fixed Shodan API -> bounded operator result -> terminal only
+explicit User Scanner command -> isolated active OSINT -> bounded operator context
+explicit Shodan command -> fixed Shodan API -> bounded operator context
+explicit GreyNoise Swarm read -> fixed GreyNoise API -> bounded operator context
+explicit GreyNoise Swarm export -> fixed GreyNoise API -> bounded one-session browser download
 ```
 
 ---

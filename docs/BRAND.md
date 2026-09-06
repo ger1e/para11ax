@@ -51,6 +51,7 @@ BOUNDED ALWAYS.
 OPERATIONAL WHEN SUPPORTED.
 OBSERVED ≠ INFERRED ≠ CONTEXTUAL
 DERIVED CONTEXT ≠ EVIDENCE
+OPERATOR CONTEXT ≠ EVIDENCE
 ABSENCE ≠ BENIGN
 IMPLEMENTED ≠ CONFIGURED ≠ PRODUCTION-VERIFIED
 ```
@@ -77,7 +78,10 @@ Public content should describe the current deterministic architecture accurately
 - Intelligence Kernel v1.0 is deterministic derived context, not Evidence v2.
 - Kernel language may describe evidence strength, source diversity, contradiction severity, temporal relevance, explicit one-hop pivots, coverage impact, hunt relevance and analyst priority.
 - No LLM, adaptive runtime model or universal maliciousness score is part of the canonical enrichment/analysis path.
-- User Scanner and the native Shodan shell remain separate operator utilities and are not silently promoted into Evidence v2 or Kernel reasoning.
+- User Scanner, native Shodan, and GreyNoise Project Swarm are separate specialist operator surfaces and are not silently promoted into Evidence v2 or Kernel reasoning.
+- Canonical GreyNoise IP enrichment and GreyNoise Swarm session operations are distinct surfaces. Swarm supports bounded `search`, `get`, `unique`, `timeseries`, and explicit single-session `export` in the Web shell.
+- Public copy must not claim a configured production GreyNoise credential, Sensors entitlement, Swarm entitlement, or export entitlement unless an authorized check on the exact deployed SHA proved it.
+- Swarm read results can be explicitly captured as Investigation Workspace operator context; PCAP/raw exports remain explicit downloads. Operator context is not Evidence v2.
 
 ## Landing page
 
@@ -93,6 +97,8 @@ Required composition:
 - visible analyst shell example using `analyst@para11ax:~$`;
 - fixed-source summary;
 - terminal footer with read-only/fixed-egress doctrine.
+
+Capability copy may mention GreyNoise Project Swarm only as a bounded specialist session surface. It must not imply that Swarm session telemetry is automatically canonical evidence or that a vendor entitlement is proven by source code.
 
 Do not use rounded marketing cards as the primary hierarchy. Do not place decorative motion over readable terminal content.
 
@@ -141,12 +147,12 @@ No new audio is part of the landing/README/documentation identity. Existing `/ap
 
 The GitHub README uses the **same geometry and typography scale as the GER1E profile README**, while retaining PARA11AX black/phosphor/white/red semantics.
 
-Canonical README SVG family:
+Current canonical README SVG family:
 
-- `assets/brand/para11ax-readme-hero-v8.svg` — `720 × 360`;
-- `assets/brand/para11ax-readme-architecture-v4.svg` — `720 × 760`;
-- `assets/brand/para11ax-readme-semantics-v4.svg` — `720 × 820`;
-- `assets/brand/para11ax-readme-footer-v1.svg` — `720 × 300`.
+- `assets/brand/para11ax-readme-hero-v9.svg` — `720 × 360`;
+- `assets/brand/para11ax-readme-architecture-v6.svg` — 720px-wide architecture panel;
+- `assets/brand/para11ax-readme-semantics-v5.svg` — 720px-wide semantic-firewall panel;
+- `assets/brand/para11ax-readme-footer-v2.svg` — `720 × 300`.
 
 GER1E-normalized type scale:
 
@@ -204,7 +210,9 @@ PARA11AX copy should be:
 - free of synthetic “AI threat score” language;
 - explicit that no LLM participates in the deterministic core;
 - free of claims that absence means benign;
-- free of attribution by infrastructure proximity alone.
+- free of attribution by infrastructure/session proximity alone;
+- explicit when a specialist operator result is contextual rather than canonical evidence;
+- explicit when configuration or vendor entitlement has not been live-proven.
 
 ## Do / do not
 
@@ -216,6 +224,8 @@ PARA11AX copy should be:
 | use red only for sparse anomaly/error cues | make red a universal maliciousness verdict |
 | preserve the GER1E 720px / 15-17-22 scale | mix arbitrary README panel type sizes |
 | distinguish Evidence v2 from Kernel derived context | present derived intelligence as new evidence |
+| distinguish operator context from Evidence v2 | describe Swarm/Shodan/User Scanner context as provider corroboration |
+| describe Swarm entitlement as external account state | infer entitlement from a configured key or READY deployment |
 | retain exact technical caveats | brand away uncertainty |
 
 ## Identity boundary
