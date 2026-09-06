@@ -86,6 +86,7 @@ test('Swarm read results become capturable investigation operator context while 
     session: {},
     downloads: { save: () => {} },
     investigations: {
+      handle: async () => ({}),
       captureOperator: async value => {
         captured.push(value);
         return { action: 'CAPTURE_OPERATOR', invalidated: [], investigation: { id: 'inv-1', revision: 2, status: { phase: 'scoped', readiness: {} } } };
