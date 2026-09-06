@@ -75,6 +75,7 @@ Provider observations preserve their own meaning. Examples:
 - RIPEstat: routing context.
 - Shodan/Censys/Modat: service/infrastructure exposure context.
 - DShield: scanner activity.
+- GreyNoise: provider-specific internet-noise/scanner/threat context from the fixed v3 IP lookup; dataset provenance is claimed only when the upstream response explicitly supplies applicable workspace labels.
 - Spamhaus DROP/ASN-DROP: netblock/ASN listing context.
 - Tor exit: Tor infrastructure context.
 - CISA KEV: known exploited status.
@@ -105,6 +106,19 @@ Both surfaces use server-side `SHODAN_API_KEY`; the browser never receives that 
 
 Credit handling is explicit on the shell route: host/count/stats/info are no-query-credit operations; domain consumes a query credit; search may consume a query credit. See `SHODAN-SHELL.md`.
 
+#### GreyNoise: canonical provider plus Project Swarm operator surface
+
+GreyNoise also appears in two distinct ways without increasing the 38-provider count.
+
+1. **Evidence v2 provider adapter** — canonical IP enrichment uses authenticated GreyNoise v3 IP Lookup at the fixed GreyNoise API origin. The default workspace-label request is `greynoise,community,personal`, optionally overridden by `GREYNOISE_WORKSPACE_LABELS`. Returned tags, CVEs and scanned ports can become normalized provider observations; PARA11AX only asserts dataset/workspace provenance when the upstream response explicitly supplies matching label information.
+2. **GreyNoise Project Swarm operator utility** — `POST /api/para11ax/swarm` implements bounded Web-only session `search`, `get`, allowlisted `unique`, allowlisted `timeseries`, and explicit single-session `export` operations.
+
+The Swarm utility is not a 39th provider, is not scheduled by Provider Value Scheduler v1.0, and does not automatically promote session/pivot/export output into Evidence v2 or Intelligence Kernel input. Successful `search`, `get`, `unique`, and `timeseries` results can be explicitly captured as Investigation Workspace operator context; PCAP/raw export remains an explicit browser download outside automatic capture.
+
+Both GreyNoise surfaces use server-side `GREYNOISE_API_KEY`; the browser never receives it. Swarm egress is fixed to `https://api.greynoise.io`, redirects are refused, search/pivot ranges and fields are bounded, JSON and individual binary export are capped at 4 MiB, bulk session export is omitted, and `scope=demo` export is rejected before egress.
+
+`scope=workspace` session reads depend on the applicable Sensors entitlement; `scope=demo` reads depend on the applicable Swarm entitlement. Repository implementation/configuration cannot prove either account entitlement. See `GREYNOISE-SWARM.md`.
+
 #### Certificate semantics
 
 Certificate lookup is explicit and contextual. The canonical classifier requires `cert-sha256:<64-hex>` so a certificate fingerprint cannot silently steal a bare SHA-256 from the file-hash workflow. Certificate subject/issuer names, reuse, infrastructure proximity, or mere presence are investigative context rather than reputation or attribution proof.
@@ -119,7 +133,7 @@ ATT&CK TAXII uses fixed MITRE collection IDs and server-side type filtering. Rel
 
 ASN/CIDR support is deliberately narrow and fixed-source: RDAP autnum/network registration, RIPEstat AS/Prefix Overview, and Spamhaus ASN-DROP / IPv4/IPv6 DROP. No active scanning is performed by the Evidence v2 provider fabric.
 
-The Shodan analyst-shell surface performs only documented Shodan API lookups; it does not expose on-demand scan submission or arbitrary scanning.
+The Shodan analyst-shell surface performs only documented Shodan API lookups; it does not expose on-demand scan submission or arbitrary scanning. GreyNoise Swarm exposes only stored/session observation search/detail/pivots and explicit bounded export; it is not an arbitrary active scanner.
 
 #### State model
 
@@ -130,7 +144,7 @@ A provider can be:
 - **Production-verified** — an authorized smoke operation succeeded against the exact deployed source SHA.
 - **Unavailable/gap** — omitted, unconfigured, or failed its source/boundedness gate.
 
-Implemented does not imply configured, and configured does not imply production-verified.
+Implemented does not imply configured, and configured does not imply production-verified. For GreyNoise Swarm, account entitlement is an additional upstream state and must not be inferred from the presence of `GREYNOISE_API_KEY`.
 
 #### Intentionally omitted
 
@@ -141,6 +155,7 @@ Implemented does not imply configured, and configured does not imply production-
 - Ransomware-wide unbounded enumeration in per-indicator enrichment.
 - Modat bulk export/broad history in normal enrichment.
 - Shodan arbitrary paging, bulk `download`, caller-selected URLs, and on-demand scan submission through the analyst shell.
+- GreyNoise arbitrary session fields, caller-selected destinations/methods, demo export, bulk `/v3/sessions/export`, and automatic packet/payload promotion into Evidence v2.
 - LLM/adaptive provider scheduling or evidence-dependent source suppression.
 
 Run `node scripts/generate-release-manifest.mjs --check` to detect registry/parser-version drift. Documentation-contract tests separately detect drift in externally documented workflow/provider/scheduler/operator facts.
