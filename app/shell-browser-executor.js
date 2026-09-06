@@ -485,6 +485,7 @@ export function createBrowserShellExecutor({
         const { data: _data, ...receipt } = value;
         return record(receipt);
       }
+      state.currentOperatorResult = { kind: 'greynoise-swarm', source: 'current-result', summary: JSON.stringify(value).slice(0, 4000), references: [] };
       return record(value);
     }
     if (handler === 'user-scanner') {
