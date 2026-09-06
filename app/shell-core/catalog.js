@@ -90,6 +90,7 @@ const commands = [
 
   // Specialist OSINT
   command('osint.shodan', ['shodan'], 'osint', 'shodan <host|search|count|stats|domain|info> ...', 'run bounded Shodan operator queries', { auth: 'required', egressClass: 'gateway', capabilities: ['gateway-read'], handler: 'shodan', outputType: 'record' }),
+  command('osint.greynoise-swarm', ['swarm'], 'osint', 'swarm <search|get|export> ...', 'query bounded GreyNoise Project Swarm sessions', { surfaces: WEB, auth: 'required', egressClass: 'gateway', capabilities: ['gateway-read'], handler: 'swarm', outputType: 'record', completion: { values: ['search', 'get', 'export'] } }),
   command('osint.user-scanner', ['user-scanner'], 'osint', 'user-scanner <email|username> <target> [options]', 'run isolated identity OSINT', { aliases: [['osint'], ['identity']], auth: 'required', egressClass: 'gateway', capabilities: ['gateway-read'], handler: 'user-scanner', outputType: 'record', completion: { values: ['email', 'username'] } }),
 
   // Result and evidence
