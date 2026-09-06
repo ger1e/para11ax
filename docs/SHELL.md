@@ -9,7 +9,7 @@ This is not an operating-system shell. Commands resolve only to registered PARA1
 
 - **Web** — the authenticated browser terminal at `analyst@para11ax:~$`. Authentication is volatile and memory-only. Browser-local cases use the existing IndexedDB workspace.
 - **CLI** — `para11ax ...` through `bin/para11ax.mjs`. It shares the same grammar/runtime but can expose explicitly registered local administrative and filesystem report operations.
-- **WEB ONLY** — browser presentation, local case workspace, clipboard/download and session controls that have no Node equivalent.
+- **WEB ONLY** — browser presentation, local case workspace, Investigation Workspace persistence/capture, clipboard/download, GreyNoise Project Swarm, and session controls that have no Node equivalent.
 - **CLI ONLY** — bounded local administration, provider probing, report filesystem compilation/diff and manifest projection.
 
 `help` and `man` can describe surface-restricted commands. Completion omits commands unavailable on the active surface.
@@ -28,6 +28,7 @@ osint
 result
 case
 mission
+investigation
 report
 export
 terminal
@@ -180,7 +181,7 @@ nvd <observable>             # NVD
 censys <observable>          # Censys
 ```
 
-These aliases do not bypass provider policy and do not receive provider credentials in the browser.
+These aliases do not bypass provider policy and do not receive provider credentials in the browser. `gn` remains canonical GreyNoise IP enrichment through Evidence v2; it is not an alias for the Project Swarm session surface.
 
 ## OSINT specialist commands
 
@@ -207,6 +208,18 @@ shodan info
 ```
 
 Shodan is a specialized bounded operator family inside this unified command fabric. Its operator result remains separate from the current Evidence v2 result. Exact credit and semantic boundaries are documented in [SHODAN-SHELL.md](SHODAN-SHELL.md).
+
+GreyNoise Project Swarm is **WEB ONLY** and uses the same volatile gateway bearer with a server-side GreyNoise credential:
+
+```text
+swarm search --from <ISO-8601> --to <ISO-8601> [--scope workspace|demo] [--query <lucene>] [--page <1..10000>] [--page-size <1..100>]
+swarm get <session-id> [--scope workspace|demo]
+swarm unique --from <ISO-8601> --to <ISO-8601> --field <field> [--scope workspace|demo] [--query <lucene>] [--include-counts]
+swarm timeseries --from <ISO-8601> --to <ISO-8601> [--scope workspace|demo] [--query <lucene>] [--field <field>] [--size <1..100>] [--interval <auto|1s|1m|1h|1d>]
+swarm export <session-id> <pcap|raw-source|raw-destination>
+```
+
+`swarm search`, `swarm get`, `swarm unique`, and `swarm timeseries` produce bounded operator records. They may be explicitly captured as Investigation Workspace operator context, but they are not automatically promoted into Evidence v2. `swarm export` performs one explicit bounded browser download and never becomes Evidence v2 or an automatic investigation attachment. Scope, entitlement, field allowlist, response ceilings and fixed upstream mapping are documented in [GREYNOISE-SWARM.md](GREYNOISE-SWARM.md).
 
 ## Mission workspace
 
@@ -438,6 +451,13 @@ Provider coverage without execution:
 provider coverage ip | fields name credentialMode costClass | sort name
 ```
 
+Bounded GreyNoise Swarm pivot:
+
+```text
+swarm unique --from 2026-09-05T00:00:00Z --to 2026-09-06T00:00:00Z --field source.ip --include-counts
+investigation capture operator
+```
+
 Current-result investigation:
 
 ```text
@@ -477,6 +497,8 @@ investigation export
 ```
 
 `inv` is an exact alias for `investigation`. Browser import/result commands use explicit hidden file pickers; cancellation performs no mutation. CLI inspection and canonical transport are pure operations and require exactly `--file <path>` or `--stdin`. Browser-local new/open/list/capture/clear operations are unavailable on CLI.
+
+`investigation capture evidence` accepts only the current compatible Evidence v2 enrichment. `investigation capture operator` accepts compatible current Shodan, User Scanner, or GreyNoise Swarm read results as contextual operator material. Operator capture never promotes that material into Evidence v2. Swarm binary export is not an operator-capture input.
 
 Mutation receipts contain investigation ID, revision, invalidated artifacts, phase, and readiness. `NO_EVIDENCE_IDENTIFIED` is distinct from `BENIGN_EXPLAINED`; the latter requires a rationale plus a linked current artifact or note. KQL execution and ServiceNow submission remain external analyst actions.
 
