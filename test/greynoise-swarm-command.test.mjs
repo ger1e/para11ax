@@ -82,6 +82,59 @@ test('GreyNoise Swarm export rejects demo before egress and returns bounded bina
   assert.match(allowed.headers['content-disposition'], /session-123-raw-source\.bin/);
 });
 
+test('GreyNoise Swarm workspace diff uses fixed POST egress and bounded aliases', async () => {
+  let captured;
+  let calls = 0;
+  const handler = createGreyNoiseSwarmCommandHandler({
+    env: { PARA11AX_TOKEN: TOKEN, GREYNOISE_API_KEY: KEY },
+    fetchImpl: async (url, init) => {
+      calls += 1;
+      captured = { url: String(url), init };
+      return json({ ips: [{ ip: '198.51.100.10', source: true, target: false }], next_token: 'next-1' });
+    },
+  });
+  const result = await handler(request({
+    command: 'diff', query: 'classification:malicious', sourceWorkspace: 'personal', targetWorkspace: 'greynoise',
+    mode: 'source-only', size: 25, nextToken: 'token-1',
+  }));
+  assert.equal(result.status, 200);
+  assert.equal(calls, 1);
+  const url = new URL(captured.url);
+  assert.equal(url.origin, 'https://api.greynoise.io');
+  assert.equal(url.pathname, '/v3/workspaces/diff');
+  assert.equal(url.search, '');
+  assert.equal(captured.init.method, 'POST');
+  assert.equal(captured.init.headers.key, KEY);
+  assert.equal(captured.init.headers['content-type'], 'application/json');
+  assert.deepEqual(JSON.parse(captured.init.body), {
+    query: 'classification:malicious', source_workspace: 'personal', target_workspace: 'greynoise', size: 25,
+    next_token: 'token-1', ips_from_source: true, require_both_workspaces: false,
+  });
+  assert.equal(result.body.command, 'diff');
+  assert.equal(JSON.stringify(result.body).includes(KEY), false);
+});
+
+test('GreyNoise Swarm workspace diff rejects unsafe workspace and mode requests before egress', async () => {
+  let calls = 0;
+  const handler = createGreyNoiseSwarmCommandHandler({
+    env: { PARA11AX_TOKEN: TOKEN, GREYNOISE_API_KEY: KEY },
+    fetchImpl: async () => { calls += 1; return json({}); },
+  });
+  const cases = [
+    { command: 'diff', query: '', sourceWorkspace: 'personal', targetWorkspace: 'greynoise' },
+    { command: 'diff', query: 'classification:malicious', sourceWorkspace: '11111111-1111-1111-1111-111111111111', targetWorkspace: 'greynoise' },
+    { command: 'diff', query: 'classification:malicious', sourceWorkspace: 'personal', targetWorkspace: 'personal' },
+    { command: 'diff', query: 'classification:malicious', sourceWorkspace: 'personal', targetWorkspace: 'greynoise', mode: 'sideways' },
+    { command: 'diff', query: 'classification:malicious', sourceWorkspace: 'personal', targetWorkspace: 'greynoise', size: 101 },
+    { command: 'diff', query: 'classification:malicious', sourceWorkspace: 'personal', targetWorkspace: 'greynoise', unexpected: true },
+  ];
+  for (const body of cases) {
+    const result = await handler(request(body));
+    assert.equal(result.status, 400);
+  }
+  assert.equal(calls, 0);
+});
+
 test('GreyNoise Swarm rejects unsafe request shapes before upstream work', async () => {
   let calls = 0;
   const handler = createGreyNoiseSwarmCommandHandler({
