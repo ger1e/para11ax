@@ -111,6 +111,19 @@ Transforms map normalized relationships, malware-family/actor context and grapha
 
 ATT&CK TAXII results are knowledge/mapping context, not IOC reputation or a maliciousness vote. Certificate metadata is contextual evidence, not an automatic malicious verdict. CIDR remains a Phrase because no stable built-in network-prefix entity is assumed. ASN uses the stable AS entity when the mapper can do so without changing the input contract.
 
+#### Specialist operator surfaces are not Maltego transforms
+
+Maltego parity tracks the nine canonical Evidence v2 workflow types only. PARA11AX also has bounded specialist operator families in the unified shell; these do not become extra Maltego transforms or extra Evidence v2 providers.
+
+GreyNoise is intentionally split into two surfaces:
+
+1. canonical GreyNoise IP enrichment can participate in `EnrichIPv4` / `EnrichIPv6` through the fixed Evidence v2 provider path when the workflow admits it;
+2. GreyNoise Project Swarm session operations are **WEB ONLY** specialist commands: `swarm search`, `swarm get`, `swarm unique`, `swarm timeseries`, and `swarm export`.
+
+Swarm session/pivot results are operator context and are not automatically Evidence v2. PCAP/raw exports are explicit browser downloads and are not Maltego entities or automatic graph evidence. The Maltego client never receives `GREYNOISE_API_KEY` and does not call `/api/para11ax/swarm`.
+
+The same separation applies to native Shodan shell commands and User Scanner. See [`../docs/SHELL.md`](../docs/SHELL.md), [`../docs/GREYNOISE-SWARM.md`](../docs/GREYNOISE-SWARM.md), and [`../docs/SHODAN-SHELL.md`](../docs/SHODAN-SHELL.md).
+
 #### Non-secret configuration
 
 ```text
@@ -138,6 +151,7 @@ No provider API secret is stored in this directory or in the generated MTZ.
 - Provider failures are surfaced as partial-result messages rather than terminating successful enrichment from other providers.
 - MTZ validation rejects path traversal, symlinks, duplicate entries, excessive archive sizes, loopback/dev gateway references, missing transform inventory and credential identifiers.
 - Vendor API credentials never cross the gateway boundary.
+- Specialist operator credentials such as `SHODAN_API_KEY` and `GREYNOISE_API_KEY` remain server-side and are not part of the Maltego configuration contract.
 
 #### CI verification
 
