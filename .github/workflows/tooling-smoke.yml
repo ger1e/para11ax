@@ -11,7 +11,6 @@ on:
 
 permissions:
   contents: read
-  statuses: write
 
 concurrency:
   group: tooling-smoke-${{ github.workflow }}-${{ github.ref }}
@@ -27,35 +26,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Mark Tooling smoke pending
-        env:
-          GH_TOKEN: ${{ github.token }}
-          STATUS_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          curl --fail-with-body --silent --show-error \
-            -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${STATUS_SHA}" \
-            -d "{\"state\":\"pending\",\"context\":\"Tooling smoke\",\"description\":\"Validation is running\",\"target_url\":\"${target_url}\"}"
-
       - name: Checkout
-        id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Setup Node.js
-        id: setup_node
         uses: actions/setup-node@ae0d4ed08881f17d1511386f5be3e62356acd4a6
         with:
           node-version-file: '.nvmrc'
           package-manager-cache: false
 
       - name: Verify runner tools
-        id: tools
         run: |
           command -v jq >/dev/null
           command -v shellcheck >/dev/null
@@ -63,34 +45,28 @@ jobs:
           command -v pwsh >/dev/null
 
       - name: Validate locked dependencies
-        id: dependency_checks
         run: |
           npm ci --ignore-scripts
           npm audit --omit=dev
 
       - name: Validate MAXX invariants and Node tests
-        id: node_checks
         run: npm run check
 
       - name: Validate Maltego tests
-        id: maltego_tests
         run: |
           python3 --version
           cd maltego
           python3 -m unittest discover -s tests -v
 
       - name: Compile Maltego Python
-        id: python_compile
         run: python3 -m compileall -q maltego
 
       - name: Validate Maltego shell
-        id: shell_checks
         run: |
           bash -n maltego/install.sh
           shellcheck maltego/install.sh
 
       - name: Validate PowerShell syntax
-        id: powershell_syntax
         shell: pwsh
         run: |
           $files = @(
@@ -112,38 +88,3 @@ jobs:
               exit 1
             }
           }
-
-      - name: Publish authoritative Tooling smoke status
-        if: ${{ always() }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          STATUS_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          CHECKOUT: ${{ steps.checkout.outcome }}
-          SETUP_NODE: ${{ steps.setup_node.outcome }}
-          TOOLS: ${{ steps.tools.outcome }}
-          DEPENDENCY_CHECKS: ${{ steps.dependency_checks.outcome }}
-          NODE_CHECKS: ${{ steps.node_checks.outcome }}
-          MALTEGO_TESTS: ${{ steps.maltego_tests.outcome }}
-          PYTHON_COMPILE: ${{ steps.python_compile.outcome }}
-          SHELL_CHECKS: ${{ steps.shell_checks.outcome }}
-          POWERSHELL_SYNTAX: ${{ steps.powershell_syntax.outcome }}
-        run: |
-          state="success"
-          description="Tooling smoke passed on Ubuntu"
-          for outcome in \
-            "${CHECKOUT}" "${SETUP_NODE}" "${TOOLS}" "${DEPENDENCY_CHECKS}" "${NODE_CHECKS}" \
-            "${MALTEGO_TESTS}" "${PYTHON_COMPILE}" "${SHELL_CHECKS}" "${POWERSHELL_SYNTAX}"; do
-            if [[ "${outcome}" != "success" ]]; then
-              state="failure"
-              description="Tooling smoke validation failed"
-              break
-            fi
-          done
-          target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          curl --fail-with-body --silent --show-error \
-            -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${STATUS_SHA}" \
-            -d "{\"state\":\"${state}\",\"context\":\"Tooling smoke\",\"description\":\"${description}\",\"target_url\":\"${target_url}\"}"
