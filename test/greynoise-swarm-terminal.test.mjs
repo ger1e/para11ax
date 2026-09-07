@@ -16,7 +16,7 @@ test('terminal exposes a bounded GreyNoise Swarm session surface', () => {
   assert.equal(descriptor.auth, 'required');
   assert.equal(descriptor.egressClass, 'gateway');
   assert.equal(descriptor.handler, 'swarm');
-  assert.deepEqual(descriptor.completion.values, ['search', 'get', 'export', 'unique', 'timeseries']);
+  assert.deepEqual(descriptor.completion.values, ['search', 'get', 'export', 'unique', 'timeseries', 'diff']);
 
   assert.deepEqual(
     parseSwarmArgs(['get', 'session-123', '--scope', 'demo']),
@@ -31,6 +31,26 @@ test('terminal exposes a bounded GreyNoise Swarm session surface', () => {
     { command: 'export', sessionId: 'session-123', scope: 'workspace', startTime: null, endTime: null, query: null, page: null, pageSize: null, exportType: 'rawSource' },
   );
   assert.throws(() => parseSwarmArgs(['export', '../escape', 'pcap']));
+});
+
+test('Swarm diff defaults to personal-to-greynoise source-only and validates aliases', () => {
+  assert.deepEqual(
+    parseSwarmArgs(['diff', '--query', 'classification:malicious']),
+    {
+      command: 'diff', query: 'classification:malicious', sourceWorkspace: 'personal', targetWorkspace: 'greynoise',
+      mode: 'source-only', size: 10, nextToken: null,
+    },
+  );
+  assert.deepEqual(
+    parseSwarmArgs(['diff', '--query', 'last_seen:1d', '--source', 'community', '--target', 'personal', '--mode', 'both', '--size', '50', '--next-token', 'opaque-token']),
+    {
+      command: 'diff', query: 'last_seen:1d', sourceWorkspace: 'community', targetWorkspace: 'personal',
+      mode: 'both', size: 50, nextToken: 'opaque-token',
+    },
+  );
+  assert.throws(() => parseSwarmArgs(['diff', '--query', 'classification:malicious', '--source', '11111111-1111-1111-1111-111111111111']));
+  assert.throws(() => parseSwarmArgs(['diff', '--query', 'classification:malicious', '--source', 'personal', '--target', 'personal']));
+  assert.throws(() => parseSwarmArgs(['diff', '--query', 'classification:malicious', '--size', '101']));
 });
 
 test('browser executor delegates Swarm search and explicitly downloads one export', async () => {
@@ -99,14 +119,38 @@ test('Swarm read results become capturable investigation operator context while 
   await executor.execute({ descriptor: captureOperatorDescriptor, args: [], context: { surface: 'web' } });
   assert.equal(captured.length, 1);
   assert.equal(captured[0].kind, 'greynoise-swarm');
-  assert.match(captured[0].summary, /"command":"search"/);
+  assert.match(captured[0].summary, /\"command\":\"search\"/);
 
   await executor.execute({ descriptor, args: ['export', 'session-123', 'pcap'], context: { surface: 'web' } });
   await executor.execute({ descriptor: captureOperatorDescriptor, args: [], context: { surface: 'web' } });
   assert.equal(captured.length, 2);
   assert.equal(captured[1].kind, 'greynoise-swarm');
-  assert.match(captured[1].summary, /"command":"search"/);
-  assert.doesNotMatch(captured[1].summary, /"command":"export"/);
+  assert.match(captured[1].summary, /\"command\":\"search\"/);
+  assert.doesNotMatch(captured[1].summary, /\"command\":\"export\"/);
+});
+
+test('Swarm diff result becomes capturable operator context', async () => {
+  const captured = [];
+  const executor = createBrowserShellExecutor({
+    client: {
+      swarm: async input => ({ requestId: 'rd', source: 'greynoise-swarm', command: 'diff', input, data: { ips: [] }, durationMs: 1 }),
+    },
+    session: {},
+    downloads: { save: () => {} },
+    investigations: {
+      handle: async () => ({}),
+      captureOperator: async value => {
+        captured.push(value);
+        return { action: 'CAPTURE_OPERATOR', invalidated: [], investigation: { id: 'inv-1', revision: 2, status: { phase: 'scoped', readiness: {} } } };
+      },
+      state: () => ({ activeInvestigationId: 'inv-1', available: true }),
+    },
+  });
+  await executor.execute({ descriptor, args: ['diff', '--query', 'classification:malicious'], context: { surface: 'web' } });
+  await executor.execute({ descriptor: captureOperatorDescriptor, args: [], context: { surface: 'web' } });
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0].kind, 'greynoise-swarm');
+  assert.match(captured[0].summary, /\"command\":\"diff\"/);
 });
 
 test('gateway client sends Swarm search to the same-origin authenticated route', async () => {
@@ -128,6 +172,32 @@ test('gateway client sends Swarm search to the same-origin authenticated route',
   assert.equal(result.source, 'greynoise-swarm');
 });
 
+test('gateway client sends bounded Swarm diff and rejects unsafe aliases before egress', async () => {
+  let calls = 0;
+  let body;
+  const client = createGatewayClient({
+    getToken: () => 'bearer-secret',
+    fetchImpl: async (path, init) => {
+      calls += 1;
+      body = JSON.parse(init.body);
+      return new Response(JSON.stringify({
+        requestId: 'rd', source: 'greynoise-swarm', command: 'diff', input: body, data: { ips: [] }, durationMs: 2,
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    },
+  });
+  const result = await client.swarm({ command: 'diff', query: 'classification:malicious', sourceWorkspace: 'personal', targetWorkspace: 'greynoise', mode: 'source-only', size: 25 });
+  assert.equal(result.command, 'diff');
+  assert.equal(body.sourceWorkspace, 'personal');
+  assert.equal(body.targetWorkspace, 'greynoise');
+  assert.equal(body.mode, 'source-only');
+  assert.equal(body.size, 25);
+  await assert.rejects(
+    client.swarm({ command: 'diff', query: 'classification:malicious', sourceWorkspace: '11111111-1111-1111-1111-111111111111', targetWorkspace: 'greynoise' }),
+    /invalid Swarm diff workspace/,
+  );
+  assert.equal(calls, 1);
+});
+
 test('gateway client accepts only bounded binary Swarm export responses', async () => {
   const client = createGatewayClient({
     getToken: () => 'bearer-secret',
@@ -135,7 +205,7 @@ test('gateway client accepts only bounded binary Swarm export responses', async 
       status: 200,
       headers: {
         'content-type': 'application/octet-stream',
-        'content-disposition': 'attachment; filename="session-123.pcap"',
+        'content-disposition': 'attachment; filename=\"session-123.pcap\"',
         'x-para11ax-request-id': 'r2',
         'x-para11ax-duration-ms': '3',
       },

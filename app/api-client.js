@@ -1,7 +1,7 @@
 const PROFILES = new Set(['fast', 'standard', 'full']);
 const SHODAN_COMMANDS = new Set(['host', 'search', 'count', 'stats', 'domain', 'info']);
-const SWARM_COMMANDS = new Set(['search', 'get', 'export', 'unique', 'timeseries']);
-const SWARM_READ_COMMANDS = new Set(['search', 'get', 'unique', 'timeseries']);
+const SWARM_COMMANDS = new Set(['search', 'get', 'export', 'unique', 'timeseries', 'diff']);
+const SWARM_READ_COMMANDS = new Set(['search', 'get', 'unique', 'timeseries', 'diff']);
 const SWARM_EXPORT_TYPES = new Set(['pcap', 'rawSource', 'rawDestination']);
 const SWARM_PIVOT_FIELDS = new Set([
   'source.ip', 'destination.ip', 'source.port', 'destination.port', 'classification', 'protocol', 'ipProtocol',
@@ -11,6 +11,8 @@ const SWARM_PIVOT_FIELDS = new Set([
   'tls.ja3', 'tls.ja4', 'tcp.ja4t', 'suricata.signature', 'suricata.category', 'suricata.severity',
 ]);
 const SWARM_TIMESERIES_INTERVALS = new Set(['auto', '1s', '1m', '1h', '1d']);
+const SWARM_DIFF_WORKSPACES = new Set(['personal', 'community', 'greynoise']);
+const SWARM_DIFF_MODES = new Set(['source-only', 'both', 'all']);
 const PROVIDER_NAME_RE = /^[a-z0-9-]{1,64}$/;
 const ENRICHMENT_OBSERVERS = new Set();
 const MAX_SWARM_EXPORT_BYTES = 4 * 1024 * 1024;
@@ -254,6 +256,27 @@ export function createGatewayClient({ fetchImpl = fetch, getToken }) {
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('Swarm request required');
     const command = String(input.command || '').trim().toLowerCase();
     if (!SWARM_COMMANDS.has(command)) throw new TypeError('invalid Swarm command');
+
+    if (command === 'diff') {
+      const query = String(input.query || '').trim();
+      if (!query || query.length > 2048 || /[\u0000-\u001f\u007f]/.test(query)) throw new TypeError('invalid Swarm diff query');
+      const sourceWorkspace = input.sourceWorkspace === undefined || input.sourceWorkspace === null ? 'personal' : String(input.sourceWorkspace).trim().toLowerCase();
+      const targetWorkspace = input.targetWorkspace === undefined || input.targetWorkspace === null ? 'greynoise' : String(input.targetWorkspace).trim().toLowerCase();
+      if (!SWARM_DIFF_WORKSPACES.has(sourceWorkspace) || !SWARM_DIFF_WORKSPACES.has(targetWorkspace)) throw new TypeError('invalid Swarm diff workspace');
+      if (sourceWorkspace === targetWorkspace) throw new TypeError('Swarm diff source and target must differ');
+      const mode = input.mode === undefined || input.mode === null ? 'source-only' : String(input.mode).trim().toLowerCase();
+      if (!SWARM_DIFF_MODES.has(mode)) throw new TypeError('invalid Swarm diff mode');
+      const size = Number(input.size ?? 10);
+      if (!Number.isSafeInteger(size) || size < 1 || size > 100) throw new TypeError('invalid Swarm diff size');
+      const payload = { command, query, sourceWorkspace, targetWorkspace, mode, size };
+      if (input.nextToken !== undefined && input.nextToken !== null) {
+        const nextToken = String(input.nextToken).trim();
+        if (!nextToken || nextToken.length > 4096 || /[\u0000-\u001f\u007f]/.test(nextToken)) throw new TypeError('invalid Swarm diff next token');
+        payload.nextToken = nextToken;
+      }
+      return payload;
+    }
+
     const scope = input.scope === undefined || input.scope === null ? 'workspace' : String(input.scope).trim().toLowerCase();
     if (!['workspace', 'demo'].includes(scope)) throw new TypeError('invalid Swarm scope');
     const payload = { command, scope };

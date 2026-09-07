@@ -9,7 +9,7 @@ Supported indicator types are `ip`, `domain`, `url`, `hash`, `cve`, `attack`, `a
 
 Profile admission and execution priority are separate. Admitted providers are ordered by **Provider Value Scheduler v1.0**. For the current IP reference workflow, 24 admitted providers retain a 48-call ceiling (maximum two attempts per provider), maximum concurrency 4, and the 20-second request deadline. Scheduler ordering does not add or suppress providers based on returned evidence.
 
-Email/username User Scanner operations, native Shodan commands, and GreyNoise Project Swarm session operations are separate analyst utilities. They do not become canonical Evidence v2 workflow types and do not automatically replace or promote into the current Evidence v2 result.
+Email/username User Scanner operations, native Shodan commands, and GreyNoise Project Swarm session/workspace operations are separate analyst utilities. They do not become canonical Evidence v2 workflow types and do not automatically replace or promote into the current Evidence v2 result.
 
 #### Route inventory
 
@@ -21,7 +21,7 @@ Email/username User Scanner operations, native Shodan commands, and GreyNoise Pr
 - `POST /api/para11ax/stix` — enrich then export bounded STIX 2.1.
 - `POST /api/para11ax/user-scanner` — isolated bounded email/username active OSINT.
 - `POST /api/para11ax/shodan` — bounded authenticated native Shodan operator commands.
-- `POST /api/para11ax/swarm` — bounded authenticated GreyNoise Project Swarm search, session detail, pivots, and explicit single-session export.
+- `POST /api/para11ax/swarm` — bounded authenticated GreyNoise Project Swarm search, session detail, pivots, Workspace Diff, and explicit single-session export.
 
 Unknown `/api/para11ax/*` paths fail closed.
 
@@ -161,6 +161,7 @@ swarm search --from <ISO-8601> --to <ISO-8601> [--scope workspace|demo] [--query
 swarm get <session-id> [--scope workspace|demo]
 swarm unique --from <ISO-8601> --to <ISO-8601> --field <field> [--scope workspace|demo] [--query <lucene>] [--include-counts]
 swarm timeseries --from <ISO-8601> --to <ISO-8601> [--scope workspace|demo] [--query <lucene>] [--field <field>] [--size <1..100>] [--interval <auto|1s|1m|1h|1d>]
+swarm diff --query <GNQL> [--source personal|community|greynoise] [--target personal|community|greynoise] [--mode source-only|both|all] [--size <1..100>] [--next-token <token>]
 swarm export <session-id> <pcap|raw-source|raw-destination>
 ```
 
@@ -181,20 +182,24 @@ swarm export <session-id> <pcap|raw-source|raw-destination>
 ```
 
 ```json
+{"command":"diff","query":"classification:malicious","sourceWorkspace":"personal","targetWorkspace":"greynoise","mode":"source-only","size":10}
+```
+
+```json
 {"command":"export","scope":"workspace","sessionId":"<session-id>","type":"pcap"}
 ```
 
-Search/pivot ranges must be valid explicit ISO-8601 intervals with `startTime < endTime`. Query text is capped at 2,048 printable characters. Search page size is 1..100, page number is 1..10,000, timeseries group size is 1..100, and pivot fields/intervals come from fixed allowlists. JSON results and each single-session binary export are capped at 4 MiB. Bulk session export is not exposed.
+Search/pivot ranges must be valid explicit ISO-8601 intervals with `startTime < endTime`. Session Lucene and Workspace Diff GNQL text are capped at 2,048 printable characters. Search page size is 1..100, page number is 1..10,000, timeseries group size is 1..100, and pivot fields/intervals come from fixed allowlists. Workspace Diff accepts only `personal`, `community`, and `greynoise`, requires different source/target aliases, caps result size at 100, and caps opaque `nextToken` values at 4,096 printable characters. JSON results and each single-session binary export are capped at 4 MiB. Bulk session export and arbitrary workspace UUIDs are not exposed.
 
-`scope=workspace` uses the sensor-backed workspace session dataset and requires the applicable GreyNoise Sensors entitlement. `scope=demo` uses the GreyNoise demo session dataset and requires the applicable Swarm entitlement. Demo export is rejected locally before upstream egress. PARA11AX does not infer or advertise a production entitlement merely because a key is configured.
+`scope=workspace` uses the sensor-backed workspace session dataset and requires the applicable GreyNoise Sensors entitlement. `scope=demo` uses the GreyNoise demo session dataset and requires the applicable Swarm entitlement. Workspace Diff uses its own approved workspace aliases instead of the session `scope` parameter. Demo export is rejected locally before upstream egress. PARA11AX does not infer or advertise a production entitlement merely because a key is configured.
 
-Successful `search`, `get`, `unique`, and `timeseries` responses are bounded operator context. They can be explicitly captured with `investigation capture operator`; that capture does not manufacture or modify Evidence v2, provider corroboration, ATT&CK mapping, maliciousness, or analyst disposition. `export` is an explicit browser download and does not replace the current operator result.
+Successful `search`, `get`, `unique`, `timeseries`, and `diff` responses are bounded operator context. They can be explicitly captured with `investigation capture operator`; that capture does not manufacture or modify Evidence v2, provider corroboration, ATT&CK mapping, maliciousness, or analyst disposition. `export` is an explicit browser download and does not replace the current operator result.
 
 Full operator contract: [`GREYNOISE-SWARM.md`](GREYNOISE-SWARM.md).
 
 #### Common errors
 
-- `400` — invalid request/indicator/profile/batch, invalid Shodan command/target/query/facets, or rejected Swarm command/range/query/pivot/export shape.
+- `400` — invalid request/indicator/profile/batch, invalid Shodan command/target/query/facets, or rejected Swarm command/range/query/pivot/diff/export shape.
 - `401 unauthorized`.
 - `405 method_not_allowed`.
 - `413 payload_too_large`.
