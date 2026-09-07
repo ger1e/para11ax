@@ -65,6 +65,8 @@ swarm export <session-id> <pcap|raw-source|raw-destination>
 
 `raw-source` maps to GreyNoise `rawSource`; `raw-destination` maps to `rawDestination`.
 
+The shared `swarm` command descriptor is conservatively marked `browser-download` because one accepted subcommand can create a browser download. Only `swarm export` performs that effect; `search`, `get`, `unique`, `timeseries`, and `diff` remain bounded read operations that return operator context.
+
 ## Workspace Diff mode mapping
 
 PARA11AX exposes one mutually exclusive mode rather than allowing callers to construct arbitrary combinations of GreyNoise's diff booleans:

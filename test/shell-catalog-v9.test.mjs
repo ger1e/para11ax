@@ -58,6 +58,12 @@ test('fixed provider front doors carry immutable provider identities', () => {
   assert.equal(COMMAND_DESCRIPTORS.some(command => command.tokens[0] === 'curl'), false);
 });
 
+test('GreyNoise Swarm catalog conservatively declares browser download side effects', () => {
+  const descriptor = resolve(['swarm'], 'web').descriptor;
+  assert.equal(descriptor.id, 'osint.greynoise-swarm');
+  assert.equal(descriptor.sideEffect, 'browser-download');
+});
+
 test('surface-specific commands stay out of completion but remain visible in help and man', () => {
   assert.equal(completeShellInput('system set', { surface: 'web' }).includes('setup'), false);
   assert.match(renderCommandIndex(), /system setup.*\[CLI ONLY\]/i);
