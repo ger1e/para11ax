@@ -88,14 +88,17 @@ test('Tooling smoke gates PRs and attests exact merged main while remaining boun
   assert.doesNotMatch(workflow, /apt-get/);
 });
 
-test('Tooling smoke invalidates stale success and publishes final status for PR head, merged main, or manual exact SHA', () => {
+test('Tooling smoke uses the native PR check and publishes classic status only for trusted exact-SHA runs', () => {
   const workflow = read(workflowPath);
 
-  assert.match(workflow, /name: Mark Tooling smoke pending/);
-  assert.match(workflow, /name: Publish authoritative Tooling smoke status/);
-  assert.match(workflow, /if: \$\{\{ always\(\) \}\}/);
-  assert.match(workflow, /STATUS_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
+  assert.match(workflow, /name: Mark Tooling smoke pending for trusted exact SHA/);
+  assert.match(workflow, /name: Publish authoritative Tooling smoke status for trusted exact SHA/);
+  assert.match(workflow, /if: \$\{\{ github\.event_name != 'pull_request' \}\}/);
+  assert.match(workflow, /if: \$\{\{ always\(\) && github\.event_name != 'pull_request' \}\}/);
+  assert.match(workflow, /STATUS_SHA: \$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(workflow, /github\.event\.pull_request\.head\.sha/);
   assert.match(workflow, /statuses\/\$\{STATUS_SHA\}/);
   assert.match(workflow, /steps\.node_checks\.outcome/);
   assert.match(workflow, /steps\.maltego_tests\.outcome/);
+  assert.match(workflow, /permissions:\s*\n\s+contents: read\s*\n\s+statuses: write/);
 });
