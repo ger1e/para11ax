@@ -216,10 +216,11 @@ swarm search --from <ISO-8601> --to <ISO-8601> [--scope workspace|demo] [--query
 swarm get <session-id> [--scope workspace|demo]
 swarm unique --from <ISO-8601> --to <ISO-8601> --field <field> [--scope workspace|demo] [--query <lucene>] [--include-counts]
 swarm timeseries --from <ISO-8601> --to <ISO-8601> [--scope workspace|demo] [--query <lucene>] [--field <field>] [--size <1..100>] [--interval <auto|1s|1m|1h|1d>]
+swarm diff --query <GNQL> [--source personal|community|greynoise] [--target personal|community|greynoise] [--mode source-only|both|all] [--size <1..100>] [--next-token <token>]
 swarm export <session-id> <pcap|raw-source|raw-destination>
 ```
 
-`swarm search`, `swarm get`, `swarm unique`, and `swarm timeseries` produce bounded operator records. They may be explicitly captured as Investigation Workspace operator context, but they are not automatically promoted into Evidence v2. `swarm export` performs one explicit bounded browser download and never becomes Evidence v2 or an automatic investigation attachment. Scope, entitlement, field allowlist, response ceilings and fixed upstream mapping are documented in [GREYNOISE-SWARM.md](GREYNOISE-SWARM.md).
+`swarm search`, `swarm get`, `swarm unique`, `swarm timeseries`, and `swarm diff` produce bounded operator records. They may be explicitly captured as Investigation Workspace operator context, but they are not automatically promoted into Evidence v2. Workspace Diff accepts only the `personal`, `community`, and `greynoise` aliases and never caller-selected workspace UUIDs. `swarm export` performs one explicit bounded browser download and never becomes Evidence v2 or an automatic investigation attachment. Scope, entitlement, field/workspace allowlists, response ceilings and fixed upstream mapping are documented in [GREYNOISE-SWARM.md](GREYNOISE-SWARM.md).
 
 ## Mission workspace
 
@@ -451,10 +452,11 @@ Provider coverage without execution:
 provider coverage ip | fields name credentialMode costClass | sort name
 ```
 
-Bounded GreyNoise Swarm pivot:
+Bounded GreyNoise Swarm pivots:
 
 ```text
 swarm unique --from 2026-09-05T00:00:00Z --to 2026-09-06T00:00:00Z --field source.ip --include-counts
+swarm diff --query "classification:malicious" --source personal --target greynoise --mode source-only
 investigation capture operator
 ```
 
