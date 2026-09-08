@@ -118,3 +118,23 @@ test('PPI sweep is narrow, range rings are restrained, and contacts have phospho
   assert.doesNotMatch(heroSvg, /M260 260L481 202A228 228 0 0 1 484 303Z/, 'standalone radar must not use the old wide wedge');
   assert.doesNotMatch(lockupSvg, /M0 0 28-8A29 29 0 0 1 28 8Z/, 'compact lockup must not use the old wide wedge');
 });
+
+test('landing PPI follows the GER1E README single-line sweep contract', () => {
+  const html = read('index.html');
+  const css = read('landing-radar-motion.css');
+  const heroSvg = read(HERO_RADAR);
+
+  const productionSweep = html.match(/\.radar-sweep\s*\{([^}]*)\}/is)?.[1] ?? '';
+  const productionBeam = html.match(/\.radar-sweep:before\s*\{([^}]*)\}/is)?.[1] ?? '';
+  const legacySweep = css.match(/\.hero-ghost>\.ghost-ring\s*\{([^}]*)\}/is)?.[1] ?? '';
+  const legacyBeam = css.match(/\.hero-ghost>\.ghost-ring::before\s*\{([^}]*)\}/is)?.[1] ?? '';
+
+  assert.doesNotMatch(productionSweep, /conic-gradient/i, 'production sweep must not render a second luminous sector');
+  assert.doesNotMatch(legacySweep, /conic-gradient/i, 'legacy sweep must not render a second luminous sector');
+  assert.doesNotMatch(productionBeam, /rotate\(/i, 'beam itself must stay radial; only the sweep wrapper rotates');
+  assert.doesNotMatch(legacyBeam, /rotate\(/i, 'legacy beam itself must stay radial; only the sweep wrapper rotates');
+  assert.match(productionBeam, /left:\s*50%[^}]*top:\s*50%[^}]*transform-origin:\s*left center/is, 'production beam must originate at radar center');
+  assert.match(legacyBeam, /left:\s*50%[^}]*top:\s*50%[^}]*transform-origin:\s*left center/is, 'legacy beam must originate at radar center');
+  assert.doesNotMatch(heroSvg, /<path[^>]+fill=["']#39FF14["'][^>]+fill-opacity=/i, 'standalone radar sweep must be the README-style rotating line, not a wedge');
+  assert.match(heroSvg, /<g class=["']ppi-sweep["'][^>]*>[\s\S]*?<path d=["']M260 260H486["'][^>]*stroke=/i, 'standalone radar line must rotate from the center toward the rim');
+});
