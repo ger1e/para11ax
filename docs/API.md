@@ -22,6 +22,7 @@ Email/username User Scanner operations, native Shodan commands, and GreyNoise Pr
 - `POST /api/para11ax/user-scanner` — isolated bounded email/username active OSINT.
 - `POST /api/para11ax/shodan` — bounded authenticated native Shodan operator commands.
 - `POST /api/para11ax/swarm` — bounded authenticated GreyNoise Project Swarm search, session detail, pivots, Workspace Diff, and explicit single-session export.
+- `POST /api/para11ax/provider` — one authenticated registered provider against one validated indicator.
 
 Unknown `/api/para11ax/*` paths fail closed.
 
@@ -197,10 +198,24 @@ Successful `search`, `get`, `unique`, `timeseries`, and `diff` responses are bou
 
 Full operator contract: [`GREYNOISE-SWARM.md`](GREYNOISE-SWARM.md).
 
+#### `POST /api/para11ax/provider`
+
+Bearer required. This route executes exactly one named provider already registered in PARA11AX against one validated indicator. It exists for bounded direct-provider shell operations; it is not a caller-controlled HTTP proxy.
+
+```json
+{"provider":"rdap","indicator":"203.0.113.10","type":"ip"}
+```
+
+The body accepts only `provider`, `indicator`, and optional `type`. Provider names must identify a registered active adapter that supports the canonical observable type. The route rejects unknown fields, unknown or inactive providers, unsupported types, and providers whose required server-side credential is unavailable.
+
+Callers cannot supply a URL, method, credential, timeout, parser, response-size limit, request headers, raw request body, or fetch implementation. Execution remains inside the provider registry, orchestrator, scheduler, and fixed `safeFetch` egress policy. A direct provider result can update the browser's current result only after the explicit command; it is not silently promoted into an Investigation Workspace evidence snapshot.
+
 #### Common errors
 
-- `400` — invalid request/indicator/profile/batch, invalid Shodan command/target/query/facets, or rejected Swarm command/range/query/pivot/diff/export shape.
+- `400` — invalid request/indicator/profile/batch, invalid Shodan command/target/query/facets, rejected Swarm command/range/query/pivot/diff/export shape, or unsupported provider type.
 - `401 unauthorized`.
+- `404 provider_not_found` for an unknown direct-provider name.
+- `409 provider_inactive` or `provider_unconfigured` for a direct provider that cannot be admitted.
 - `405 method_not_allowed`.
 - `413 payload_too_large`.
 - `415 unsupported_media_type`.

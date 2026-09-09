@@ -3,7 +3,7 @@
 
 ## Scope and audit baseline
 
-Audit record updated: 2026-09-06.
+Audit record updated: 2026-09-09.
 
 This report covers repository behavior, browser surfaces, deterministic intelligence runtime, specialist operator surfaces, Maltego integration, CI controls, deployment metadata, public production behavior, and static-response security boundaries. Repository source, CI, deployment metadata, live public checks, credentials, vendor account entitlements and authorized data-bearing probes remain separate proof states.
 
@@ -138,7 +138,11 @@ The implementation and documentation must agree that:
 
 **Proof:** the live root response exposed HSTS but no explicit CSP, clickjacking, MIME-sniffing, referrer, cross-origin isolation, or permissions policy. API JSON already applied its own response controls, leaving the HTML/static boundary inconsistent.
 
-**Disposition:** fixed at the Vercel deployment boundary with one global policy covering landing, app, assets, and branded error pages. The policy constrains scripts, connections, objects, framing, forms, referrers, cross-origin embedding, and browser device capabilities. A regression test parses the deployable configuration and requires the complete policy.
+**Root cause:** the deployable configuration mixed a top-level modern `headers` rule with a legacy `routes` pipeline. The repository's structural test validated the unused top-level rule, while the production legacy route chain emitted none of those headers.
+
+**RED evidence:** the 2026-09-09 repair first changed the regression test to require the complete policy on a global continuing legacy route. The test failed because no such rule existed; the live root, app, and branded 404 responses independently reproduced the missing policy.
+
+**Disposition:** fixed in the deployment candidate by making the complete policy the first continuing rule in the active legacy route pipeline, covering landing, app, assets, API, and branded error pages. Repository closure requires the focused and full suites; production closure additionally requires a READY deployment from the accepted exact `main` SHA and live header checks against root, app, and an HTML error response.
 
 ### QA-010 — GreyNoise Swarm runtime outpaced cross-repository documentation
 

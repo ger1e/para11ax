@@ -95,6 +95,7 @@ None of these operator paths silently replaces, mutates or promotes output into 
 - `POST /api/para11ax/user-scanner` — bounded email/username active OSINT through the configured worker.
 - `POST /api/para11ax/shodan` — bounded native Shodan operator commands; authenticated; fixed upstream; separate result envelope.
 - `POST /api/para11ax/swarm` — bounded GreyNoise Swarm session search/detail/pivots, Workspace Diff, and explicit single-session binary export.
+- `POST /api/para11ax/provider` — one authenticated, registered provider against one validated indicator; fixed adapter policy only.
 - Unknown `/api/para11ax/*` — controlled fail-closed API 404.
 
 Evidence v2 example:

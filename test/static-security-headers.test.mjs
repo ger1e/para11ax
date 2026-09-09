@@ -4,11 +4,15 @@ import test from 'node:test';
 
 const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
 
-test('every browser route receives the deployment security policy', () => {
-  const rule = config.headers?.find(({ source }) => source === '/(.*)');
-  assert.ok(rule, 'a global response-header rule must cover landing, app, assets, and error pages');
+test('the legacy route pipeline applies the deployment security policy before routing', () => {
+  const rule = config.routes?.find(({ src, headers, continue: shouldContinue }) => (
+    src === '/(.*)' && headers && shouldContinue === true
+  ));
+  assert.ok(rule, 'a continuing legacy route must cover landing, app, assets, API, and error pages');
 
-  const headers = Object.fromEntries(rule.headers.map(({ key, value }) => [key.toLowerCase(), value]));
+  const headers = Object.fromEntries(
+    Object.entries(rule.headers).map(([key, value]) => [key.toLowerCase(), value]),
+  );
   assert.equal(headers['x-content-type-options'], 'nosniff');
   assert.equal(headers['x-frame-options'], 'DENY');
   assert.equal(headers['referrer-policy'], 'no-referrer');
