@@ -18,11 +18,13 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  verify:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
       - name: Checkout exact source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -65,6 +67,31 @@ jobs:
           npm run check
           node scripts/generate-release-manifest.mjs --check
 
+  attest:
+    needs: verify
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@ae0d4ed08881f17d1511386f5be3e62356acd4a6
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+          check-latest: false
+
+      - name: Prepare deterministic dependency state
+        run: npm ci --ignore-scripts
+
       - name: Generate SBOM and build provenance
         env:
           REQUESTED_VERSION: ${{ inputs.version }}
@@ -103,6 +130,66 @@ jobs:
             build-provenance.json \
             > SHA256SUMS
 
+      - name: Attest release artifacts
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: |
+            release-manifest.json
+            sbom.cdx.json
+            sbom.spdx.json
+            build-provenance.json
+            SHA256SUMS
+
+      - name: Upload verified release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-assets-${{ github.sha }}
+          path: |
+            release-manifest.json
+            sbom.cdx.json
+            sbom.spdx.json
+            build-provenance.json
+            SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Verification-only summary
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
+        run: |
+          echo 'Verification-only run complete; signed provenance was recorded and no tag or GitHub Release was created.'
+          cat SHA256SUMS
+
+  publish:
+    needs:
+      - verify
+      - attest
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified release artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: release-assets-${{ github.sha }}
+          path: .
+
+      - name: Refuse release overwrite
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MANUAL_TAG: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="$MANUAL_TAG"
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "::error::Release $tag already exists; refusing to overwrite."
+            exit 1
+          fi
+
       - name: Create or verify manual version tag
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
         env:
@@ -125,8 +212,7 @@ jobs:
               -f "sha=${GITHUB_SHA}" >/dev/null
           fi
 
-      - name: Publish GitHub release
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+      - name: Publish GitHub release once
         env:
           GH_TOKEN: ${{ github.token }}
           MANUAL_TAG: ${{ inputs.version }}
@@ -138,18 +224,8 @@ jobs:
             tag="$MANUAL_TAG"
           fi
           assets=(release-manifest.json sbom.cdx.json sbom.spdx.json build-provenance.json SHA256SUMS)
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "${assets[@]}" --clobber
-          else
-            gh release create "$tag" \
-              --verify-tag \
-              --title "$tag" \
-              --generate-notes \
-              "${assets[@]}"
-          fi
-
-      - name: Verification-only summary
-        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
-        run: |
-          echo 'Verification-only run complete; no tag or GitHub Release was created.'
-          cat SHA256SUMS
+          gh release create "$tag" \
+            --verify-tag \
+            --title "$tag" \
+            --generate-notes \
+            "${assets[@]}"
