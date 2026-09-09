@@ -39,6 +39,8 @@ All notable repository changes should be recorded here. This project uses a ligh
 
 ##### Changed
 
+- Static browser security headers now run as the first continuing rule in Vercel's active legacy route pipeline, covering landing, app, assets, API, and branded errors instead of relying on an ineffective mixed-config top-level header rule.
+- README and API documentation now include the implemented authenticated `POST /api/para11ax/provider` boundary alongside the other nine public/protected routes.
 - The unified shell now documents GreyNoise Swarm as a Web-only specialist operator family distinct from the canonical GreyNoise Evidence v2 provider.
 - Investigation Workspace operator capture now explicitly supports compatible GreyNoise Swarm `search`, `get`, `unique`, and `timeseries` results as contextual records; Swarm binary exports remain download-only and outside automatic Evidence v2 promotion.
 - The unified shell includes a volatile `mission` namespace. Browser mission state clears on disconnect/reboot and persists across auth clearing; CLI state is process/pipeline-local and reads files or stdin only when explicitly requested.
@@ -56,6 +58,7 @@ All notable repository changes should be recorded here. This project uses a ligh
 
 ##### Security
 
+- Deployment regression coverage now requires CSP, anti-framing, MIME-sniffing, referrer, cross-origin, and permissions controls on the effective continuing legacy route rule used by production.
 - GreyNoise Swarm accepts only five bounded operations, fixed scopes and vetted pivot fields/intervals/export types; rejects caller-selected URL/method/header/credential/bulk-export behavior; keeps `GREYNOISE_API_KEY` server-side; refuses redirects; caps JSON and individual exports at 4 MiB; and preserves operational failures as failures rather than threat evidence.
 - Swarm session/pivot context is not Evidence v2. Explicit Investigation Workspace operator capture does not manufacture maliciousness, ATT&CK mapping, corroboration or disposition; PCAP/raw export is never automatically attached or promoted.
 - Investigation v2 adds no provider, host, credential, network method, runtime dependency, LLM, KQL execution, ServiceNow submission, or server persistence. Recursive closed-schema validation rejects hostile JSON structure, secret-shaped keys, unsafe URLs, invalid fingerprints/timestamps, forged status, and bound violations.

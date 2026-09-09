@@ -55,7 +55,18 @@ test('current evidence projection versions are first-class documented contracts'
 
 test('API docs cover canonical public and protected route names', () => {
   const api = read('docs/API.md');
-  for (const route of ['meta', 'health', 'status', 'enrich', 'batch', 'stix', 'swarm']) {
+  for (const route of [
+    'meta',
+    'health',
+    'status',
+    'enrich',
+    'batch',
+    'stix',
+    'user-scanner',
+    'shodan',
+    'swarm',
+    'provider',
+  ]) {
     assert.ok(api.includes(`/api/para11ax/${route}`), `API docs missing ${route}`);
   }
 });
