@@ -28,8 +28,9 @@ test('tag-triggered releases require the tag version to match package.json', () 
   assert.match(workflow, /if \[\[ "\$TAG_VERSION" != "\$PACKAGE_VERSION" \]\]; then[\s\S]*?exit 1[\s\S]*?fi/);
 });
 
-test('tag-triggered releases require the tagged commit to be the protected main head', () => {
+test('tag-triggered releases require the tagged commit to come from protected main', () => {
   assert.match(workflow, /git fetch --no-tags origin \+refs\/heads\/main:refs\/remotes\/origin\/main/);
+  assert.match(workflow, /TAGGED_SHA="\$\(git rev-parse "\$GITHUB_REF\^\{commit\}"\)"/);
   assert.match(workflow, /MAIN_SHA="\$\(git rev-parse refs\/remotes\/origin\/main\)"/);
-  assert.match(workflow, /if \[\[ "\$GITHUB_SHA" != "\$MAIN_SHA" \]\]; then[\s\S]*?exit 1[\s\S]*?fi/);
+  assert.match(workflow, /if ! git merge-base --is-ancestor "\$TAGGED_SHA" "\$MAIN_SHA"; then[\s\S]*?exit 1[\s\S]*?fi/);
 });
