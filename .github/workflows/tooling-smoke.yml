@@ -96,6 +96,7 @@ jobs:
         run: |
           $files = @(
             'scripts/bootstrap-vercel.ps1',
+            'scripts/configure-vercel-firewall.ps1',
             'scripts/finalize.ps1',
             'maltego/install.ps1'
           )
