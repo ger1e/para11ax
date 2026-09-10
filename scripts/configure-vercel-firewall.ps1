@@ -86,19 +86,6 @@ $Vercel = Get-PinnedVercelCli
 Assert-VercelLogin -Vercel $Vercel
 Assert-CanonicalProjectLink
 
-$ruleArgs = @(
-    '--condition', $PathCondition,
-    '--condition', $MethodCondition,
-    '--action', 'rate_limit',
-    '--rate-limit-window', '60',
-    '--rate-limit-requests', '30',
-    '--rate-limit-keys', 'ip',
-    '--rate-limit-algo', 'fixed_window',
-    '--rate-limit-action', 'rate_limit',
-    '--yes',
-    '--scope', $TeamSlug
-)
-
 Push-Location $RepoRoot
 try {
     & $Vercel firewall rules inspect $RuleName --scope $TeamSlug *> $null
@@ -106,10 +93,18 @@ try {
 
     if ($ruleExists) {
         Write-Host "Staging exact update for existing Vercel Firewall rule '$RuleName'..."
-        Invoke-NativeChecked $Vercel firewall rules edit $RuleName @ruleArgs
+        Invoke-NativeChecked $Vercel firewall rules edit $RuleName `
+            --condition $PathCondition --condition $MethodCondition `
+            --action rate_limit --rate-limit-window 60 --rate-limit-requests 30 `
+            --rate-limit-keys ip --rate-limit-algo fixed_window --rate-limit-action rate_limit `
+            --yes --scope $TeamSlug
     } else {
         Write-Host "Staging new Vercel Firewall rule '$RuleName'..."
-        Invoke-NativeChecked $Vercel firewall rules add $RuleName @ruleArgs
+        Invoke-NativeChecked $Vercel firewall rules add $RuleName `
+            --condition $PathCondition --condition $MethodCondition `
+            --action rate_limit --rate-limit-window 60 --rate-limit-requests 30 `
+            --rate-limit-keys ip --rate-limit-algo fixed_window --rate-limit-action rate_limit `
+            --yes --scope $TeamSlug
     }
 
     Write-Host ''
