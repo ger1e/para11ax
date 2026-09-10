@@ -22,3 +22,8 @@ test('release publication fails closed instead of overwriting existing assets', 
   assert.match(workflow, /Release \$tag already exists; refusing to overwrite/);
   assert.match(workflow, /if gh release view "\$tag"[^\n]*; then[\s\S]*?exit 1[\s\S]*?fi/);
 });
+
+test('tag-triggered releases require the tag version to match package.json', () => {
+  assert.match(workflow, /TAG_VERSION="\$\{RELEASE_TAG#v\}"/);
+  assert.match(workflow, /if \[\[ "\$TAG_VERSION" != "\$PACKAGE_VERSION" \]\]; then[\s\S]*?exit 1[\s\S]*?fi/);
+});
