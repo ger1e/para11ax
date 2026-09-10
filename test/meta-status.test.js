@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { createApp } from '../src/app.js';
 import { TtlCache } from '../src/core/cache.js';
 import { createTelemetry } from '../src/core/telemetry.js';
-import { PROVIDER_SCHEDULER_POLICY_VERSION } from '../src/core/provider-priority.js';
 
 function adapter() {
   return Object.freeze({
@@ -19,32 +18,32 @@ function adapter() {
 }
 function get(token = null) { return { method: 'GET', headers: token ? { authorization: `Bearer ${token}` } : {} }; }
 
-test('public meta exposes static capabilities and hard limits but no secret names or configuration state', async () => {
+test('public meta is a minimal capability contract and does not expose provider topology or internal limits', async () => {
   const app = createApp({ env: { PARA11AX_TOKEN: 'gateway', RDAP_SECRET_TEST: 'actual-secret' }, adapters: [adapter()] });
   const out = await app.handleMeta(get());
   assert.equal(out.status, 200);
+  assert.deepEqual(Object.keys(out.body).sort(), [
+    'documentation',
+    'gatewayVersion',
+    'profiles',
+    'schemaVersion',
+    'security',
+    'types',
+  ]);
   assert.equal(out.body.gatewayVersion, '2.0.0');
   assert.equal(out.body.schemaVersion, '2.0');
   assert.deepEqual(out.body.profiles, ['fast', 'standard', 'full']);
   assert.ok(out.body.types.includes('asn'));
-  assert.equal(out.body.limits.batchInputs, 20);
-  assert.equal(out.body.limits.providerConcurrency, 4);
-  assert.equal(out.body.providers.rdap.requiresCredential, true);
-  assert.equal(out.body.providers.rdap.scheduler.version, PROVIDER_SCHEDULER_POLICY_VERSION);
-  assert.deepEqual(out.body.providers.rdap.scheduler.byType.ip, {
-    authorityClass: 'authoritative',
-    semanticUniqueness: 'unique',
-    intelligenceValue: 'contextual',
-    pivotValue: 'medium',
-    latencyClass: 'fast',
-    fallback: false,
-  });
-  assert.deepEqual(out.body.providers.rdap.scheduler.byType.domain, { fallback: true, rationale: 'legacy_priority_fallback' });
+  assert.equal(out.body.documentation, 'https://github.com/ger1e/para11ax/blob/main/docs/API.md');
+  assert.equal(out.body.security, 'https://para11ax.vercel.app/.well-known/security.txt');
+
   const text = JSON.stringify(out.body);
-  assert.equal(text.includes('RDAP_SECRET_TEST'), false);
-  assert.equal(text.includes('actual-secret'), false);
-  assert.equal(text.includes('configured'), false);
-  assert.doesNotMatch(text, /"rank"|"workflowIndex"/);
+  for (const forbidden of [
+    'providers', 'limits', 'fixedHosts', 'requiresCredential', 'scheduler',
+    'RDAP_SECRET_TEST', 'actual-secret', 'configured', 'fixture.invalid',
+  ]) {
+    assert.equal(text.includes(forbidden), false, `public meta leaked ${forbidden}`);
+  }
 });
 
 test('authenticated status is no-store and aggregate-only', async () => {
