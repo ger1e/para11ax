@@ -64,6 +64,13 @@ jobs:
         run: |
           set -euo pipefail
           RELEASE_TAG="$GITHUB_REF_NAME"
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          TAGGED_SHA="$(git rev-parse "$GITHUB_REF^{commit}")"
+          MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+          if ! git merge-base --is-ancestor "$TAGGED_SHA" "$MAIN_SHA"; then
+            echo "::error::Release tag $RELEASE_TAG does not point to a commit reachable from protected main."
+            exit 1
+          fi
           PACKAGE_VERSION="$(node -p "JSON.parse(require('fs').readFileSync('package.json','utf8')).version")"
           TAG_VERSION="${RELEASE_TAG#v}"
           if [[ "$TAG_VERSION" != "$PACKAGE_VERSION" ]]; then
