@@ -23,3 +23,7 @@
 ## MCP Lifecycle Note
 
 The live ChatGPT namespace loss may be client/plugin lifecycle behavior rather than a server mutation. PARA11AX adds repeated discovery/list regression coverage and keeps the tool catalog immutable. Do not invent a transport workaround unless the server-side test reproduces a mutation or protocol defect.
+
+---
+
+<p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
