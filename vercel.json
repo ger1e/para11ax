@@ -45,6 +45,10 @@
       }
     },
     {
+      "src": "/mcp",
+      "dest": "/api/mcp.js"
+    },
+    {
       "handle": "filesystem"
     },
     {
