@@ -99,6 +99,40 @@ function boundedExtra(value) {
   }
 }
 
+function comparable(value) {
+  try { return decodeURIComponent(String(value ?? '')).toLowerCase(); }
+  catch { return String(value ?? '').toLowerCase(); }
+}
+
+function extraContainsTarget(extra, target) {
+  if (!extra || typeof extra !== 'object') return false;
+  const needle = comparable(target);
+  try { return comparable(JSON.stringify(extra)).includes(needle); }
+  catch { return false; }
+}
+
+function classifyMatch(item, target) {
+  const needle = comparable(target);
+  if (!needle) return 'unverified';
+  const urlValue = boundedString(item?.url, 2048);
+  let parsed = null;
+  try { parsed = new URL(urlValue); } catch { /* malformed upstream URLs remain unverified */ }
+
+  if (parsed) {
+    const path = comparable(`${parsed.pathname}${parsed.hash}`);
+    if (path.includes(needle)) return 'exact';
+    const query = comparable(parsed.search);
+    if (query.includes(needle)) return 'search_result_only';
+  }
+
+  const upstreamIdentity = [item?.username, item?.email, item?.handle, item?.user]
+    .map(comparable)
+    .filter(Boolean);
+  if (upstreamIdentity.includes(needle)) return 'exact';
+  if (extraContainsTarget(item?.extra, target)) return 'exact';
+  return 'unverified';
+}
+
 function normalizeWorkerPayload(payload, scan, durationMs) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('invalid_worker_response');
   const rawSummary = payload.summary;
@@ -108,21 +142,34 @@ function normalizeWorkerPayload(payload, scan, durationMs) {
     if (!Number.isSafeInteger(value) || value < 0) throw new Error('invalid_worker_response');
     return value;
   };
-  const summary = {
+  const rawFound = int('found', 'found');
+  const baseSummary = {
     totalScanned: int('totalScanned', 'total_scanned'),
-    found: int('found', 'found'),
     notFound: int('notFound', 'not_found'),
     errors: int('errors', 'errors'),
     skipped: int('skipped', 'skipped'),
   };
   if (!Array.isArray(payload.results)) throw new Error('invalid_worker_response');
-  const results = payload.results.slice(0, MAX_RESULTS).map(item => ({
-    status: boundedString(item?.status, 32),
-    siteName: boundedString(item?.siteName ?? item?.site_name, 128),
-    category: boundedString(item?.category, 128),
-    url: boundedString(item?.url, 2048),
-    extra: boundedExtra(item?.extra),
-  }));
+  const results = payload.results.slice(0, MAX_RESULTS).map(item => {
+    const matchConfidence = classifyMatch(item, scan.target);
+    const verified = matchConfidence === 'exact';
+    return {
+      status: verified ? boundedString(item?.status, 32) : 'Unverified',
+      matchConfidence,
+      siteName: boundedString(item?.siteName ?? item?.site_name, 128),
+      category: boundedString(item?.category, 128),
+      url: boundedString(item?.url, 2048),
+      extra: boundedExtra(item?.extra),
+    };
+  });
+  const found = results.filter(item => item.matchConfidence === 'exact').length;
+  const unverified = results.length - found;
+  const summary = {
+    ...baseSummary,
+    found,
+    unverified,
+    rawFound,
+  };
   const errored = payload.erroredSites ?? payload.errored_sites ?? [];
   const erroredSites = Array.isArray(errored) ? errored.slice(0, MAX_ERRORED_SITES).map(value => boundedString(value, 128)).filter(Boolean) : [];
   return {

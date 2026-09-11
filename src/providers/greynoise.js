@@ -3,15 +3,15 @@ import { arr, compact, envValue, relation, requireEnv, uniq } from './helpers.js
 
 const LOOKUP_DOC = 'https://docs.greynoise.io/reference/v3ip';
 const SWARM_DOC = 'https://docs.greynoise.io/docs/using-the-greynoise-community-dataset';
-const DEFAULT_DATASET_SCOPES = Object.freeze(['greynoise', 'community', 'personal']);
-const ALLOWED_DATASET_SCOPES = new Set(DEFAULT_DATASET_SCOPES);
+const DEFAULT_DATASET_SCOPES = Object.freeze(['greynoise']);
+const ALLOWED_DATASET_SCOPES = new Set(['greynoise', 'community', 'personal']);
 
 function datasetScopes(context) {
   const configured = envValue(context, 'GREYNOISE_WORKSPACE_LABELS');
-  if (!configured) return [...DEFAULT_DATASET_SCOPES];
+  if (!configured) return { scopes: [...DEFAULT_DATASET_SCOPES], explicit: false };
   const scopes = uniq(configured.split(',').map(value => value.trim().toLowerCase()))
     .filter(value => ALLOWED_DATASET_SCOPES.has(value));
-  return scopes.length ? scopes : [...DEFAULT_DATASET_SCOPES];
+  return { scopes: scopes.length ? scopes : [...DEFAULT_DATASET_SCOPES], explicit: scopes.length > 0 };
 }
 
 function tagNames(value) {
@@ -59,12 +59,14 @@ function noResult(ip, scopes) {
 }
 
 export const greynoiseProvider = Object.freeze({
-  name: 'greynoise', types: ['ip'], requiredEnv: 'GREYNOISE_API_KEY', cacheTtlMs: 86400000, negativeCacheTtlMs: 21600000, costClass: 'scarce', timeoutMs: 5000, parserVersion: '2026-09-06.1',
+  name: 'greynoise', types: ['ip'], requiredEnv: 'GREYNOISE_API_KEY', cacheTtlMs: 86400000, negativeCacheTtlMs: 21600000, costClass: 'scarce', timeoutMs: 5000, parserVersion: '2026-09-11.1',
   async run(input, context = {}) {
     const key = requireEnv(context, 'GREYNOISE_API_KEY');
-    const scopes = datasetScopes(context);
+    const { scopes, explicit } = datasetScopes(context);
     const url = new URL(`https://api.greynoise.io/v3/ip/${encodeURIComponent(input.value)}`);
-    url.searchParams.set('workspace_labels', scopes.join(','));
+    // GreyNoise treats workspace_labels as an entitlement-bearing request. Omitting
+    // it uses the default global dataset and works with ordinary API keys.
+    if (explicit) url.searchParams.set('workspace_labels', scopes.join(','));
     let raw;
     try {
       raw = await fetchJson(url, { ...context, headers: { key } });

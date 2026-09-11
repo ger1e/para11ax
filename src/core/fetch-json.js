@@ -5,6 +5,21 @@ function httpError(response) {
   return error;
 }
 
+function mergeHeaders(defaults = {}, overrides = {}) {
+  const output = {};
+  const index = new Map();
+  const set = (key, value) => {
+    const normalized = String(key).toLowerCase();
+    const existing = index.get(normalized);
+    if (existing !== undefined) delete output[existing];
+    output[key] = value;
+    index.set(normalized, key);
+  };
+  for (const [key, value] of Object.entries(defaults)) set(key, value);
+  for (const [key, value] of Object.entries(overrides)) set(key, value);
+  return output;
+}
+
 export async function fetchJson(url, {
   fetchImpl = fetch,
   signal,
@@ -14,7 +29,7 @@ export async function fetchJson(url, {
   body,
   redirect = 'error',
 } = {}) {
-  const requestHeaders = { accept: 'application/json', ...headers };
+  const requestHeaders = mergeHeaders({ accept: 'application/json' }, headers);
   const response = await fetchImpl(url, {
     method,
     signal,

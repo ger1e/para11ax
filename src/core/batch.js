@@ -54,7 +54,7 @@ export async function runBatch({
         unique.push(item);
       }
     } catch {
-      results[index] = { index, input, status: 'invalid', error: 'invalid_indicator' };
+      results[index] = { index, input, status: 'invalid', requestStatus: 'rejected', error: 'invalid_indicator' };
     }
   }
 
@@ -68,14 +68,14 @@ export async function runBatch({
     const remainingMs = deadlineAt - now;
     if (remainingMs <= 0) {
       deadlineExhausted = true;
-      return { status: 'skipped', reason: 'batch_deadline_exhausted', classified: item.classified };
+      return { status: 'skipped', requestStatus: 'skipped', reason: 'batch_deadline_exhausted', classified: item.classified };
     }
 
     const desired = Math.max(1, Number(callLimitFor(item.classified.type)) || 1);
     const reserved = Math.min(desired, availableCalls);
     if (reserved <= 0) {
       callBudgetExhausted = true;
-      return { status: 'skipped', reason: 'batch_provider_call_budget_exhausted', classified: item.classified };
+      return { status: 'skipped', requestStatus: 'skipped', reason: 'batch_provider_call_budget_exhausted', classified: item.classified };
     }
     availableCalls -= reserved;
 
@@ -93,9 +93,11 @@ export async function runBatch({
     actualCalls += used;
     availableCalls += reserved - used;
 
-    if (!enrichment) return { status: 'error', reason: 'batch_enrichment_error', classified: item.classified };
+    if (!enrichment) return { status: 'error', requestStatus: 'failed', reason: 'batch_enrichment_error', classified: item.classified };
+    const enrichmentStatus = ['ok', 'partial', 'error'].includes(enrichment.status) ? enrichment.status : 'error';
     return {
-      status: enrichment.status === 'error' ? 'error' : 'ok',
+      status: enrichmentStatus,
+      requestStatus: enrichmentStatus === 'error' ? 'failed' : 'completed',
       classified: item.classified,
       enrichment,
     };
@@ -111,6 +113,7 @@ export async function runBatch({
         canonical: item.classified.value,
         type: item.classified.type,
         status: work.status,
+        requestStatus: work.requestStatus,
       };
       if (duplicateOf !== undefined) base.duplicateOf = duplicateOf;
       if (work.enrichment) base.enrichment = work.enrichment;

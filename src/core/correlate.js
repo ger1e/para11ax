@@ -6,8 +6,10 @@ const MAX_CORROBORATED_FACTS = 50;
 const MAX_ASSESSMENT_PROVIDERS = 25;
 const MAX_LIMITATIONS = 16;
 const NETWORK_TYPES = new Set(['ip', 'domain', 'url', 'asn', 'cidr']);
+const STATEFUL_OBSERVATION_KINDS = new Set(['known_exploited']);
 const INFRASTRUCTURE_RELATIONSHIP_TYPES = new Set([
-  'asn', 'hostname', 'domain', 'ip', 'cidr', 'netblock', 'registration', 'nameserver', 'mx', 'certificate',
+  'asn', 'hostname', 'domain', 'ip', 'cidr', 'netblock', 'registration', 'nameserver', 'mx',
+  'resolves_to', 'cname', 'mail_exchanger', 'certificate',
 ]);
 const THREAT_NOT_APPLICABLE_TYPES = new Set(['attack', 'cve', 'asn', 'cidr']);
 
@@ -31,16 +33,19 @@ function observationTime(item) {
 function buildFreshness(evidence, now) {
   const nowMs = parseDate(now) ?? Date.now();
   const items = evidence.map(item => {
-    const observedMs = observationTime(item);
+    const rawObservedMs = observationTime(item);
     const retrievedMs = parseDate(item?.retrievedAt);
-    const observationClass = freshnessClass(observedMs == null ? null : nowMs - observedMs);
+    const stateful = STATEFUL_OBSERVATION_KINDS.has(item?.observation?.kind);
+    const effectiveObservedMs = stateful ? (retrievedMs ?? rawObservedMs) : rawObservedMs;
+    const observationClass = freshnessClass(effectiveObservedMs == null ? null : nowMs - effectiveObservedMs);
     const retrievalClass = freshnessClass(retrievedMs == null ? null : nowMs - retrievedMs);
     return {
       provider: item.provider,
       class: observationClass,
       observationClass,
       retrievalClass,
-      observedAt: observedMs == null ? null : new Date(observedMs).toISOString(),
+      freshnessBasis: stateful ? 'retrieval_state' : 'observation_time',
+      observedAt: effectiveObservedMs == null ? null : new Date(effectiveObservedMs).toISOString(),
       retrievedAt: retrievedMs == null ? null : new Date(retrievedMs).toISOString(),
     };
   });
@@ -148,6 +153,10 @@ function threatAssessment(type, evidence) {
   };
 }
 
+function relationshipKind(rel) {
+  return rel?.type ?? rel?.relationship ?? '';
+}
+
 function infrastructureContext(type, evidence, relationships) {
   if (!NETWORK_TYPES.has(type)) return undefined;
   const providers = [...new Set(evidence
@@ -157,9 +166,10 @@ function infrastructureContext(type, evidence, relationships) {
 
   const facts = new Map();
   for (const rel of relationships) {
-    if (!rel?.provider || !INFRASTRUCTURE_RELATIONSHIP_TYPES.has(rel?.type) || rel?.target == null || rel.target === '') continue;
-    const key = `${rel.type}\u0000${String(rel.target)}`;
-    if (!facts.has(key)) facts.set(key, { type: rel.type, target: rel.target, providers: new Set() });
+    const kind = relationshipKind(rel);
+    if (!rel?.provider || !INFRASTRUCTURE_RELATIONSHIP_TYPES.has(kind) || rel?.target == null || rel.target === '') continue;
+    const key = `${kind}\u0000${String(rel.target)}`;
+    if (!facts.has(key)) facts.set(key, { type: kind, target: rel.target, providers: new Set() });
     facts.get(key).providers.add(rel.provider);
   }
   const corroboratedFacts = [...facts.values()]
@@ -195,22 +205,55 @@ function huntability(type, evidence) {
   return { level: 'none', reason: 'no_explicit_hunt_mapping' };
 }
 
+function normalizedCvss(item) {
+  const raw = item?.observation?.attributes?.cvss;
+  if (Number.isFinite(Number(raw))) return { score: Number(raw), provider: item.provider };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !Number.isFinite(Number(raw.score))) return null;
+  return {
+    score: Number(raw.score),
+    version: raw.version ?? null,
+    severity: raw.severity ?? null,
+    vector: raw.vector ?? null,
+    provider: item.provider,
+  };
+}
+
 function riskAxes(evidence) {
   const kev = evidence.find(item => item?.observation?.kind === 'known_exploited');
   const epss = evidence.find(item => item?.observation?.kind === 'exploit_probability');
-  const cvss = evidence.find(item => Number.isFinite(Number(item?.observation?.attributes?.cvss)));
+  const cvss = evidence.map(normalizedCvss).find(Boolean) ?? null;
   return {
     kev: kev ? { listed: kev.observation.verdict === 'known_exploited' || kev.observation.attributes?.cataloged === true, ransomwareUse: kev.observation.attributes?.knownRansomwareCampaignUse ?? null, provider: kev.provider } : null,
     epss: epss ? { score: Number.isFinite(Number(epss.observation.attributes?.epss)) ? Number(epss.observation.attributes.epss) : null, percentile: Number.isFinite(Number(epss.observation.attributes?.percentile)) ? Number(epss.observation.attributes.percentile) : null, provider: epss.provider } : null,
-    cvss: cvss ? { score: Number(cvss.observation.attributes.cvss), provider: cvss.provider } : null,
+    cvss,
   };
 }
 
 function dedupeRelationships(relationships) {
+  const input = Array.isArray(relationships) ? relationships : [];
+  const providersByTarget = new Map();
+  for (const rel of input) {
+    const kind = relationshipKind(rel);
+    const target = rel?.target ?? rel?.value;
+    const targetType = rel?.targetType ?? '';
+    if (!kind || target == null || target === '' || !rel?.provider) continue;
+    const key = `${kind}\u0000${String(targetType).toLowerCase()}\u0000${String(target).toLowerCase()}`;
+    if (!providersByTarget.has(key)) providersByTarget.set(key, new Set());
+    providersByTarget.get(key).add(rel.provider);
+  }
+
   const seen = new Set();
   const output = [];
-  for (const rel of Array.isArray(relationships) ? relationships : []) {
-    const key = [rel?.type ?? '', rel?.source ?? '', rel?.target ?? '', rel?.provider ?? ''].join('\u0000');
+  for (const rel of input) {
+    const kind = relationshipKind(rel);
+    const target = rel?.target ?? rel?.value;
+    const targetType = rel?.targetType ?? '';
+    const corroborationKey = `${kind}\u0000${String(targetType).toLowerCase()}\u0000${String(target ?? '').toLowerCase()}`;
+    // Modat host search returns passive/historical hostname associations. Keep
+    // them in provider attributes, but do not promote a single-source hostname
+    // into the shared relationship graph/hunt surface without corroboration.
+    if (rel?.provider === 'modat' && kind === 'hostname' && (providersByTarget.get(corroborationKey)?.size ?? 0) < 2) continue;
+    const key = [kind, rel?.source ?? '', target ?? '', rel?.provider ?? ''].join('\u0000');
     if (seen.has(key)) continue;
     seen.add(key);
     output.push(rel);
@@ -220,7 +263,7 @@ function dedupeRelationships(relationships) {
 }
 
 function attributionFromRelationships(relationships) {
-  const actors = [...new Set(relationships.filter(rel => rel?.targetType === 'actor' || rel?.type === 'attributed_to').map(rel => rel?.target).filter(Boolean))].sort();
+  const actors = [...new Set(relationships.filter(rel => rel?.targetType === 'actor' || relationshipKind(rel) === 'attributed_to').map(rel => rel?.target).filter(Boolean))].sort();
   if (!actors.length) return undefined;
   return { basis: 'explicit_relationship', actors };
 }
