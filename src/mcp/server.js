@@ -11,7 +11,11 @@ import {
   importInvestigation,
   reduceInvestigation,
 } from '../core/investigation/index.js';
-import { buildInvestigationReport, renderInvestigationText } from '../report/render-investigation.js';
+import {
+  buildInvestigationManifest,
+  buildInvestigationReport,
+  renderInvestigationText,
+} from '../report/render-investigation.js';
 import {
   createCase,
   validateCaseValue,
@@ -372,7 +376,7 @@ function runReport(args, now) {
     const investigation = importInvestigation(args.investigation);
     if (args.operation === 'render') return { artifact: { filename: 'investigation-report.txt', mimeType: 'text/plain;charset=utf-8', encoding: 'utf8', content: renderInvestigationText(investigation) }, report: buildInvestigationReport(investigation) };
     if (args.operation === 'quality') return { ok: true, report: buildInvestigationReport(investigation) };
-    if (args.operation === 'manifest') throw new Error('investigation manifest is not a registered in-memory report capability');
+    if (args.operation === 'manifest') return { manifest: buildInvestigationManifest(investigation, { generatedAt: now }) };
     throw new Error('unsupported investigation report operation');
   }
   const snapshot = args.snapshot;
