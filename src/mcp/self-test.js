@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { securityHeaders } from '../core/http.js';
+import { runFullMcpConformance } from './ga-conformance.js';
 import { verifyGitHubActionsOidc } from './github-actions-oidc.js';
 import { createMcpHttpHandler, MCP_PROTOCOL_VERSION } from './transport.js';
 
@@ -132,6 +133,10 @@ export function createSignedProductionSelfTestHandler({
     if (request?.method !== 'GET') return response(405, { error: 'method_not_allowed' }, { allow: 'GET' });
     if (typeof token !== 'string' || !token) return response(503, { error: 'self_test_unconfigured' });
 
+    const mode = queryValue(request, 'mode');
+    if (mode !== null && mode !== 'full') return response(400, { error: 'invalid_self_test_mode' });
+    const fullMode = mode === 'full';
+
     const authorization = await authorizeSelfTest(request, { token, fetchImpl, nowMs });
     if (!authorization) return response(401, { error: 'unauthorized' });
     const runtimeOidc = String(headerValue(request?.headers, 'x-vercel-oidc-token') ?? '').trim() || null;
@@ -152,6 +157,7 @@ export function createSignedProductionSelfTestHandler({
 
     let enrichmentOk = false;
     let enrichmentSummary;
+    let enrichmentValue = null;
     let enrichResult;
     try {
       enrichResult = await mcp(mcpRequest(token, 'tools/call', {
@@ -161,6 +167,7 @@ export function createSignedProductionSelfTestHandler({
       const enrichTool = toolPayload(enrichResult, 'mcp_enrichment');
       const enrichment = enrichTool.structuredContent?.enrichment;
       if (!enrichment || typeof enrichment !== 'object' || Array.isArray(enrichment)) throw new Error('mcp_enrichment_failed');
+      enrichmentValue = enrichment;
       enrichmentOk = true;
       enrichmentSummary = {
         target: TEST_IP,
@@ -180,6 +187,7 @@ export function createSignedProductionSelfTestHandler({
 
     let userScannerOk = false;
     let userScannerSummary;
+    let userScannerValue = null;
     let userResult;
     try {
       userResult = await mcp(mcpRequest(token, 'tools/call', {
@@ -190,14 +198,17 @@ export function createSignedProductionSelfTestHandler({
       const scan = userTool.structuredContent?.result;
       const summary = scan?.summary;
       if (!summary || typeof summary !== 'object' || Array.isArray(summary)) throw new Error('mcp_user_scanner_failed');
-      userScannerOk = true;
-      userScannerSummary = {
-        target: TEST_USERNAME,
+      userScannerValue = {
         totalScanned: Number(summary.totalScanned ?? 0),
         found: Number(summary.found ?? 0),
         notFound: Number(summary.notFound ?? 0),
         errors: Number(summary.errors ?? 0),
         skipped: Number(summary.skipped ?? 0),
+      };
+      userScannerOk = true;
+      userScannerSummary = {
+        target: TEST_USERNAME,
+        ...userScannerValue,
         durationMs: Number(scan.durationMs ?? 0),
       };
     } catch {
@@ -228,8 +239,30 @@ export function createSignedProductionSelfTestHandler({
       };
     }
 
+    let conformance;
+    if (fullMode) {
+      let nextId = 10;
+      const invoke = async (name, args = {}) => {
+        const result = await mcp(mcpRequest(token, 'tools/call', {
+          name,
+          arguments: args,
+        }, nextId++, name, runtimeOidc));
+        const payload = toolPayload(result, `mcp_ga_${name}`);
+        return payload.structuredContent;
+      };
+      conformance = await runFullMcpConformance({
+        invoke,
+        enrichment: enrichmentValue,
+        userScanner: userScannerValue,
+        now,
+      });
+    }
+
+    const baselineStatus = enrichmentOk && userScannerOk ? 'pass' : enrichmentOk || userScannerOk ? 'partial' : 'fail';
+    const status = fullMode && conformance?.status !== 'pass' ? 'fail' : baselineStatus;
+
     return response(200, {
-      status: enrichmentOk && userScannerOk ? 'pass' : enrichmentOk || userScannerOk ? 'partial' : 'fail',
+      status,
       authorization,
       deploymentSha: typeof env.VERCEL_GIT_COMMIT_SHA === 'string' && /^[0-9a-f]{40}$/i.test(env.VERCEL_GIT_COMMIT_SHA)
         ? env.VERCEL_GIT_COMMIT_SHA.toLowerCase()
@@ -237,6 +270,7 @@ export function createSignedProductionSelfTestHandler({
       mcp: { authenticated: true, toolCount: tools.length },
       enrichment: enrichmentSummary,
       userScanner: userScannerSummary,
+      ...(conformance ? { conformance } : {}),
       ...(diagnostics ? { diagnostics } : {}),
     });
   };

@@ -1,7 +1,10 @@
 import { clone, deepFreeze } from '../core/investigation/canonical.js';
 import { importInvestigation } from '../core/investigation/model.js';
+import { sha256Hex } from '../core/sha256.js';
 
 const REQUIRED = new Set(['hunt', 'result', 'disposition']);
+const REPORT_FILENAME = 'investigation-report.txt';
+const REPORT_MIME_TYPE = 'text/plain;charset=utf-8';
 
 function unique(values) {
   return [...new Set(values.filter(value => typeof value === 'string' && value))].sort((a, b) => a.localeCompare(b));
@@ -101,3 +104,30 @@ export function renderInvestigationText(investigation) {
   return `${lines.join('\n')}\n`;
 }
 
+export function buildInvestigationManifest(input, { generatedAt } = {}) {
+  const investigation = importInvestigation(input);
+  // Rendering is the readiness/quality gate: a manifest must never describe an
+  // investigation that cannot produce the corresponding report artifact.
+  const content = renderInvestigationText(investigation);
+  const reportSha256 = sha256Hex(content);
+  const injectedTimestamp = typeof generatedAt === 'function' ? generatedAt() : generatedAt;
+  const timestamp = injectedTimestamp ?? investigation.updatedAt;
+  if (typeof timestamp !== 'string' || !Number.isFinite(Date.parse(timestamp))) {
+    throw new TypeError('invalid investigation manifest timestamp');
+  }
+
+  return deepFreeze({
+    manifestVersion: '1.0',
+    investigationId: investigation.id,
+    investigationRevision: investigation.revision,
+    generatedAt: new Date(Date.parse(timestamp)).toISOString(),
+    reportSha256,
+    files: [{
+      name: REPORT_FILENAME,
+      mimeType: REPORT_MIME_TYPE,
+      encoding: 'utf8',
+      bytes: new TextEncoder().encode(content).byteLength,
+      sha256: reportSha256,
+    }],
+  });
+}

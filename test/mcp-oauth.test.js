@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises';
 import {
   MCP_AUTH_ISSUER,
   MCP_OAUTH_SCOPE,
+  MCP_OFFLINE_SCOPE,
   MCP_PROTECTED_RESOURCE_METADATA,
   MCP_RESOURCE,
   createMcpOAuthHandlers,
@@ -91,6 +92,8 @@ test('publishes protected-resource and OAuth authorization metadata for ChatGPT'
   assert.equal(metadata.body.authorization_response_iss_parameter_supported, true);
   assert.deepEqual(metadata.body.code_challenge_methods_supported, ['S256']);
   assert.deepEqual(metadata.body.token_endpoint_auth_methods_supported, ['none']);
+  assert.deepEqual(metadata.body.grant_types_supported, ['authorization_code', 'refresh_token']);
+  assert.deepEqual(metadata.body.scopes_supported, [MCP_OAUTH_SCOPE, MCP_OFFLINE_SCOPE]);
 });
 
 test('Vercel routes every OAuth endpoint through the existing MCP function before catch-all handling', async () => {
@@ -176,6 +179,45 @@ test('authorization-code exchange enforces PKCE and issues a resource-bound acce
   }));
   assert.equal(replay.status, 400);
   assert.equal(replay.body.error, 'invalid_grant');
+});
+
+test('offline_access issues a refresh token that restores ChatGPT access without persisted credentials', () => {
+  const requestedScope = `${MCP_OAUTH_SCOPE} ${MCP_OFFLINE_SCOPE}`;
+  const handlers = createMcpOAuthHandlers({ env: { PARA11AX_TOKEN: SECRET }, nowMs: () => NOW_MS });
+  const consent = handlers.handleAuthorize(formRequest({
+    ...authorizeParams({ scope: requestedScope }),
+    gateway_token: SECRET,
+  }));
+  assert.equal(consent.status, 302);
+  const code = new URL(consent.headers.location).searchParams.get('code');
+  assert.ok(code);
+
+  const exchange = handlers.handleToken(formRequest({
+    grant_type: 'authorization_code',
+    code,
+    client_id: authorizeParams().client_id,
+    redirect_uri: authorizeParams().redirect_uri,
+    resource: MCP_RESOURCE,
+    code_verifier: VERIFIER,
+  }));
+  assert.equal(exchange.status, 200);
+  assert.equal(exchange.body.scope, requestedScope);
+  assert.equal(typeof exchange.body.refresh_token, 'string');
+  assert.ok(exchange.body.refresh_token.length > 32);
+
+  const later = NOW_MS + (31 * 24 * 60 * 60 * 1000);
+  const freshProcess = createMcpOAuthHandlers({ env: { PARA11AX_TOKEN: SECRET }, nowMs: () => later });
+  const refreshed = freshProcess.handleToken(formRequest({
+    grant_type: 'refresh_token',
+    refresh_token: exchange.body.refresh_token,
+    client_id: authorizeParams().client_id,
+    resource: MCP_RESOURCE,
+  }));
+  assert.equal(refreshed.status, 200);
+  assert.equal(refreshed.body.scope, requestedScope);
+  assert.equal(typeof refreshed.body.refresh_token, 'string');
+  assert.notEqual(refreshed.body.refresh_token, exchange.body.refresh_token);
+  assert.equal(verifyMcpAuthorization({ headers: { authorization: `Bearer ${refreshed.body.access_token}` } }, SECRET, later).scheme, 'oauth2');
 });
 
 test('MCP discovery is public while every tool declares OAuth and calls trigger linking', async () => {
