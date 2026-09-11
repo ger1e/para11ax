@@ -8,6 +8,7 @@ const MAX_RESULTS = 1000;
 const MAX_ERRORED_SITES = 512;
 const DEFAULT_TIMEOUT_MS = 55_000;
 const SAFE_NAME = /^[a-z0-9._-]{1,64}$/i;
+const DEFAULT_PRODUCTION_WORKER_URL = 'https://user-scanner-git-main-geri6.vercel.app/scan';
 
 function response(status, body, extraHeaders = {}) {
   return {
@@ -70,6 +71,13 @@ function workerUrl(value) {
   if (parsed.protocol !== 'https:' && !(localhost && parsed.protocol === 'http:')) throw new Error('invalid_user_scanner_worker_url');
   parsed.hash = '';
   return parsed.toString();
+}
+
+function resolveWorkerUrl(env) {
+  const configured = workerUrl(env.PARA11AX_USER_SCANNER_URL);
+  if (configured) return configured;
+  if (env.VERCEL === '1' && env.VERCEL_ENV === 'production') return DEFAULT_PRODUCTION_WORKER_URL;
+  return null;
 }
 
 function boundedString(value, max = 2048) {
@@ -158,7 +166,7 @@ export function createUserScannerHandler({
     catch (error) { return errorResponse(400, error.message); }
 
     let url;
-    try { url = workerUrl(env.PARA11AX_USER_SCANNER_URL); }
+    try { url = resolveWorkerUrl(env); }
     catch { return errorResponse(503, 'user_scanner_misconfigured'); }
     if (!url) return errorResponse(503, 'user_scanner_unconfigured');
 
@@ -171,7 +179,16 @@ export function createUserScannerHandler({
       no_nsfw: scan.noNsfw,
     };
     const headers = { 'Content-Type': 'application/json' };
-    if (env.PARA11AX_USER_SCANNER_TOKEN) headers.Authorization = `Bearer ${env.PARA11AX_USER_SCANNER_TOKEN}`;
+    const staticWorkerToken = typeof env.PARA11AX_USER_SCANNER_TOKEN === 'string' ? env.PARA11AX_USER_SCANNER_TOKEN.trim() : '';
+    const workloadToken = typeof env.VERCEL_OIDC_TOKEN === 'string' ? env.VERCEL_OIDC_TOKEN.trim() : '';
+    if (staticWorkerToken) {
+      headers.Authorization = `Bearer ${staticWorkerToken}`;
+    } else if (workloadToken) {
+      headers.Authorization = `Bearer ${workloadToken}`;
+      headers['x-vercel-trusted-oidc-idp-token'] = workloadToken;
+    } else {
+      return errorResponse(503, 'user_scanner_auth_unconfigured');
+    }
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), Math.max(1000, Math.min(120_000, timeoutMs)));
