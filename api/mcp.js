@@ -1,4 +1,4 @@
-import { createMcpHttpHandler } from '../src/mcp/server.js';
+import { createMcpHttpHandler } from '../src/mcp/transport.js';
 
 const handleMcp = createMcpHttpHandler();
 
