@@ -3,7 +3,7 @@
 
 ## Purpose
 
-This workflow integrates the isolated User Scanner operator surface and bounded defensive Google dorking into the Authorised OSINT process without promoting search/scanner output directly into Evidence v2 or treating a registration/profile hit as proof of identity.
+This workflow integrates bounded defensive Google dorking, the isolated User Scanner operator surface, and the PARA11AX MCP control plane into the Authorised OSINT process without promoting search/scanner output directly into Evidence v2 or treating a registration/profile hit as proof of identity.
 
 Use this workflow only for identifiers the operator owns, test fixtures, or investigations covered by explicit authorization and a legitimate defensive purpose.
 
@@ -14,6 +14,7 @@ scope / authority
   -> authoritative identity anchor
   -> exact-identifier Google dorks / passive public-source discovery
   -> User Scanner bounded username/email collection
+       via Web/REST/CLI or MCP para11ax_user_scan
   -> candidate social/profile/account leads
   -> exact-identifier pivots inside scope
   -> independent corroboration
@@ -24,7 +25,7 @@ scope / authority
   -> remediation / report / re-test
 ```
 
-Full search-engine query policy and templates: [`GOOGLE-DORKING.md`](GOOGLE-DORKING.md).
+Full search-engine query policy and templates: [`GOOGLE-DORKING.md`](GOOGLE-DORKING.md). Remote tool contract: [`MCP.md`](MCP.md).
 
 ## Trigger
 
@@ -46,6 +47,36 @@ Useful result classes include:
 - indexed historical documents, pages, repositories, error/config artifacts, or accidental exposure;
 - operator-authorized breach/infostealer context when separately lawful and enabled.
 
+## Preferred execution surfaces
+
+The same bounded User Scanner handler is reachable through the browser/REST path and remotely through MCP. Prefer MCP when the investigation is already being orchestrated from ChatGPT or another authenticated MCP client because it removes the manual copy/paste boundary while preserving the same scanner validation and fixed worker destination.
+
+MCP username example:
+
+```json
+{
+  "name":"para11ax_user_scan",
+  "arguments":{
+    "scanType":"username",
+    "target":"example_handle"
+  }
+}
+```
+
+MCP email example:
+
+```json
+{
+  "name":"para11ax_user_scan",
+  "arguments":{
+    "scanType":"email",
+    "target":"analyst@example.com"
+  }
+}
+```
+
+These are tool arguments, not evidence claims. MCP transport does not upgrade scanner output to a stronger authority class.
+
 ## Semantic firewall
 
 A Google result or User Scanner hit is an **investigative lead**, not proof of identity, ownership, activity, intent, compromise, current control, or vulnerability.
@@ -58,7 +89,7 @@ Classify every material result as one of:
 - `UNRESOLVED` — the signal is plausible but conflicting or insufficient;
 - `REJECTED` — the signal was a false positive, same-name/handle collision, stale artifact, or otherwise disproven.
 
-Only `CORROBORATED` observations should normally become confirmed OSINT findings. `OBSERVED` and `INFERRED` items remain pivots/hypotheses. A zero-result Google query is `NOT_INDEXED_OR_NOT_RETURNED`, never proof of absence.
+Only `CORROBORATED` observations should normally become confirmed OSINT findings. `OBSERVED` and `INFERRED` items remain pivots/hypotheses. A zero-result Google query is `NOT_INDEXED_OR_NOT_RETURNED`, never proof of absence. A zero-result User Scanner pass is scanner-scoped non-observation, not proof that the identifier is unused.
 
 ## Corroboration order
 
@@ -70,11 +101,11 @@ Prefer evidence in this order:
 4. second independent OSINT source;
 5. generic search/index results.
 
-Search repetition is not independent corroboration when multiple engines are indexing the same underlying page.
+Search repetition is not independent corroboration when multiple engines are indexing the same underlying page. User Scanner modules that ultimately resolve the same underlying profile are also not independent merely because multiple module names returned it.
 
 ## PARA11AX integration
 
-PARA11AX already exposes the bounded authenticated User Scanner route and CLI aliases:
+PARA11AX exposes the bounded authenticated User Scanner route and CLI aliases:
 
 ```text
 user-scanner username <target>
@@ -82,6 +113,8 @@ user-scanner email <target>
 osint username <target> --module <module>
 identity username <target> --category <category> --cross-scan
 ```
+
+The MCP equivalent is `para11ax_user_scan`. It delegates to the same bounded server-side User Scanner handler and therefore inherits the same worker URL, timeout, request/response and input validation. MCP cannot select the worker host, token, proxy, arbitrary module path, concurrency or arbitrary destination.
 
 Google dork output and User Scanner output remain isolated operator context. Compatible results may be captured explicitly into Investigation Workspace context, but that capture is **not Evidence v2** and must not silently affect the Intelligence Kernel, Decision Support, or top-level threat conclusions.
 
@@ -92,6 +125,8 @@ Promote information onward only after corroboration and normalization. Preserve 
 Allowed bounded pivots include exact aliases, public profile URLs, public domains linked by a corroborated profile, and infrastructure explicitly connected to the authorized entity.
 
 A newly discovered sibling account, username, domain, person, company, IP, cloud object, or service is a **candidate asset**, not automatic scan scope. Re-check authorization before target-directed interaction or broader enumeration.
+
+MCP automation does not weaken this rule. A tool discovering a new identifier does not implicitly authorize the next scan.
 
 ## XDR bridge
 
@@ -110,6 +145,8 @@ Store the minimum normalized evidence required to reproduce the finding. Do not 
 
 For reports, preserve URLs/timestamps/queries and redact unnecessary sensitive fields. If a finding materially affects a person, organization, or response action, require independent corroboration before escalation.
 
+External MCP clients can persist conversation/tool state outside PARA11AX. Treat client-side retention and sharing as a separate data-handling boundary. Do not assume PARA11AX's stateless MCP server controls how the client stores returned identity data.
+
 ## Stop conditions
 
 Stop expanding the identity graph when any of the following is true:
@@ -125,7 +162,7 @@ Stop expanding the identity graph when any of the following is true:
 Authorised OSINT Toolkit
   -> anchor-first entity resolution
   -> defensive Google dorking on exact scoped identifiers/domains
-  -> User Scanner identity/social discovery
+  -> MCP para11ax_user_scan when connected, otherwise existing User Scanner surface
   -> primary-source profile/document verification
   -> Exa/Parallel only for material recall gaps
   -> PARA11AX normalized operator context
@@ -135,7 +172,7 @@ Authorised OSINT Toolkit
   -> same-query / same-probe re-test when applicable
 ```
 
-The design goal is maximum useful recall with minimum attribution error: Google dorking adds indexed/historical/document exposure, User Scanner adds structured identity/social discovery, and the Authorised OSINT Toolkit plus PARA11AX semantic firewall prevent that breadth from becoming false certainty.
+The design goal is maximum useful recall with minimum attribution error: Google dorking adds indexed/historical/document exposure, User Scanner adds structured identity/social discovery, MCP removes the orchestration dead-end, and the Authorised OSINT Toolkit plus PARA11AX semantic firewall prevent that breadth from becoming false certainty.
 
 ---
 

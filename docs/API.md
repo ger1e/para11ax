@@ -3,16 +3,24 @@
 
 All responses are JSON unless a documented human-facing error representation is explicitly negotiated. Production clients should use HTTPS. The gateway bearer is `Authorization: Bearer <PARA11AX_TOKEN>`.
 
+PARA11AX has two remote protocol surfaces over the same bounded domain logic:
+
+- REST under `/api/para11ax/*`;
+- authenticated stateless MCP at `POST /mcp`.
+
+The MCP surface does not duplicate provider, scanner, mission, investigation, case, or report implementations. It delegates to the existing PARA11AX handlers/registered command catalog and preserves their input validation, fixed-host egress, evidence semantics, and side-effect boundaries. See [`MCP.md`](MCP.md) for the canonical MCP contract.
+
 #### Canonical Evidence v2 workflows
 
 Supported indicator types are `ip`, `domain`, `url`, `hash`, `cve`, `attack`, `asn`, `cidr`, and `certificate`. Certificate input is explicit: `cert-sha256:<64-hex>`. Fixed profiles are `fast`, `standard`, and `full`; callers cannot select arbitrary Evidence v2 providers.
 
 Profile admission and execution priority are separate. Admitted providers are ordered by **Provider Value Scheduler v1.0**. For the current IP reference workflow, 24 admitted providers retain a 48-call ceiling (maximum two attempts per provider), maximum concurrency 4, and the 20-second request deadline. Scheduler ordering does not add or suppress providers based on returned evidence.
 
-Email/username User Scanner operations, native Shodan commands, and GreyNoise Project Swarm session/workspace operations are separate analyst utilities. They do not become canonical Evidence v2 workflow types and do not automatically replace or promote into the current Evidence v2 result.
+Email/username User Scanner operations, native Shodan commands, and GreyNoise Project Swarm session/workspace operations are separate analyst utilities. They do not become canonical Evidence v2 workflow types and do not automatically replace or promote into the current Evidence v2 result. The same separation applies when those utilities are invoked through MCP.
 
 #### Route inventory
 
+- `POST /mcp` — bearer-protected stateless MCP control plane; current profile `2026-07-28`; 13 grouped tools over existing PARA11AX capabilities.
 - `GET /api/para11ax/meta` — public static capabilities and hard limits, including scheduler policy metadata where applicable.
 - `GET /api/para11ax/health` — bearer-protected readiness; `Cache-Control: no-store`.
 - `GET /api/para11ax/status` — bearer-protected count-only runtime state; `Cache-Control: no-store`.
@@ -24,7 +32,79 @@ Email/username User Scanner operations, native Shodan commands, and GreyNoise Pr
 - `POST /api/para11ax/swarm` — bounded authenticated GreyNoise Project Swarm search, session detail, pivots, Workspace Diff, and explicit single-session export.
 - `POST /api/para11ax/provider` — one authenticated registered provider against one validated indicator.
 
-Unknown `/api/para11ax/*` paths fail closed.
+Unknown `/api/para11ax/*` paths fail closed. `/mcp` is routed explicitly before the REST catch-all and is never dispatched through an unknown REST path.
+
+#### `POST /mcp`
+
+MCP authentication uses the same gateway bearer as protected REST routes:
+
+```text
+Authorization: Bearer <PARA11AX_TOKEN>
+Content-Type: application/json
+MCP-Protocol-Version: 2026-07-28
+Mcp-Method: <json-rpc method>
+Mcp-Name: <tool name>   # tools/call only
+```
+
+For the modern stateless profile, `Mcp-Method` must equal the JSON-RPC body method. On `tools/call`, `Mcp-Name` must equal `params.name`. Missing or mismatched routing headers fail closed. Successful modern responses use `resultType: "complete"`; `server/discover` and `tools/list` expose bounded private cache hints.
+
+Canonical discovery:
+
+```text
+server/discover
+  -> tools/list
+  -> tools/call
+```
+
+Current grouped tools:
+
+```text
+para11ax_capabilities
+para11ax_enrich
+para11ax_batch
+para11ax_provider
+para11ax_shodan
+para11ax_swarm
+para11ax_user_scan
+para11ax_stix
+para11ax_mission
+para11ax_investigation
+para11ax_case
+para11ax_report
+para11ax_command
+```
+
+Representative MCP User Scanner call body:
+
+```json
+{
+  "jsonrpc":"2.0",
+  "id":1,
+  "method":"tools/call",
+  "params":{
+    "name":"para11ax_user_scan",
+    "arguments":{"scanType":"username","target":"example_handle"}
+  }
+}
+```
+
+Representative MCP enrichment call body:
+
+```json
+{
+  "jsonrpc":"2.0",
+  "id":2,
+  "method":"tools/call",
+  "params":{
+    "name":"para11ax_enrich",
+    "arguments":{"indicator":"203.0.113.10","profile":"standard"}
+  }
+}
+```
+
+Stateful logical workflows remain transport-stateless. `para11ax_mission`, `para11ax_investigation`, and `para11ax_case` return explicit state objects which the client supplies on subsequent calls. No hidden per-user server session is required.
+
+`para11ax_command` is a registered-command fallback, not arbitrary shell execution. Commands requiring local-admin/filesystem effects or browser-session-only behavior remain unavailable remotely.
 
 #### `POST /api/para11ax/enrich`
 
@@ -77,17 +157,17 @@ Uses the same single-indicator request contract as `/enrich`. The gateway enrich
 
 #### `POST /api/para11ax/user-scanner`
 
-Separate active-OSINT capability used by the `user-scanner` command and `osint` / `identity` aliases.
+Separate active-OSINT capability used by the `user-scanner` command and `osint` / `identity` aliases, and remotely by `para11ax_user_scan` over MCP.
 
 ```json
 {"scanType":"username","target":"kaifcodec","crossScan":false,"noNsfw":true}
 ```
 
-The caller cannot select the worker URL, proxy, concurrency, arbitrary destination or timeout. Output remains separate from Evidence v2 and Intelligence Kernel reasoning.
+The caller cannot select the worker URL, proxy, concurrency, arbitrary destination or timeout. Output remains separate from Evidence v2 and Intelligence Kernel reasoning. Scanner hits remain identity/account leads until corroborated; see [`IDENTITY-OSINT.md`](IDENTITY-OSINT.md) and [`GOOGLE-DORKING.md`](GOOGLE-DORKING.md).
 
 #### `POST /api/para11ax/shodan`
 
-Bearer required. The browser sends a normalized Shodan operator request to the same-origin route. The gateway reads `SHODAN_API_KEY` server-side and contacts only `https://api.shodan.io`.
+Bearer required. The browser or MCP wrapper sends a normalized Shodan operator request to the same bounded handler. The gateway reads `SHODAN_API_KEY` server-side and contacts only `https://api.shodan.io`.
 
 Approved shell commands and equivalent request shapes:
 
@@ -149,11 +229,11 @@ Response envelope:
 - `domain` — `consumes_query_credit`
 - `search` — `may_consume_query_credit`
 
-Search is first-page only. Search results and host-service lists are bounded; large raw banners/service bodies are removed before the response reaches the browser. Shodan operator output is terminal/operator context and leaves the current Evidence v2 enrichment and `intelligence` projection unchanged.
+Search is first-page only. Search results and host-service lists are bounded; large raw banners/service bodies are removed before the response reaches the client. Shodan operator output is terminal/operator context and leaves the current Evidence v2 enrichment and `intelligence` projection unchanged.
 
 #### `POST /api/para11ax/swarm`
 
-Bearer required. The browser sends only normalized Swarm operations to the same-origin route. The gateway reads `GREYNOISE_API_KEY` server-side, contacts only `https://api.greynoise.io`, refuses redirects, and does not accept caller-selected URLs, methods, headers, credentials, or arbitrary GreyNoise operations.
+Bearer required. The browser or MCP wrapper sends only normalized Swarm operations to the same bounded handler. The gateway reads `GREYNOISE_API_KEY` server-side, contacts only `https://api.greynoise.io`, refuses redirects, and does not accept caller-selected URLs, methods, headers, credentials, or arbitrary GreyNoise operations.
 
 Approved operations and representative request shapes:
 
@@ -194,13 +274,13 @@ Search/pivot ranges must be valid explicit ISO-8601 intervals with `startTime < 
 
 `scope=workspace` uses the sensor-backed workspace session dataset and requires the applicable GreyNoise Sensors entitlement. `scope=demo` uses the GreyNoise demo session dataset and requires the applicable Swarm entitlement. Workspace Diff uses its own approved workspace aliases instead of the session `scope` parameter. Demo export is rejected locally before upstream egress. PARA11AX does not infer or advertise a production entitlement merely because a key is configured.
 
-Successful `search`, `get`, `unique`, `timeseries`, and `diff` responses are bounded operator context. They can be explicitly captured with `investigation capture operator`; that capture does not manufacture or modify Evidence v2, provider corroboration, ATT&CK mapping, maliciousness, or analyst disposition. `export` is an explicit browser download and does not replace the current operator result.
+Successful `search`, `get`, `unique`, `timeseries`, and `diff` responses are bounded operator context. They can be explicitly captured with `investigation capture operator`; that capture does not manufacture or modify Evidence v2, provider corroboration, ATT&CK mapping, maliciousness, or analyst disposition. `export` remains an explicit export and does not replace the current operator result.
 
 Full operator contract: [`GREYNOISE-SWARM.md`](GREYNOISE-SWARM.md).
 
 #### `POST /api/para11ax/provider`
 
-Bearer required. This route executes exactly one named provider already registered in PARA11AX against one validated indicator. It exists for bounded direct-provider shell operations; it is not a caller-controlled HTTP proxy.
+Bearer required. This route executes exactly one named provider already registered in PARA11AX against one validated indicator. It exists for bounded direct-provider shell/MCP operations; it is not a caller-controlled HTTP proxy.
 
 ```json
 {"provider":"rdap","indicator":"203.0.113.10","type":"ip"}
@@ -212,11 +292,11 @@ Callers cannot supply a URL, method, credential, timeout, parser, response-size 
 
 #### Common errors
 
-- `400` — invalid request/indicator/profile/batch, invalid Shodan command/target/query/facets, rejected Swarm command/range/query/pivot/diff/export shape, or unsupported provider type.
+- `400` — invalid request/indicator/profile/batch, invalid MCP routing header/body agreement, invalid Shodan command/target/query/facets, rejected Swarm command/range/query/pivot/diff/export shape, or unsupported provider type.
 - `401 unauthorized`.
 - `404 provider_not_found` for an unknown direct-provider name.
 - `409 provider_inactive` or `provider_unconfigured` for a direct provider that cannot be admitted.
-- `405 method_not_allowed`.
+- `405 method_not_allowed`; `GET /mcp` intentionally returns 405 with `Allow: POST`.
 - `413 payload_too_large`.
 - `415 unsupported_media_type`.
 - User Scanner uses controlled `502`/`503`/`504` worker errors.
@@ -225,7 +305,7 @@ Callers cannot supply a URL, method, credential, timeout, parser, response-size 
 
 #### Security invariants
 
-Caller input never selects arbitrary provider hosts, Shodan hosts, GreyNoise hosts, worker hosts, methods, provider secrets, `SHODAN_API_KEY`, `GREYNOISE_API_KEY`, or arbitrary adapters. Evidence v2 provider egress remains fixed through `safeFetch`. Provider Value Scheduler v1.0 and Intelligence Kernel v1.0 add no new egress, credential, persistence or dependency surface and use no LLM. User Scanner, Shodan, and GreyNoise Swarm use separate bounded authenticated routes with server-configured fixed destinations. See `THREAT-MODEL.md`, `SECURITY-CONTROLS.md`, `SHODAN-SHELL.md`, and `GREYNOISE-SWARM.md`.
+Caller input never selects arbitrary provider hosts, Shodan hosts, GreyNoise hosts, worker hosts, methods, provider secrets, `SHODAN_API_KEY`, `GREYNOISE_API_KEY`, or arbitrary adapters. Evidence v2 provider egress remains fixed through `safeFetch`. Provider Value Scheduler v1.0 and Intelligence Kernel v1.0 add no new egress, credential, persistence or dependency surface and use no LLM. User Scanner, Shodan, and GreyNoise Swarm use separate bounded authenticated handlers with server-configured fixed destinations whether invoked by REST, Web, CLI adapters, or MCP. MCP does not expose host shell, arbitrary fetch/filesystem, local-admin operations, or hidden server-side workflow state. See `MCP.md`, `THREAT-MODEL.md`, `SECURITY-CONTROLS.md`, `IDENTITY-OSINT.md`, `SHODAN-SHELL.md`, and `GREYNOISE-SWARM.md`.
 
 ---
 
