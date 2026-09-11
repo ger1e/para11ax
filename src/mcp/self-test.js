@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { securityHeaders } from '../core/http.js';
+import { verifyGitHubActionsOidc } from './github-actions-oidc.js';
 import { createMcpHttpHandler, MCP_PROTOCOL_VERSION } from './transport.js';
 
 export const SELF_TEST_MESSAGE_PREFIX = 'para11ax-production-self-test:v1:';
@@ -19,6 +20,12 @@ function response(status, body, extraHeaders = {}) {
     },
     body,
   };
+}
+
+function headerValue(headers, name) {
+  if (!headers) return undefined;
+  if (typeof headers.get === 'function') return headers.get(name) ?? undefined;
+  return headers[name] ?? headers[name.toLowerCase()] ?? headers[name.toUpperCase()];
 }
 
 function queryValue(request, name) {
@@ -40,6 +47,22 @@ function validSignature(token, timestamp, supplied) {
     .digest();
   const actual = Buffer.from(String(supplied), 'hex');
   return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+async function authorizeSelfTest(request, { token, fetchImpl, nowMs }) {
+  const authorization = String(headerValue(request?.headers, 'authorization') ?? '');
+  if (authorization.startsWith('Bearer ')) {
+    const oidc = authorization.slice(7).trim();
+    if (oidc && await verifyGitHubActionsOidc(oidc, { fetchImpl, nowMs })) return 'github_oidc';
+  }
+
+  const tsRaw = queryValue(request, 'ts');
+  const sig = queryValue(request, 'sig');
+  if (!/^\d{10,13}$/.test(String(tsRaw ?? ''))) return null;
+  const ts = Number(tsRaw);
+  const nowSeconds = Math.floor(nowMs() / 1000);
+  if (!Number.isSafeInteger(ts) || Math.abs(nowSeconds - ts) > MAX_SKEW_SECONDS || !validSignature(token, ts, sig)) return null;
+  return 'hmac';
 }
 
 function mcpRequest(token, method, params, id, name = null) {
@@ -98,14 +121,8 @@ export function createSignedProductionSelfTestHandler({
     if (request?.method !== 'GET') return response(405, { error: 'method_not_allowed' }, { allow: 'GET' });
     if (typeof token !== 'string' || !token) return response(503, { error: 'self_test_unconfigured' });
 
-    const tsRaw = queryValue(request, 'ts');
-    const sig = queryValue(request, 'sig');
-    if (!/^\d{10,13}$/.test(String(tsRaw ?? ''))) return response(401, { error: 'unauthorized' });
-    const ts = Number(tsRaw);
-    const nowSeconds = Math.floor(nowMs() / 1000);
-    if (!Number.isSafeInteger(ts) || Math.abs(nowSeconds - ts) > MAX_SKEW_SECONDS || !validSignature(token, ts, sig)) {
-      return response(401, { error: 'unauthorized' });
-    }
+    const authorization = await authorizeSelfTest(request, { token, fetchImpl, nowMs });
+    if (!authorization) return response(401, { error: 'unauthorized' });
 
     let tools;
     try {
@@ -181,6 +198,10 @@ export function createSignedProductionSelfTestHandler({
 
     return response(200, {
       status: enrichmentOk && userScannerOk ? 'pass' : enrichmentOk || userScannerOk ? 'partial' : 'fail',
+      authorization,
+      deploymentSha: typeof env.VERCEL_GIT_COMMIT_SHA === 'string' && /^[0-9a-f]{40}$/i.test(env.VERCEL_GIT_COMMIT_SHA)
+        ? env.VERCEL_GIT_COMMIT_SHA.toLowerCase()
+        : null,
       mcp: { authenticated: true, toolCount: tools.length },
       enrichment: enrichmentSummary,
       userScanner: userScannerSummary,
