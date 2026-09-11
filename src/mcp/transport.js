@@ -10,6 +10,15 @@ applyChatGptToolMetadata(MCP_TOOLS);
 
 const LIST_TTL_MS = 300_000;
 const HEADER_MISMATCH = -32001;
+const MCP_SERVER_BRAND = Object.freeze({
+  title: 'PARA11AX',
+  websiteUrl: 'https://para11ax.vercel.app/',
+  icons: Object.freeze([Object.freeze({
+    src: 'https://para11ax.vercel.app/assets/brand/para11ax-mark.svg',
+    mimeType: 'image/svg+xml',
+    sizes: Object.freeze(['any']),
+  })]),
+});
 
 function headerValue(headers, name) {
   if (!headers) return undefined;
@@ -74,6 +83,22 @@ function complete(result) {
     : result;
 }
 
+function brandedServerInfo(serverInfo = {}) {
+  return {
+    ...serverInfo,
+    ...MCP_SERVER_BRAND,
+    icons: MCP_SERVER_BRAND.icons.map(icon => ({ ...icon, sizes: [...icon.sizes] })),
+  };
+}
+
+function applyServerBranding(body, response) {
+  if (!['initialize', 'server/discover'].includes(body?.method)) return response;
+  if (!response?.body || typeof response.body !== 'object' || response.body.error || !response.body.result) return response;
+  const next = structuredClone(response);
+  next.body.result.serverInfo = brandedServerInfo(next.body.result.serverInfo);
+  return next;
+}
+
 function normalizeModernResult(request, response) {
   if (headerValue(request?.headers, 'mcp-protocol-version') !== MCP_PROTOCOL_VERSION) return response;
   if (!response?.body || typeof response.body !== 'object' || response.body.error || !response.body.result) return response;
@@ -116,7 +141,8 @@ export function createMcpHttpHandler(options = {}) {
     const body = requestBody(request);
     const headerFailure = validateModernRoutingHeaders(request, body);
     if (headerFailure) return headerFailure;
-    return normalizeModernResult(request, await core(request));
+    const branded = applyServerBranding(body, await core(request));
+    return normalizeModernResult(request, branded);
   };
 }
 
