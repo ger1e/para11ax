@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import handler from '../api/para11ax/[...path].js';
 
 function fakeResponse() {
@@ -56,5 +57,6 @@ test('signed self-test is multiplexed through the existing catch-all function', 
 });
 
 test('Vercel API source stays within the Hobby twelve-function ceiling', () => {
-  assert.ok(countJsFiles(new URL('../api/', import.meta.url)) <= 12);
+  const apiDirectory = fileURLToPath(new URL('../api/', import.meta.url));
+  assert.ok(countJsFiles(apiDirectory) <= 12);
 });
