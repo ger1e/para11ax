@@ -69,6 +69,43 @@ const USER_SCAN_SCHEMA = Object.freeze({
   additionalProperties: false,
 });
 
+const SWARM_FIELDS = Object.freeze([
+  'source.ip', 'destination.ip', 'source.port', 'destination.port', 'classification', 'protocol', 'ipProtocol',
+  'sourceMetadata.asn', 'sourceMetadata.org', 'sourceMetadata.country_code',
+  'destinationMetadata.asn', 'destinationMetadata.org', 'destinationMetadata.country_code',
+  'gnTagMetadata.name', 'gnTagMetadata.slug', 'gnTagMetadata.category', 'gnTagMetadata.intention', 'gnTagMetadata.cves',
+  'tls.ja3', 'tls.ja4', 'tcp.ja4t', 'suricata.signature', 'suricata.category', 'suricata.severity',
+]);
+
+const SWARM_SCHEMA = Object.freeze({
+  type: 'object',
+  properties: {
+    command: {
+      type: 'string',
+      description: 'Swarm operation. search requires startTime/endTime; get requires sessionId; export requires sessionId/exportType; unique requires startTime/endTime/field; timeseries requires startTime/endTime; diff requires query and distinct sourceWorkspace/targetWorkspace.',
+      enum: ['search', 'get', 'export', 'unique', 'timeseries', 'diff'],
+    },
+    sessionId: { type: 'string', description: 'Session identifier for get/export.' },
+    scope: { type: 'string', description: 'Dataset scope for search/get/export/unique/timeseries. demo does not support export.', enum: ['workspace', 'demo'] },
+    startTime: { type: 'string', description: 'ISO-8601 range start for search, unique, or timeseries; must precede endTime.' },
+    endTime: { type: 'string', description: 'ISO-8601 range end for search, unique, or timeseries.' },
+    query: { type: 'string', description: 'Bounded GreyNoise query for search/unique/timeseries, and required diff query.' },
+    page: { type: 'integer', minimum: 1, maximum: 10000, description: 'Search result page.' },
+    pageSize: { type: 'integer', minimum: 1, maximum: 100, description: 'Search result page size.' },
+    exportType: { type: 'string', description: 'Export payload type.', enum: ['pcap', 'rawSource', 'rawDestination'] },
+    field: { type: 'string', description: 'Allowed pivot field for unique and optional timeseries grouping.', enum: SWARM_FIELDS },
+    includeCounts: { type: 'boolean', description: 'Whether unique should include counts.' },
+    interval: { type: 'string', description: 'Timeseries bucket interval.', enum: ['auto', '1s', '1m', '1h', '1d'] },
+    size: { type: 'integer', minimum: 1, maximum: 100, description: 'Timeseries or diff result size.' },
+    sourceWorkspace: { type: 'string', description: 'Diff source workspace.', enum: ['personal', 'community', 'greynoise'] },
+    targetWorkspace: { type: 'string', description: 'Diff target workspace; must differ from sourceWorkspace.', enum: ['personal', 'community', 'greynoise'] },
+    mode: { type: 'string', description: 'Diff comparison mode.', enum: ['source-only', 'both', 'all'] },
+    nextToken: { type: 'string', description: 'Optional bounded pagination token for diff.' },
+  },
+  required: ['command'],
+  additionalProperties: false,
+});
+
 export function applyChatGptToolMetadata(tools) {
   for (const tool of tools) {
     const metadata = TOOL_METADATA[tool.name];
@@ -77,6 +114,7 @@ export function applyChatGptToolMetadata(tools) {
     tool.annotations = { ...metadata.annotations };
     tool.securitySchemes = [{ type: 'oauth2', scopes: [MCP_OAUTH_SCOPE] }];
     if (tool.name === 'para11ax_user_scan') tool.inputSchema = USER_SCAN_SCHEMA;
+    if (tool.name === 'para11ax_swarm') tool.inputSchema = SWARM_SCHEMA;
   }
   return tools;
 }
