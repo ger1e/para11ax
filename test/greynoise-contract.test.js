@@ -7,7 +7,7 @@ function json(value, status = 200) {
   return new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } });
 }
 
-test('GreyNoise queries Project Swarm datasets through v3 IP Lookup', async () => {
+test('GreyNoise default v3 IP lookup uses the global dataset without entitlement-gated workspace labels', async () => {
   let request;
   const output = await greynoiseProvider.run(
     { type: 'ip', value: '8.8.8.8' },
@@ -38,16 +38,16 @@ test('GreyNoise queries Project Swarm datasets through v3 IP Lookup', async () =
 
   const url = new URL(request.url);
   assert.equal(url.pathname, '/v3/ip/8.8.8.8');
-  assert.equal(url.searchParams.get('workspace_labels'), 'greynoise,community,personal');
+  assert.equal(url.searchParams.has('workspace_labels'), false);
   assert.equal(request.init.headers.key, 'test-key');
   assert.equal(output.verdict, 'suspicious');
-  assert.deepEqual(output.attributes.datasetScopes, ['greynoise', 'community', 'personal']);
+  assert.deepEqual(output.attributes.datasetScopes, ['greynoise']);
   assert.equal(output.attributes.actor, 'example-actor');
   assert.deepEqual(output.attributes.cves, ['CVE-2026-1234']);
   assert.deepEqual(output.attributes.scannedPorts, ['22/TCP', '443/TCP']);
 });
 
-test('GreyNoise allows a restricted Project Swarm dataset scope list', async () => {
+test('GreyNoise allows an explicit restricted Project Swarm dataset scope list', async () => {
   let requestUrl;
   const output = await greynoiseProvider.run(
     { type: 'ip', value: '1.1.1.1' },
@@ -78,7 +78,7 @@ test('GreyNoise normalizes an explicit v3 no-result response', async () => {
 
   assert.equal(output.verdict, 'no_result');
   assert.equal(output.attributes.noise, false);
-  assert.deepEqual(output.attributes.datasetScopes, ['greynoise', 'community', 'personal']);
+  assert.deepEqual(output.attributes.datasetScopes, ['greynoise']);
 });
 
 test('GreyNoise adapter fails closed without revealing credential identifiers', async () => {
