@@ -2,8 +2,13 @@ import hmac
 import json
 import os
 from http.server import BaseHTTPRequestHandler
+from urllib.parse import urlsplit
 
 from worker import run_scan
+
+
+def _request_path(value: str) -> str:
+    return urlsplit(value).path
 
 
 class handler(BaseHTTPRequestHandler):
@@ -26,13 +31,13 @@ class handler(BaseHTTPRequestHandler):
         return hmac.compare_digest(supplied[7:], expected)
 
     def do_GET(self):
-        if self.path == "/health":
+        if _request_path(self.path) == "/health":
             self._json(200, {"status": "ok", "service": "user-scanner"})
             return
         self._json(404, {"error": "not_found"})
 
     def do_POST(self):
-        if self.path != "/scan":
+        if _request_path(self.path) != "/scan":
             self._json(404, {"error": "not_found"})
             return
         if not self._authorized():
