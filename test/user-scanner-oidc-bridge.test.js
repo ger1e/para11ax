@@ -8,20 +8,23 @@ const response = body => new Response(JSON.stringify(body), {
   headers: { 'content-type': 'application/json' },
 });
 
-const request = body => ({
+const request = (body, extraHeaders = {}) => ({
   method: 'POST',
-  headers: { authorization: 'Bearer gateway-token', 'content-type': 'application/json' },
+  headers: {
+    authorization: 'Bearer gateway-token',
+    'content-type': 'application/json',
+    ...extraHeaders,
+  },
   body,
 });
 
-test('production Vercel bridge defaults to owned worker alias and forwards workload identity', async () => {
+test('production Vercel bridge defaults to owned worker alias and forwards runtime workload identity header', async () => {
   const calls = [];
   const handle = createUserScannerHandler({
     env: {
       PARA11AX_TOKEN: 'gateway-token',
       VERCEL: '1',
       VERCEL_ENV: 'production',
-      VERCEL_OIDC_TOKEN: 'vercel-workload-jwt',
     },
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
@@ -33,12 +36,15 @@ test('production Vercel bridge defaults to owned worker alias and forwards workl
     },
   });
 
-  const result = await handle(request({ scanType: 'username', target: 'ger1e', crossScan: false, noNsfw: true }));
+  const result = await handle(request(
+    { scanType: 'username', target: 'ger1e', crossScan: false, noNsfw: true },
+    { 'x-vercel-oidc-token': 'vercel-runtime-workload-jwt' },
+  ));
   assert.equal(result.status, 200);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://user-scanner-git-main-geri6.vercel.app/scan');
-  assert.equal(calls[0].init.headers.Authorization, 'Bearer vercel-workload-jwt');
-  assert.equal(calls[0].init.headers['x-vercel-trusted-oidc-idp-token'], 'vercel-workload-jwt');
+  assert.equal(calls[0].init.headers.Authorization, 'Bearer vercel-runtime-workload-jwt');
+  assert.equal(calls[0].init.headers['x-vercel-trusted-oidc-idp-token'], 'vercel-runtime-workload-jwt');
 });
 
 test('non-Vercel environments still fail closed without explicit worker URL', async () => {

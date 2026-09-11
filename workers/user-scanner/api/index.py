@@ -7,28 +7,41 @@ from urllib.parse import urlsplit
 from worker import run_scan
 
 
-VERCEL_ISSUER = "https://oidc.vercel.com/geri6"
+VERCEL_TEAM_ISSUER = "https://oidc.vercel.com/geri6"
+VERCEL_GLOBAL_ISSUER = "https://oidc.vercel.com"
 VERCEL_AUDIENCE = "https://vercel.com/geri6"
 VERCEL_SUBJECT = "owner:geri6:project:para11ax:environment:production"
 VERCEL_OWNER_ID = "team_hXokufMlDFuhPPT5r8jPf4aH"
 VERCEL_PROJECT_ID = "prj_ojUpOTw8x8KOj9CrTs8jih1mrPjo"
-_JWKS_CLIENT = None
+_JWKS_CLIENTS = {}
+
+
+def _jwks_url(issuer: str) -> str:
+    if issuer == VERCEL_TEAM_ISSUER:
+        return f"{VERCEL_TEAM_ISSUER}/.well-known/jwks"
+    if issuer == VERCEL_GLOBAL_ISSUER:
+        return f"{VERCEL_GLOBAL_ISSUER}/.well-known/jwks"
+    raise ValueError("untrusted_issuer")
 
 
 def _verify_vercel_oidc(token: str) -> bool:
-    global _JWKS_CLIENT
     try:
         import jwt
         from jwt import PyJWKClient
 
-        if _JWKS_CLIENT is None:
-            _JWKS_CLIENT = PyJWKClient(f"{VERCEL_ISSUER}/.well-known/jwks")
-        key = _JWKS_CLIENT.get_signing_key_from_jwt(token).key
+        unverified = jwt.decode(token, options={"verify_signature": False, "verify_exp": False})
+        issuer = str(unverified.get("iss", ""))
+        jwks_url = _jwks_url(issuer)
+        client = _JWKS_CLIENTS.get(jwks_url)
+        if client is None:
+            client = PyJWKClient(jwks_url)
+            _JWKS_CLIENTS[jwks_url] = client
+        key = client.get_signing_key_from_jwt(token).key
         claims = jwt.decode(
             token,
             key,
             algorithms=["RS256"],
-            issuer=VERCEL_ISSUER,
+            issuer=issuer,
             audience=VERCEL_AUDIENCE,
             options={"require": ["exp", "iat", "iss", "aud", "sub"]},
         )

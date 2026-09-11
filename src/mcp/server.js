@@ -278,12 +278,14 @@ function remoteCommandCatalog() {
   }));
 }
 
-function innerRequest(env, body = undefined, method = 'POST') {
+function innerRequest(env, body = undefined, method = 'POST', sourceRequest = null) {
+  const runtimeOidc = headerValue(sourceRequest?.headers, 'x-vercel-oidc-token');
   return {
     method,
     headers: {
       authorization: `Bearer ${env.PARA11AX_TOKEN}`,
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      ...(runtimeOidc ? { 'x-vercel-oidc-token': String(runtimeOidc) } : {}),
     },
     ...(body === undefined ? {} : { body }),
   };
@@ -382,7 +384,7 @@ export function createMcpHttpHandler({
   const userScanner = createUserScannerHandler({ env, fetchImpl, nowMs });
   const swarm = createGreyNoiseSwarmCommandHandler({ env, fetchImpl, nowMs });
 
-  async function invokeTool(name, args = {}) {
+  async function invokeTool(name, args = {}, sourceRequest = null) {
     if (name === 'para11ax_capabilities') {
       const view = args.view ?? 'catalog';
       if (view === 'catalog') return { protocolVersion: MCP_PROTOCOL_VERSION, gatewayVersion: GATEWAY_VERSION, tools: TOOLS.map(({ name: toolName, title, description }) => ({ name: toolName, title, description })), commands: remoteCommandCatalog() };
@@ -397,7 +399,7 @@ export function createMcpHttpHandler({
     if (name === 'para11ax_provider') return { enrichment: await unwrap(app.handleProvider(innerRequest(env, { provider: args.provider, indicator: args.indicator, ...(args.type ? { type: args.type } : {}) }))) };
     if (name === 'para11ax_stix') return { bundle: await unwrap(app.handleStix(innerRequest(env, { indicator: args.indicator, ...(args.type ? { type: args.type } : {}), ...(args.profile ? { profile: args.profile } : {}) }))) };
     if (name === 'para11ax_shodan') return { result: await unwrap(shodan(innerRequest(env, args))) };
-    if (name === 'para11ax_user_scan') return { result: await unwrap(userScanner(innerRequest(env, args))) };
+    if (name === 'para11ax_user_scan') return { result: await unwrap(userScanner(innerRequest(env, args, 'POST', sourceRequest))) };
     if (name === 'para11ax_swarm') {
       const result = await swarm(innerRequest(env, args));
       if (!result || result.status < 200 || result.status >= 300) return { result: await unwrap(result) };
@@ -463,7 +465,7 @@ export function createMcpHttpHandler({
       const name = body.params?.name;
       const args = body.params?.arguments ?? {};
       if (typeof name !== 'string' || !args || typeof args !== 'object' || Array.isArray(args)) return response(200, rpcResult(id, toolFailure(new Error('invalid tool call'))));
-      try { return response(200, rpcResult(id, toolSuccess(await invokeTool(name, args)))); }
+      try { return response(200, rpcResult(id, toolSuccess(await invokeTool(name, args, request)))); }
       catch (error) { return response(200, rpcResult(id, toolFailure(error))); }
     }
     return response(200, rpcError(id, -32601, 'Method not found'));
