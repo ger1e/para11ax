@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 import { requireGatewayAuth } from '../core/auth.js';
 import { securityHeaders } from '../core/http.js';
@@ -105,7 +105,7 @@ function encode(value) {
 }
 
 function signingKey(secret) {
-  return createHmac('sha256', secret).update('para11ax:mcp-oauth:signing-key:v1', 'utf8').digest();
+  return scryptSync(secret, 'para11ax:mcp-oauth:signing-key:v1', 32);
 }
 
 function sign(payload, secret) {
