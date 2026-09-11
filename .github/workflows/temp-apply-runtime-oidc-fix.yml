@@ -1,0 +1,102 @@
+name: Temporary apply runtime OIDC fix
+
+on:
+  push:
+    branches:
+      - fix/vercel-runtime-oidc-header
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: fix/vercel-runtime-oidc-header
+      - name: Apply exact source patches
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, got {count}')
+              p.write_text(text.replace(old, new, 1))
+
+          # User Scanner consumes Vercel's runtime OIDC request header; build-time env remains fallback only.
+          once(
+              'src/user-scanner.js',
+              "const workloadToken = typeof env.VERCEL_OIDC_TOKEN === 'string' ? env.VERCEL_OIDC_TOKEN.trim() : '';",
+              "const workloadToken = String(headerValue(request.headers, 'x-vercel-oidc-token') ?? env.VERCEL_OIDC_TOKEN ?? '').trim();",
+          )
+
+          # MCP preserves the runtime workload identity when dispatching the scanner handler.
+          once(
+              'src/mcp/server.js',
+              "function innerRequest(env, body = undefined, method = 'POST') {\n  return {\n    method,\n    headers: {\n      authorization: `Bearer ${env.PARA11AX_TOKEN}`,\n      ...(body === undefined ? {} : { 'content-type': 'application/json' }),\n    },",
+              "function innerRequest(env, body = undefined, method = 'POST', sourceRequest = null) {\n  const runtimeOidc = headerValue(sourceRequest?.headers, 'x-vercel-oidc-token');\n  return {\n    method,\n    headers: {\n      authorization: `Bearer ${env.PARA11AX_TOKEN}`,\n      ...(body === undefined ? {} : { 'content-type': 'application/json' }),\n      ...(runtimeOidc ? { 'x-vercel-oidc-token': String(runtimeOidc) } : {}),\n    },",
+          )
+          once(
+              'src/mcp/server.js',
+              '  async function invokeTool(name, args = {}) {',
+              '  async function invokeTool(name, args = {}, sourceRequest = null) {',
+          )
+          once(
+              'src/mcp/server.js',
+              "    if (name === 'para11ax_user_scan') return { result: await unwrap(userScanner(innerRequest(env, args))) };",
+              "    if (name === 'para11ax_user_scan') return { result: await unwrap(userScanner(innerRequest(env, args, 'POST', sourceRequest))) };",
+          )
+          once(
+              'src/mcp/server.js',
+              '      try { return response(200, rpcResult(id, toolSuccess(await invokeTool(name, args)))); }',
+              '      try { return response(200, rpcResult(id, toolSuccess(await invokeTool(name, args, request)))); }',
+          )
+
+          # The production self-test itself is a Vercel Function, so propagate its runtime OIDC token into internal MCP calls.
+          self_test = Path('src/mcp/self-test.js')
+          text = self_test.read_text()
+          text = text.replace(
+              'function mcpRequest(token, method, params, id, name = null) {',
+              'function mcpRequest(token, method, params, id, name = null, runtimeOidc = null) {',
+              1,
+          )
+          text = text.replace(
+              "      ...(name ? { 'mcp-name': name } : {}),\n",
+              "      ...(name ? { 'mcp-name': name } : {}),\n      ...(runtimeOidc ? { 'x-vercel-oidc-token': runtimeOidc } : {}),\n",
+              1,
+          )
+          anchor = "    const authorization = await authorizeSelfTest(request, { token, fetchImpl, nowMs });\n    if (!authorization) return response(401, { error: 'unauthorized' });\n"
+          replacement = anchor + "    const runtimeOidc = String(headerValue(request?.headers, 'x-vercel-oidc-token') ?? '').trim() || null;\n"
+          if text.count(anchor) != 1:
+              raise SystemExit('self-test auth anchor mismatch')
+          text = text.replace(anchor, replacement, 1)
+          # Every internal MCP request gets the same Vercel runtime identity.
+          text = text.replace("mcpRequest(token, 'tools/list', {}, 1)", "mcpRequest(token, 'tools/list', {}, 1, null, runtimeOidc)")
+          text = text.replace("}, 2, 'para11ax_enrich')", "}, 2, 'para11ax_enrich', runtimeOidc)")
+          text = text.replace("}, 3, 'para11ax_user_scan')", "}, 3, 'para11ax_user_scan', runtimeOidc)")
+          text = text.replace("}, 4, 'para11ax_command')", "}, 4, 'para11ax_command', runtimeOidc)")
+          self_test.write_text(text)
+
+          # Worker accepts either documented Vercel issuer mode, but still pins exact source identity claims.
+          api = Path('workers/user-scanner/api/index.py')
+          text = api.read_text()
+          old = '''VERCEL_ISSUER = "https://oidc.vercel.com/geri6"\nVERCEL_AUDIENCE = "https://vercel.com/geri6"\nVERCEL_SUBJECT = "owner:geri6:project:para11ax:environment:production"\nVERCEL_OWNER_ID = "team_hXokufMlDFuhPPT5r8jPf4aH"\nVERCEL_PROJECT_ID = "prj_ojUpOTw8x8KOj9CrTs8jih1mrPjo"\n_JWKS_CLIENT = None\n\n\ndef _verify_vercel_oidc(token: str) -> bool:\n    global _JWKS_CLIENT\n    try:\n        import jwt\n        from jwt import PyJWKClient\n\n        if _JWKS_CLIENT is None:\n            _JWKS_CLIENT = PyJWKClient(f"{VERCEL_ISSUER}/.well-known/jwks")\n        key = _JWKS_CLIENT.get_signing_key_from_jwt(token).key\n        claims = jwt.decode(\n            token,\n            key,\n            algorithms=["RS256"],\n            issuer=VERCEL_ISSUER,\n            audience=VERCEL_AUDIENCE,\n            options={"require": ["exp", "iat", "iss", "aud", "sub"]},\n        )\n        return (\n            hmac.compare_digest(str(claims.get("sub", "")), VERCEL_SUBJECT)\n            and hmac.compare_digest(str(claims.get("owner_id", "")), VERCEL_OWNER_ID)\n            and hmac.compare_digest(str(claims.get("project_id", "")), VERCEL_PROJECT_ID)\n            and hmac.compare_digest(str(claims.get("environment", "")), "production")\n        )\n    except Exception:\n        return False\n'''
+          new = '''VERCEL_TEAM_ISSUER = "https://oidc.vercel.com/geri6"\nVERCEL_GLOBAL_ISSUER = "https://oidc.vercel.com"\nVERCEL_AUDIENCE = "https://vercel.com/geri6"\nVERCEL_SUBJECT = "owner:geri6:project:para11ax:environment:production"\nVERCEL_OWNER_ID = "team_hXokufMlDFuhPPT5r8jPf4aH"\nVERCEL_PROJECT_ID = "prj_ojUpOTw8x8KOj9CrTs8jih1mrPjo"\n_JWKS_CLIENTS = {}\n\n\ndef _jwks_url(issuer: str) -> str:\n    if issuer == VERCEL_TEAM_ISSUER:\n        return f"{VERCEL_TEAM_ISSUER}/.well-known/jwks"\n    if issuer == VERCEL_GLOBAL_ISSUER:\n        return f"{VERCEL_GLOBAL_ISSUER}/.well-known/jwks"\n    raise ValueError("untrusted_issuer")\n\n\ndef _verify_vercel_oidc(token: str) -> bool:\n    try:\n        import jwt\n        from jwt import PyJWKClient\n\n        unverified = jwt.decode(token, options={"verify_signature": False, "verify_exp": False})\n        issuer = str(unverified.get("iss", ""))\n        jwks_url = _jwks_url(issuer)\n        client = _JWKS_CLIENTS.get(jwks_url)\n        if client is None:\n            client = PyJWKClient(jwks_url)\n            _JWKS_CLIENTS[jwks_url] = client\n        key = client.get_signing_key_from_jwt(token).key\n        claims = jwt.decode(\n            token,\n            key,\n            algorithms=["RS256"],\n            issuer=issuer,\n            audience=VERCEL_AUDIENCE,\n            options={"require": ["exp", "iat", "iss", "aud", "sub"]},\n        )\n        return (\n            hmac.compare_digest(str(claims.get("sub", "")), VERCEL_SUBJECT)\n            and hmac.compare_digest(str(claims.get("owner_id", "")), VERCEL_OWNER_ID)\n            and hmac.compare_digest(str(claims.get("project_id", "")), VERCEL_PROJECT_ID)\n            and hmac.compare_digest(str(claims.get("environment", "")), "production")\n        )\n    except Exception:\n        return False\n'''
+          if text.count(old) != 1:
+              raise SystemExit('worker oidc verifier block mismatch')
+          api.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Commit source changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/mcp/server.js src/mcp/self-test.js src/user-scanner.js workers/user-scanner/api/index.py
+          git commit -m 'fix: propagate Vercel runtime OIDC header'
+          git push origin HEAD:fix/vercel-runtime-oidc-header
