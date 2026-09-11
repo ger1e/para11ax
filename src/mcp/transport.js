@@ -10,7 +10,9 @@ import { applyChatGptToolMetadata } from './chatgpt-tool-metadata.js';
 applyChatGptToolMetadata(MCP_TOOLS);
 
 const LIST_TTL_MS = 300_000;
+const LEGACY_PROTOCOL_VERSION = '2025-06-18';
 const HEADER_MISMATCH = -32020;
+const UNSUPPORTED_PROTOCOL_VERSION = -32022;
 const SERVER_INFO_META_KEY = 'io.modelcontextprotocol/serverInfo';
 const PROTOCOL_VERSION_META_KEY = 'io.modelcontextprotocol/protocolVersion';
 const MCP_SERVER_BRAND = Object.freeze({
@@ -44,15 +46,19 @@ function bodyProtocolVersion(body) {
   return body?.params?._meta?.[PROTOCOL_VERSION_META_KEY];
 }
 
-function errorBody(id, message) {
+function rpcErrorBody(id, code, message, data) {
   return {
     jsonrpc: '2.0',
     id: id ?? null,
-    error: { code: HEADER_MISMATCH, message },
+    error: {
+      code,
+      message,
+      ...(data === undefined ? {} : { data }),
+    },
   };
 }
 
-function rejectHeaderMismatch(body, message) {
+function rejectModernRequest(body, code, message, data) {
   return {
     status: 400,
     headers: {
@@ -61,8 +67,19 @@ function rejectHeaderMismatch(body, message) {
       'content-type': 'application/json; charset=utf-8',
       'mcp-protocol-version': MCP_PROTOCOL_VERSION,
     },
-    body: errorBody(body?.id, message),
+    body: rpcErrorBody(body?.id, code, message, data),
   };
+}
+
+function rejectHeaderMismatch(body, message) {
+  return rejectModernRequest(body, HEADER_MISMATCH, message);
+}
+
+function rejectUnsupportedProtocol(body, requested) {
+  return rejectModernRequest(body, UNSUPPORTED_PROTOCOL_VERSION, 'Unsupported MCP protocol version', {
+    supported: [MCP_PROTOCOL_VERSION, LEGACY_PROTOCOL_VERSION],
+    requested,
+  });
 }
 
 function validateModernRoutingHeaders(request, body) {
@@ -70,8 +87,19 @@ function validateModernRoutingHeaders(request, body) {
 
   const protocolHeader = headerValue(request?.headers, 'mcp-protocol-version');
   const protocolEnvelope = bodyProtocolVersion(body);
-  const modernHeader = String(protocolHeader ?? '') === MCP_PROTOCOL_VERSION;
-  const modernEnvelope = String(protocolEnvelope ?? '') === MCP_PROTOCOL_VERSION;
+  const headerVersion = protocolHeader === undefined ? undefined : String(protocolHeader);
+  const envelopeVersion = protocolEnvelope === undefined ? undefined : String(protocolEnvelope);
+
+  if (headerVersion !== undefined && ![MCP_PROTOCOL_VERSION, LEGACY_PROTOCOL_VERSION].includes(headerVersion)) {
+    return rejectUnsupportedProtocol(body, headerVersion);
+  }
+  if (headerVersion === undefined && envelopeVersion !== undefined
+    && ![MCP_PROTOCOL_VERSION, LEGACY_PROTOCOL_VERSION].includes(envelopeVersion)) {
+    return rejectUnsupportedProtocol(body, envelopeVersion);
+  }
+
+  const modernHeader = headerVersion === MCP_PROTOCOL_VERSION;
+  const modernEnvelope = envelopeVersion === MCP_PROTOCOL_VERSION;
 
   // The modern era is self-identifying. If either side claims 2026-07-28,
   // require the HTTP/body mirror to agree rather than silently downgrading.
@@ -79,7 +107,7 @@ function validateModernRoutingHeaders(request, body) {
     return rejectHeaderMismatch(body, 'Header mismatch: MCP-Protocol-Version must mirror the request _meta protocol version');
   }
   if (!modernHeader) return null;
-  if (protocolEnvelope !== undefined && String(protocolEnvelope) !== MCP_PROTOCOL_VERSION) {
+  if (envelopeVersion !== undefined && envelopeVersion !== MCP_PROTOCOL_VERSION) {
     return rejectHeaderMismatch(body, 'Header mismatch: MCP-Protocol-Version must match the request _meta protocol version');
   }
 
