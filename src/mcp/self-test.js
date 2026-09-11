@@ -63,6 +63,12 @@ function toolPayload(result, stage) {
   return payload;
 }
 
+function boundedToolError(result, fallback) {
+  const candidate = result?.body?.result?.structuredContent?.error;
+  if (typeof candidate === 'string' && /^[a-z0-9_:-]{1,64}$/i.test(candidate)) return candidate;
+  return fallback;
+}
+
 function evidenceCount(enrichment) {
   if (Array.isArray(enrichment?.evidence)) return enrichment.evidence.length;
   if (Array.isArray(enrichment?.evidenceV2?.observations)) return enrichment.evidenceV2.observations.length;
@@ -101,22 +107,53 @@ export function createSignedProductionSelfTestHandler({
       return response(401, { error: 'unauthorized' });
     }
 
+    let tools;
     try {
       const catalogResult = await mcp(mcpRequest(token, 'tools/list', {}, 1));
       const catalog = toolPayload(catalogResult, 'mcp_catalog');
-      const tools = Array.isArray(catalog.tools) ? catalog.tools : [];
+      tools = Array.isArray(catalog.tools) ? catalog.tools : [];
       const names = new Set(tools.map(tool => tool?.name).filter(Boolean));
       if (!names.has('para11ax_enrich') || !names.has('para11ax_user_scan')) throw new Error('mcp_catalog_failed');
+    } catch (error) {
+      const code = ['mcp_catalog_transport_failed', 'mcp_catalog_failed'].includes(error?.message)
+        ? error.message
+        : 'self_test_failed';
+      return response(502, { status: 'fail', error: code });
+    }
 
-      const enrichResult = await mcp(mcpRequest(token, 'tools/call', {
+    let enrichmentOk = false;
+    let enrichmentSummary;
+    let enrichResult;
+    try {
+      enrichResult = await mcp(mcpRequest(token, 'tools/call', {
         name: 'para11ax_enrich',
         arguments: { indicator: TEST_IP, profile: 'fast' },
       }, 2, 'para11ax_enrich'));
       const enrichTool = toolPayload(enrichResult, 'mcp_enrichment');
       const enrichment = enrichTool.structuredContent?.enrichment;
       if (!enrichment || typeof enrichment !== 'object' || Array.isArray(enrichment)) throw new Error('mcp_enrichment_failed');
+      enrichmentOk = true;
+      enrichmentSummary = {
+        target: TEST_IP,
+        profile: 'fast',
+        status: String(enrichment.status ?? 'unknown').slice(0, 32),
+        evidenceCount: evidenceCount(enrichment),
+        failureCount: failureCount(enrichment),
+      };
+    } catch {
+      enrichmentSummary = {
+        target: TEST_IP,
+        profile: 'fast',
+        status: 'fail',
+        error: boundedToolError(enrichResult, 'mcp_enrichment_failed'),
+      };
+    }
 
-      const userResult = await mcp(mcpRequest(token, 'tools/call', {
+    let userScannerOk = false;
+    let userScannerSummary;
+    let userResult;
+    try {
+      userResult = await mcp(mcpRequest(token, 'tools/call', {
         name: 'para11ax_user_scan',
         arguments: { scanType: 'username', target: TEST_USERNAME, crossScan: false, noNsfw: true },
       }, 3, 'para11ax_user_scan'));
@@ -124,35 +161,29 @@ export function createSignedProductionSelfTestHandler({
       const scan = userTool.structuredContent?.result;
       const summary = scan?.summary;
       if (!summary || typeof summary !== 'object' || Array.isArray(summary)) throw new Error('mcp_user_scanner_failed');
-
-      return response(200, {
-        status: 'pass',
-        mcp: { authenticated: true, toolCount: tools.length },
-        enrichment: {
-          target: TEST_IP,
-          profile: 'fast',
-          status: String(enrichment.status ?? 'unknown').slice(0, 32),
-          evidenceCount: evidenceCount(enrichment),
-          failureCount: failureCount(enrichment),
-        },
-        userScanner: {
-          target: TEST_USERNAME,
-          totalScanned: Number(summary.totalScanned ?? 0),
-          found: Number(summary.found ?? 0),
-          notFound: Number(summary.notFound ?? 0),
-          errors: Number(summary.errors ?? 0),
-          skipped: Number(summary.skipped ?? 0),
-          durationMs: Number(scan.durationMs ?? 0),
-        },
-      });
-    } catch (error) {
-      const known = new Set([
-        'mcp_catalog_transport_failed', 'mcp_catalog_failed',
-        'mcp_enrichment_transport_failed', 'mcp_enrichment_failed',
-        'mcp_user_scanner_transport_failed', 'mcp_user_scanner_failed',
-      ]);
-      const code = known.has(error?.message) ? error.message : 'self_test_failed';
-      return response(502, { status: 'fail', error: code });
+      userScannerOk = true;
+      userScannerSummary = {
+        target: TEST_USERNAME,
+        totalScanned: Number(summary.totalScanned ?? 0),
+        found: Number(summary.found ?? 0),
+        notFound: Number(summary.notFound ?? 0),
+        errors: Number(summary.errors ?? 0),
+        skipped: Number(summary.skipped ?? 0),
+        durationMs: Number(scan.durationMs ?? 0),
+      };
+    } catch {
+      userScannerSummary = {
+        target: TEST_USERNAME,
+        status: 'fail',
+        error: boundedToolError(userResult, 'mcp_user_scanner_failed'),
+      };
     }
+
+    return response(200, {
+      status: enrichmentOk && userScannerOk ? 'pass' : enrichmentOk || userScannerOk ? 'partial' : 'fail',
+      mcp: { authenticated: true, toolCount: tools.length },
+      enrichment: enrichmentSummary,
+      userScanner: userScannerSummary,
+    });
   };
 }
