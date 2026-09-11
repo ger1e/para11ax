@@ -10,7 +10,6 @@ export const circlHashlookupProvider = Object.freeze({
   async run(input, context = {}) {
     const kind = hashKind(input.value);
     if (!kind) throw Object.assign(new Error('unsupported hash'), { status: 400 });
-    const subject = canonicalHash(input.value);
     const url = `https://hashlookup.circl.lu/lookup/${kind}/${encodeURIComponent(input.value)}`;
     let raw;
     try {
@@ -23,7 +22,7 @@ export const circlHashlookupProvider = Object.freeze({
     }
     const hashRelation = (value, relationship) => {
       const target = canonicalHash(value);
-      return !target || target === subject ? null : relation('hash', target, relationship);
+      return target ? relation('hash', target, relationship) : null;
     };
     return {
       observationType: 'known_file_lookup',
