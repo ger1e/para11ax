@@ -12,6 +12,7 @@ const LIST_TTL_MS = 300_000;
 const HEADER_MISMATCH = -32001;
 const MCP_SERVER_BRAND = Object.freeze({
   title: 'PARA11AX',
+  description: 'PARA11AX is a provenance-first cyber threat intelligence and analyst operations platform for deterministic enrichment, correlation, identity OSINT, threat hunting, STIX 2.1, and bounded MCP workflows in ChatGPT.',
   websiteUrl: 'https://para11ax.vercel.app/',
   icons: Object.freeze([Object.freeze({
     src: 'https://para11ax.vercel.app/assets/brand/para11ax-mark.svg',
