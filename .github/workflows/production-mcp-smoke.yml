@@ -1,0 +1,88 @@
+name: Production MCP smoke
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-mcp-smoke
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  smoke:
+    name: Authenticated production MCP smoke
+    if: ${{ github.repository == 'ger1e/para11ax' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Request short-lived GitHub OIDC token and verify production MCP
+        env:
+          AUDIENCE: para11ax-production-smoke
+          SELF_TEST_URL: https://para11ax.vercel.app/api/para11ax/self-test
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+
+          oidc_json="$(curl --fail-with-body --silent --show-error \
+            --connect-timeout 10 --max-time 20 \
+            -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            -H 'Accept: application/json; api-version=2.0' \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUDIENCE}")"
+          oidc_token="$(jq -er '.value' <<<"${oidc_json}")"
+          echo "::add-mask::${oidc_token}"
+          unset oidc_json
+
+          response_file="$(mktemp)"
+          trap 'rm -f "${response_file}"' EXIT
+          matched=0
+
+          for attempt in $(seq 1 24); do
+            http_code="$(curl --silent --show-error \
+              --connect-timeout 10 --max-time 120 \
+              --output "${response_file}" --write-out '%{http_code}' \
+              -H "Authorization: Bearer ${oidc_token}" \
+              -H 'Accept: application/json' \
+              "${SELF_TEST_URL}" || true)"
+
+            if [[ "${http_code}" == "200" ]] && jq -e --arg sha "${EXPECTED_SHA}" '.deploymentSha == $sha' "${response_file}" >/dev/null 2>&1; then
+              matched=1
+              break
+            fi
+            sleep 5
+          done
+
+          if [[ "${matched}" != "1" ]]; then
+            echo "::error::Production MCP smoke never reached the exact merged SHA. Response body intentionally withheld."
+            exit 1
+          fi
+
+          jq -e '
+            .authorization == "github_oidc" and
+            .mcp.authenticated == true and
+            .mcp.toolCount == 13 and
+            .enrichment.target == "1.1.1.1" and
+            .enrichment.profile == "fast" and
+            .enrichment.status != "fail" and
+            .userScanner.target == "ger1e" and
+            .userScanner.status != "fail" and
+            (.userScanner.totalScanned | type == "number") and
+            (.userScanner.found | type == "number") and
+            (.userScanner.errors | type == "number")
+          ' "${response_file}" >/dev/null
+
+          jq -r '
+            "PRODUCTION_MCP_SMOKE=PASS SHA=\(.deploymentSha) AUTH=\(.authorization) TOOLS=\(.mcp.toolCount) " +
+            "IP_STATUS=\(.enrichment.status) IP_EVIDENCE=\(.enrichment.evidenceCount) IP_FAILURES=\(.enrichment.failureCount) " +
+            "USER_SCANNER_TOTAL=\(.userScanner.totalScanned) USER_SCANNER_FOUND=\(.userScanner.found) " +
+            "USER_SCANNER_ERRORS=\(.userScanner.errors) USER_SCANNER_SKIPPED=\(.userScanner.skipped)"
+          ' "${response_file}"
