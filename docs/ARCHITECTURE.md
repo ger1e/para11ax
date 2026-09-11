@@ -9,7 +9,7 @@ PARA11AX now exposes the functional analyst surface through three principal inte
 
 1. **Web / terminal UI** — browser analyst experience and browser-local workspace persistence.
 2. **CLI / registered command fabric** — local operator and deterministic report/mission tooling.
-3. **Remote MCP control plane** — authenticated stateless `POST /mcp`, exposing grouped tools that delegate to existing handlers and registered server-safe commands.
+3. **Remote MCP control plane** — public metadata discovery plus OAuth/bearer-authenticated stateless `POST /mcp` tool execution, exposing grouped tools that delegate to existing handlers and registered server-safe commands.
 
 Four analyst utilities/workflow engines intentionally sit beside—not inside—the Evidence v2 / Intelligence Kernel path:
 
@@ -29,9 +29,10 @@ None automatically becomes Evidence v2 evidence, Intelligence Kernel input, repu
 ```text
 MCP client
   -> POST /mcp
-  -> gateway bearer authentication
-  -> MCP protocol/header validation
-  -> server/discover | tools/list | tools/call
+  -> public server/discover | initialize | tools/list
+  -> OAuth 2.1 authorization-code + PKCE linking when required
+  -> scoped OAuth access token or existing gateway bearer
+  -> MCP protocol/header validation | tools/call
   -> grouped PARA11AX MCP tool
   -> existing handler / pure domain function / registered safe command
   -> existing validation + fixed egress + semantic boundary
@@ -252,13 +253,13 @@ Mission Workspace introduces no model call, provider, new network destination, c
 
 ##### Caller -> MCP transport
 
-`POST /mcp` requires the gateway bearer. Modern protocol routing headers must agree with JSON-RPC body semantics. The transport exposes only the grouped MCP tool registry. Tool calls delegate to bounded existing handlers or pure domain functions; `para11ax_command` additionally denies browser-session-only, filesystem, and local-admin command effects.
+`POST /mcp` exposes only protocol/tool metadata before authentication. Each tool declares the `para11ax:use` OAuth scope. Tool execution requires either a resource-, scope-, issuer-, and expiry-validated OAuth access token from the ChatGPT PKCE link flow or the existing gateway bearer. Modern protocol routing headers must agree with JSON-RPC body semantics. Tool calls delegate to bounded existing handlers or pure domain functions; `para11ax_command` additionally denies browser-session-only, filesystem, and local-admin command effects.
 
 MCP is not an arbitrary RPC bridge. It exposes no caller-selected module/function name, arbitrary shell, arbitrary URL fetcher, environment-secret reader, filesystem path, or hidden persistent session.
 
 ##### Caller -> gateway
 
-Bearer authentication protects enrichment, batch, STIX, status, health, User Scanner, Shodan, GreyNoise Swarm, and MCP surfaces. Request/media/input validation occurs before external execution. Caller input never chooses arbitrary provider hosts, User Scanner worker hosts, Shodan hosts, GreyNoise hosts, methods, credentials, scheduler rank, or proxy routes.
+The gateway bearer protects private REST operations. OAuth access tokens or the existing bearer protect MCP tool execution; MCP protocol/tool metadata and `/api/para11ax/meta` are intentionally public. Request/media/input validation occurs before external execution. Caller input never chooses arbitrary provider hosts, User Scanner worker hosts, Shodan hosts, GreyNoise hosts, methods, credentials, scheduler rank, or proxy routes.
 
 ##### Gateway -> Evidence v2 provider
 

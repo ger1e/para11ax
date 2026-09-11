@@ -3,7 +3,7 @@
 
 #### Assets
 
-- gateway bearer token;
+- gateway bearer token and MCP OAuth authorization/access tokens;
 - provider API credentials, including `SHODAN_API_KEY` and `GREYNOISE_API_KEY`;
 - MCP tool catalog, routing integrity, and remote command policy;
 - explicit client-carried Mission/Investigation/Case state used by MCP;
@@ -23,7 +23,8 @@ The design assumes an untrusted caller may control indicator text, MCP tool argu
 
 | Threat | Primary controls | Executable evidence |
 |---|---|---|
-| Leaked gateway bearer | bearer auth on sensitive APIs and `/mcp`; no token reflection; rotation through secret store | auth/API/MCP tests; public-release audit |
+| Leaked gateway bearer or MCP access token | bearer/OAuth auth on sensitive operations; no token reflection; signed MCP tokens are scope/audience/time bound and revoked by gateway-secret rotation | auth/API/MCP/OAuth tests; public-release audit |
+| OAuth redirect, client or PKCE confusion | exact ChatGPT CIMD client ID, stable redirect URI, MCP resource, scope and `S256` challenge are validated at authorization and exchange | MCP OAuth conformance and hostile-redirect tests |
 | MCP method/tool confusion | `Mcp-Method` and `Mcp-Name` must agree with JSON-RPC body in current protocol profile | MCP conformance tests |
 | MCP arbitrary RPC/function dispatch | fixed grouped tool catalog; explicit schemas; no caller-selected module/function | MCP catalog/tool tests |
 | MCP command fallback becomes shell/admin plane | exact registered command IDs only; browser-session-only/filesystem/local-admin effects denied | MCP command-policy tests |
@@ -92,7 +93,7 @@ The MCP server must never:
 - reinterpret operator context as Evidence v2 merely because it crossed MCP;
 - execute KQL or submit ServiceNow records automatically.
 
-Residual risk remains. A stolen gateway bearer can invoke any MCP tool permitted by its fixed catalog until the bearer is rotated. A valid but maliciously chosen User Scanner/Shodan/Swarm target can still consume external-service resources within the bounded tool policy. Client-carried workflow state can be copied, replayed, or stored insecurely by the external MCP client. A schema or command-classification bug could expose more capability than intended, so tool-list and command-denial tests are security controls rather than documentation convenience.
+Residual risk remains. A stolen gateway bearer can invoke any MCP tool permitted by its fixed catalog until the bearer is rotated. A stolen OAuth access token can do the same until its expiry or gateway-secret rotation, although it is bound to the PARA11AX MCP resource and scope. Authorization codes are short-lived and PKCE-bound, but the browser/session running consent remains a trust boundary. A valid but maliciously chosen User Scanner/Shodan/Swarm target can still consume external-service resources within the bounded tool policy. Client-carried workflow state can be copied, replayed, or stored insecurely by the external MCP client. A schema or command-classification bug could expose more capability than intended, so tool-list and command-denial tests are security controls rather than documentation convenience.
 
 The server being deployment/transport-proven does not prove a specific MCP client has been connected safely. Client installation/authentication is a separate trust boundary and proof state.
 
@@ -154,7 +155,7 @@ Residual risk remains: deterministic policy can still be wrong or insufficient. 
 - In-memory gateway cache/circuit state is instance-local and non-durable.
 - Browser-local cases/investigations are durable inside the browser profile by design.
 - MCP client-carried state is durable wherever the client chooses to store it; PARA11AX cannot enforce downstream client retention.
-- A stolen gateway bearer remains usable until rotation/revocation.
+- A stolen gateway bearer remains usable until rotation; a stolen MCP OAuth access token remains usable until expiry or the same rotation.
 - A compromised repository/deployment administrator can bypass application controls.
 - Source coverage changes over time; absence is not benignness.
 - Documentation-contract tests protect selected facts, not every prose nuance.

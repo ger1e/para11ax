@@ -59,7 +59,8 @@ Reference topology:
 ```text
 MCP client
   -> https://para11ax.vercel.app/mcp
-  -> PARA11AX_TOKEN bearer authentication
+  -> public protocol/tool metadata discovery
+  -> ChatGPT OAuth 2.1 + PKCE link or existing PARA11AX_TOKEN bearer
   -> MCP protocol/header validation
   -> grouped MCP tool
   -> existing PARA11AX handler / pure domain logic / registered server-safe command
@@ -81,13 +82,14 @@ Operational MCP verification should distinguish:
 ```text
 route exists
 -> transport conforms
--> bearer authentication works
+-> protected-resource and authorization-server metadata resolve
 -> tools/list works
+-> OAuth link or direct bearer authentication works
 -> selected tool succeeds
 -> selected provider/worker/entitlement succeeds
 ```
 
-A 401 on an authenticated-required call proves the route is protected, not broken. A successful `tools/list` proves the MCP catalog, not all credentialed dependencies. A successful User Scanner/Shodan/Swarm call proves only that specific bounded path and current external dependency state.
+Public `tools/list` proves the MCP catalog and OAuth declarations, not tool authorization or credentialed dependencies. An unauthenticated `tools/call` must return the bounded MCP linking challenge. A successful OAuth-linked or direct-bearer call proves tool authorization. A successful User Scanner/Shodan/Swarm call proves only that specific bounded path and current external dependency state.
 
 #### Historical GreyNoise integration baseline — 2026-09-06
 
@@ -314,13 +316,16 @@ Public QA can verify without a bearer:
 - `GET /app/`;
 - public `GET /api/para11ax/meta`;
 - `GET /mcp` returns 405/`Allow: POST` with current MCP protocol/header posture;
+- OAuth protected-resource and authorization-server discovery documents;
+- unauthenticated MCP initialization and `tools/list`, including per-tool OAuth scope declarations;
 - representative static/error routes;
 - deployment metadata/source SHA.
 
 Credential-bearing acceptance, only when explicitly authorized, adds:
 
 - protected `/api/para11ax/health` and `/status`;
-- MCP `server/discover` and `tools/list` with matching protocol/routing headers;
+- either a complete ChatGPT OAuth/PKCE link or the existing direct bearer path;
+- an authenticated MCP `tools/call` with matching protocol/routing headers;
 - one bounded `para11ax_enrich` or equivalent REST enrichment;
 - one configured credentialed-source enrichment;
 - for IP, confirm `intelligence.schemaVersion: "1.0"` only on a deployment whose source SHA includes Kernel v1;
