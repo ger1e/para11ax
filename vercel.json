@@ -58,7 +58,10 @@
     },
     {
       "src": "/oauth/authorize",
-      "dest": "/api/mcp.js?_para11ax_mcp_route=authorize"
+      "dest": "/api/mcp.js?_para11ax_mcp_route=authorize",
+      "headers": {
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://chatgpt.com/connector_platform_oauth_redirect; frame-ancestors 'none'; base-uri 'none'"
+      }
     },
     {
       "src": "/oauth/token",

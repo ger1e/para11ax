@@ -261,7 +261,7 @@ function authorizationPage(value, error = '') {
 function htmlResponse(status, body) {
   return response(status, body, {
     'content-type': 'text/html; charset=utf-8',
-    'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+    'content-security-policy': `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${CHATGPT_REDIRECT_URI}; frame-ancestors 'none'; base-uri 'none'`,
   });
 }
 
