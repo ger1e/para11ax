@@ -5,6 +5,7 @@ import { fetchJson } from '../src/core/fetch-json.js';
 import { greynoiseProvider } from '../src/providers/greynoise.js';
 import { osvProvider } from '../src/providers/osv.js';
 import { circlHashlookupProvider } from '../src/providers/circl-hashlookup.js';
+import { ALL_PROVIDERS } from '../src/providers/index.js';
 import { toStixBundle } from '../src/export/stix.js';
 import { runBatch } from '../src/core/batch.js';
 import { correlateEvidence } from '../src/core/correlate.js';
@@ -149,7 +150,7 @@ test('hash evidence graph canonicalizes case-equivalent values and suppresses se
   assert.equal(graph.edges.some(edge => edge.type === 'related_to' && edge.source === edge.target), false);
 });
 
-test('CIRCL hashlookup canonicalizes equivalent hashes and does not emit the subject as a pivot', async () => {
+test('CIRCL hashlookup canonicalizes equivalent hashes while preserving provider equivalence evidence', async () => {
   const sha256 = '275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f';
   const output = await circlHashlookupProvider.run({ type: 'hash', value: sha256 }, {
     fetchImpl: async () => json({
@@ -159,10 +160,10 @@ test('CIRCL hashlookup canonicalizes equivalent hashes and does not emit the sub
       'SHA-256': sha256.toUpperCase(),
     }),
   });
-  assert.equal(output.relationships.some(rel => rel.target === sha256), false);
   assert.deepEqual(output.relationships.map(rel => rel.target), [
     '44d88612fea8a8f36de82e1278abb02f',
     '3395856ce81f2b7382dee72602f798b642f14140',
+    sha256,
   ]);
 });
 
@@ -229,7 +230,7 @@ test('provider status separates configured credentials from observed runtime hea
   telemetry.emit({ event: 'provider_outcome', provider: 'greynoise', status: 'failure' });
   const app = createApp({
     env: { PARA11AX_TOKEN: 'gateway-token', GREYNOISE_API_KEY: 'configured-but-not-proven-valid' },
-    adapters: [greynoiseProvider],
+    adapters: ALL_PROVIDERS,
     telemetry,
     nowMs: (() => { let value = 1000; return () => (value += 10); })(),
   });
