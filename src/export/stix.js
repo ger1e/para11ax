@@ -1,7 +1,8 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 const MAX_OBJECTS = 100;
 const MAX_REFERENCES = 20;
+const UUID_NAMESPACE_URL = Buffer.from('6ba7b8119dad11d180b400c04fd430c8', 'hex');
 const SUPPORTED_ATTACK_TYPES = new Set([
   'attack-pattern', 'intrusion-set', 'malware', 'tool', 'campaign', 'course-of-action',
   'x-mitre-tactic', 'x-mitre-data-source', 'x-mitre-data-component', 'x-mitre-detection-strategy',
@@ -60,17 +61,38 @@ function timestamp(value, fallback) {
   return Number.isFinite(ms) ? new Date(ms).toISOString() : fallback;
 }
 
-function newId(type, uuid) {
-  return `${type}--${uuid()}`;
+function canonicalIdentity(type, value) {
+  const text = String(value ?? '').trim();
+  if (type === 'hash' || type === 'domain') return text.toLowerCase();
+  if (type === 'cve' || type === 'asn') return text.toUpperCase();
+  return text;
+}
+
+function uuidV5(name) {
+  const hash = createHash('sha1')
+    .update(UUID_NAMESPACE_URL)
+    .update(Buffer.from(String(name), 'utf8'))
+    .digest();
+  const bytes = Buffer.from(hash.subarray(0, 16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function newId(type, uuid, identity) {
+  const value = uuid ? uuid() : uuidV5(`para11ax-stix\u0000${type}\u0000${identity}`);
+  return `${type}--${value}`;
 }
 
 function primaryObject(enrichment, now, uuid) {
   const refs = externalReferences(enrichment.evidence);
+  const identity = `${enrichment.type}\u0000${canonicalIdentity(enrichment.type, enrichment.indicator)}`;
   if (enrichment.type === 'cve') {
     return {
       type: 'vulnerability',
       spec_version: '2.1',
-      id: newId('vulnerability', uuid),
+      id: newId('vulnerability', uuid, identity),
       created: now,
       modified: now,
       name: enrichment.indicator,
@@ -83,7 +105,7 @@ function primaryObject(enrichment, now, uuid) {
   const object = {
     type: 'indicator',
     spec_version: '2.1',
-    id: newId('indicator', uuid),
+    id: newId('indicator', uuid, identity),
     created: now,
     modified: now,
     valid_from: timestamp(enrichment.queriedAt, now),
@@ -145,7 +167,7 @@ function relationshipObjects(enrichment, now, uuid) {
     const object = {
       type,
       spec_version: '2.1',
-      id: newId(type, uuid),
+      id: newId(type, uuid, key),
       created: now,
       modified: now,
       name: target.slice(0, 512),
@@ -165,21 +187,25 @@ function assertGatewayEnrichment(value) {
 export function toStixBundle(enrichment, {
   maxObjects = MAX_OBJECTS,
   now = () => new Date().toISOString(),
-  uuid = randomUUID,
+  uuid = null,
 } = {}) {
   assertGatewayEnrichment(enrichment);
   if (!Number.isInteger(maxObjects) || maxObjects < 1 || maxObjects > MAX_OBJECTS) throw new TypeError('maxObjects must be between 1 and 100');
-  if (typeof uuid !== 'function') throw new TypeError('uuid must be a function');
+  if (uuid !== null && typeof uuid !== 'function') throw new TypeError('uuid must be a function');
 
   const created = timestamp(now(), new Date().toISOString());
   const objects = [];
   const first = enrichment.type === 'attack' ? attackObject(enrichment) : primaryObject(enrichment, created, uuid);
   if (first) objects.push(first);
   if (objects.length < maxObjects) objects.push(...relationshipObjects(enrichment, created, uuid).slice(0, maxObjects - objects.length));
+  const boundedObjects = objects.slice(0, maxObjects);
+  const bundleIdentity = boundedObjects.map(object => object.id).sort().join('|') || `${enrichment.type}\u0000${canonicalIdentity(enrichment.type, enrichment.indicator)}`;
 
   return {
     type: 'bundle',
-    id: newId('bundle', uuid),
-    objects: objects.slice(0, maxObjects),
+    id: newId('bundle', uuid, bundleIdentity),
+    objects: boundedObjects,
   };
 }
+
+export { randomUUID };
