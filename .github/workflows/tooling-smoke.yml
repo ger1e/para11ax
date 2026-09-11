@@ -27,11 +27,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Mark Tooling smoke pending for trusted exact SHA
-        if: ${{ github.event_name != 'pull_request' }}
+      - name: Mark Tooling smoke pending for exact source SHA
         env:
           GH_TOKEN: ${{ github.token }}
-          STATUS_SHA: ${{ github.sha }}
+          STATUS_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
           target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           curl --fail-with-body --silent --show-error \
@@ -115,11 +114,11 @@ jobs:
             }
           }
 
-      - name: Publish authoritative Tooling smoke status for trusted exact SHA
-        if: ${{ always() && github.event_name != 'pull_request' }}
+      - name: Publish authoritative Tooling smoke status for exact source SHA
+        if: ${{ always() }}
         env:
           GH_TOKEN: ${{ github.token }}
-          STATUS_SHA: ${{ github.sha }}
+          STATUS_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           CHECKOUT: ${{ steps.checkout.outcome }}
           SETUP_NODE: ${{ steps.setup_node.outcome }}
           TOOLS: ${{ steps.tools.outcome }}
