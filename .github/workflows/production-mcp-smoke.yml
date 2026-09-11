@@ -66,6 +66,14 @@ jobs:
             exit 1
           fi
 
+          jq -r '
+            "PRODUCTION_MCP_DIAGNOSTIC SHA=\(.deploymentSha) AUTH=\(.authorization) TOOLS=\(.mcp.toolCount) " +
+            "IP_STATUS=\(.enrichment.status // "missing") IP_ERROR=\(.enrichment.error // "none") " +
+            "USER_STATUS=\(.userScanner.status // "ok") USER_ERROR=\(.userScanner.error // "none") " +
+            "USER_TOTAL=\(.userScanner.totalScanned // -1) USER_FOUND=\(.userScanner.found // -1) " +
+            "USER_ERRORS=\(.userScanner.errors // -1) USER_SKIPPED=\(.userScanner.skipped // -1)"
+          ' "${response_file}"
+
           jq -e '
             .authorization == "github_oidc" and
             .mcp.authenticated == true and
