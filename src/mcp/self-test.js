@@ -65,7 +65,7 @@ async function authorizeSelfTest(request, { token, fetchImpl, nowMs }) {
   return 'hmac';
 }
 
-function mcpRequest(token, method, params, id, name = null) {
+function mcpRequest(token, method, params, id, name = null, runtimeOidc = null) {
   return {
     method: 'POST',
     headers: {
@@ -74,6 +74,7 @@ function mcpRequest(token, method, params, id, name = null) {
       'mcp-protocol-version': MCP_PROTOCOL_VERSION,
       'mcp-method': method,
       ...(name ? { 'mcp-name': name } : {}),
+      ...(runtimeOidc ? { 'x-vercel-oidc-token': runtimeOidc } : {}),
     },
     body: { jsonrpc: '2.0', id, method, params },
   };
@@ -133,10 +134,11 @@ export function createSignedProductionSelfTestHandler({
 
     const authorization = await authorizeSelfTest(request, { token, fetchImpl, nowMs });
     if (!authorization) return response(401, { error: 'unauthorized' });
+    const runtimeOidc = String(headerValue(request?.headers, 'x-vercel-oidc-token') ?? '').trim() || null;
 
     let tools;
     try {
-      const catalogResult = await mcp(mcpRequest(token, 'tools/list', {}, 1));
+      const catalogResult = await mcp(mcpRequest(token, 'tools/list', {}, 1, null, runtimeOidc));
       const catalog = toolPayload(catalogResult, 'mcp_catalog');
       tools = Array.isArray(catalog.tools) ? catalog.tools : [];
       const names = new Set(tools.map(tool => tool?.name).filter(Boolean));
@@ -155,7 +157,7 @@ export function createSignedProductionSelfTestHandler({
       enrichResult = await mcp(mcpRequest(token, 'tools/call', {
         name: 'para11ax_enrich',
         arguments: { indicator: TEST_IP, profile: 'fast' },
-      }, 2, 'para11ax_enrich'));
+      }, 2, 'para11ax_enrich', runtimeOidc));
       const enrichTool = toolPayload(enrichResult, 'mcp_enrichment');
       const enrichment = enrichTool.structuredContent?.enrichment;
       if (!enrichment || typeof enrichment !== 'object' || Array.isArray(enrichment)) throw new Error('mcp_enrichment_failed');
@@ -183,7 +185,7 @@ export function createSignedProductionSelfTestHandler({
       userResult = await mcp(mcpRequest(token, 'tools/call', {
         name: 'para11ax_user_scan',
         arguments: { scanType: 'username', target: TEST_USERNAME, crossScan: false, noNsfw: true },
-      }, 3, 'para11ax_user_scan'));
+      }, 3, 'para11ax_user_scan', runtimeOidc));
       const userTool = toolPayload(userResult, 'mcp_user_scanner');
       const scan = userTool.structuredContent?.result;
       const summary = scan?.summary;
@@ -215,7 +217,7 @@ export function createSignedProductionSelfTestHandler({
         const probeResult = await mcp(mcpRequest(token, 'tools/call', {
           name: 'para11ax_command',
           arguments: { commandId: 'intel.validate', args: [TEST_IP] },
-        }, 4, 'para11ax_command'));
+        }, 4, 'para11ax_command', runtimeOidc));
         const probe = toolPayload(probeResult, 'mcp_generic_probe');
         if (probe.structuredContent?.command === 'intel.validate') genericToolCall = 'pass';
       } catch {}

@@ -180,7 +180,7 @@ export function createUserScannerHandler({
     };
     const headers = { 'Content-Type': 'application/json' };
     const staticWorkerToken = typeof env.PARA11AX_USER_SCANNER_TOKEN === 'string' ? env.PARA11AX_USER_SCANNER_TOKEN.trim() : '';
-    const workloadToken = typeof env.VERCEL_OIDC_TOKEN === 'string' ? env.VERCEL_OIDC_TOKEN.trim() : '';
+    const workloadToken = String(headerValue(request.headers, 'x-vercel-oidc-token') ?? env.VERCEL_OIDC_TOKEN ?? '').trim();
     if (staticWorkerToken) {
       headers.Authorization = `Bearer ${staticWorkerToken}`;
     } else if (workloadToken) {
