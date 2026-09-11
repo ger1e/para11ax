@@ -3,6 +3,7 @@ import {
   MCP_PROTOCOL_VERSION,
   MCP_TOOLS,
 } from './server.js';
+import { securityHeaders } from '../core/http.js';
 
 const LIST_TTL_MS = 300_000;
 const HEADER_MISMATCH = -32001;
@@ -32,15 +33,14 @@ function errorBody(id, message) {
   };
 }
 
-function rejectHeaderMismatch(request, body, message) {
+function rejectHeaderMismatch(body, message) {
   return {
     status: 400,
     headers: {
+      ...securityHeaders(),
       'cache-control': 'no-store',
       'content-type': 'application/json; charset=utf-8',
       'mcp-protocol-version': MCP_PROTOCOL_VERSION,
-      'x-content-type-options': 'nosniff',
-      'x-frame-options': 'DENY',
     },
     body: errorBody(body?.id, message),
   };
@@ -52,14 +52,14 @@ function validateModernRoutingHeaders(request, body) {
 
   const methodHeader = headerValue(request.headers, 'mcp-method');
   if (methodHeader === undefined || String(methodHeader) !== body.method) {
-    return rejectHeaderMismatch(request, body, 'Header mismatch: Mcp-Method must match the JSON-RPC method');
+    return rejectHeaderMismatch(body, 'Header mismatch: Mcp-Method must match the JSON-RPC method');
   }
 
   if (body.method === 'tools/call') {
     const bodyName = body.params?.name;
     const nameHeader = headerValue(request.headers, 'mcp-name');
     if (typeof bodyName !== 'string' || nameHeader === undefined || String(nameHeader) !== bodyName) {
-      return rejectHeaderMismatch(request, body, 'Header mismatch: Mcp-Name must match params.name');
+      return rejectHeaderMismatch(body, 'Header mismatch: Mcp-Name must match params.name');
     }
   }
   return null;
