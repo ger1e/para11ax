@@ -11,9 +11,13 @@ const probe = String.raw`
 import importlib.util
 import pathlib
 import sys
+import types
 
 root = pathlib.Path('.').resolve()
-sys.path.insert(0, str(root))
+stub_worker = types.ModuleType('worker')
+stub_worker.run_scan = lambda payload: {'summary': {}, 'results': [], 'errored_sites': []}
+sys.modules['worker'] = stub_worker
+
 spec = importlib.util.spec_from_file_location('user_scanner_api', root / 'api' / 'index.py')
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
