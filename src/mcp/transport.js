@@ -4,6 +4,9 @@ import {
   MCP_TOOLS,
 } from './server.js';
 import { securityHeaders } from '../core/http.js';
+import { applyChatGptToolMetadata } from './chatgpt-tool-metadata.js';
+
+applyChatGptToolMetadata(MCP_TOOLS);
 
 const LIST_TTL_MS = 300_000;
 const HEADER_MISMATCH = -32001;
