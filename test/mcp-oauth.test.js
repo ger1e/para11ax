@@ -116,6 +116,7 @@ test('authorization form accepts only the fixed ChatGPT client and never echoes 
   const page = handlers.handleAuthorize({ method: 'GET', query: authorizeParams() });
   assert.equal(page.status, 200);
   assert.match(page.body, /Authorize ChatGPT/);
+  assert.match(page.headers['content-security-policy'], /form-action 'self' https:\/\/chatgpt\.com\/connector_platform_oauth_redirect;/);
 
   const rejected = handlers.handleAuthorize(formRequest({ ...authorizeParams(), gateway_token: 'do-not-echo-this' }));
   assert.equal(rejected.status, 401);
@@ -125,6 +126,13 @@ test('authorization form accepts only the fixed ChatGPT client and never echoes 
   const redirectAttack = handlers.handleAuthorize({ method: 'GET', query: authorizeParams({ redirect_uri: 'https://evil.example/callback' }) });
   assert.equal(redirectAttack.status, 400);
   assert.equal(redirectAttack.headers.location, undefined);
+});
+
+test('OAuth authorization route permits the fixed ChatGPT form redirect through the edge CSP', async () => {
+  const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const route = config.routes.find(value => value.src === '/oauth/authorize');
+  assert.match(route.headers['Content-Security-Policy'], /form-action 'self' https:\/\/chatgpt\.com\/connector_platform_oauth_redirect;/);
+  assert.doesNotMatch(route.headers['Content-Security-Policy'], /\*/);
 });
 
 test('authorization-code exchange enforces PKCE and issues a resource-bound access token', () => {
