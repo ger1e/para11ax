@@ -5,7 +5,8 @@ This document maps PARA11AX controls to the risks they reduce. It is descriptive
 
 | Area | Control | Security effect | Residual risk |
 | --- | --- | --- | --- |
-| Authentication | Gateway bearer required for MCP, enrichment/health/status/User Scanner/Shodan/GreyNoise Swarm | Prevents unauthenticated provider-backed, operational and analyst-utility use | A stolen bearer remains usable until rotated |
+| Authentication | OAuth 2.1/PKCE or gateway bearer required for MCP tool execution; gateway bearer required for protected REST operations | Prevents unauthenticated provider-backed, operational and analyst-utility use | A stolen access token remains usable until expiry or gateway-secret rotation |
+| MCP OAuth | Fixed ChatGPT CIMD client/redirect, exact resource and scope, `S256` PKCE, short-lived signed codes, time/audience/scope-bound access tokens | Lets ChatGPT link without receiving the reusable gateway secret | Compromise of the authorization browser session or an unexpired access token still permits bounded tool use |
 | MCP transport | `/mcp` is explicit POST-only stateless route; modern `Mcp-Method` and `Mcp-Name` must agree with JSON-RPC body | Prevents ambiguous/misdirected remote tool dispatch | A correctly authenticated malicious caller can still invoke allowed tools within their policy |
 | MCP capability boundary | Fixed grouped tool catalog delegates to existing handlers; no arbitrary function/module dispatch | Prevents MCP becoming a generic RPC execution plane | Tool schemas/policies can still contain design defects |
 | MCP command fallback | `para11ax_command` resolves exact registered command IDs and denies browser-session-only, filesystem and local-admin effects | Preserves broad functional parity without exposing host shell/admin primitives | Safe-command classification must remain accurate |
@@ -63,7 +64,10 @@ MCP is a transport/control-plane layer over existing PARA11AX capabilities, not 
 
 Security invariants:
 
-- `POST /mcp` requires the same gateway bearer as other protected remote operations;
+- protocol initialization and tool metadata discovery execute no capability and remain public;
+- every MCP tool declares the `para11ax:use` OAuth scope;
+- tool execution requires a validated resource-bound OAuth token or the same gateway bearer as other protected remote operations;
+- OAuth discovery, `WWW-Authenticate`, and tool-level `mcp/www_authenticate` challenges identify the protected resource;
 - the modern protocol uses `MCP-Protocol-Version: 2026-07-28`;
 - `Mcp-Method` must match the JSON-RPC method;
 - `Mcp-Name` must match `params.name` for `tools/call`;

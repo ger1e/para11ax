@@ -31,7 +31,7 @@
 
 PARA11AX is a bounded, read-only CTI enrichment/correlation core with deterministic analysis and isolated analyst utilities. Canonical observables enter fixed Evidence v2 workflows. Profile admission stays separate from execution priority: the **Provider Value Scheduler v1.0** deterministically orders admitted providers without evidence-dependent source suppression. The IP reference path then projects **Intelligence Kernel v1.0** derived context over normalized evidence and correlation before Decision Support, Guidance and the analyst report consume it.
 
-**MCP control plane** exposes the functional analyst surface through authenticated `POST https://para11ax.vercel.app/mcp`. It delegates to the same bounded PARA11AX handlers rather than duplicating application logic. The current stateless MCP surface covers capabilities, enrichment/batch/provider work, User Scanner, Shodan, GreyNoise Swarm, STIX, Mission Workspace, Investigation Workspace, portable cases, deterministic reports, and registered server-safe commands. Browser cosmetics, arbitrary shell/fetch/filesystem access and local-admin operations remain outside MCP.
+**MCP control plane** exposes the functional analyst surface through `POST https://para11ax.vercel.app/mcp`. ChatGPT links with OAuth 2.1 authorization-code + PKCE; existing trusted clients can retain the direct gateway bearer. The stateless MCP surface covers capabilities, enrichment/batch/provider work, User Scanner, Shodan, GreyNoise Swarm, STIX, Mission Workspace, Investigation Workspace, portable cases, deterministic reports, and registered server-safe commands. Browser cosmetics, arbitrary shell/fetch/filesystem access and local-admin operations remain outside MCP.
 
 **Mission Workspace v1** adds a portable, deterministic analyst loop across Web, CLI, and explicit MCP state handles: explicit client profile → relevance → hunt package → conservative KQL validation → bounded result analysis → ServiceNow-ready projection. It adds no model call, secret access, query execution or ticket submission. Web/CLI remain local/volatile as documented; MCP state is client-carried and stateless server-side.
 
@@ -39,7 +39,7 @@ The Kernel does not fetch, mutate or manufacture evidence. Raw **Evidence v2 rem
 
 <sub><strong>STATE</strong> — OPERATIONAL CORE<br/>
 <strong>INPUTS</strong> — `ip` · `domain` · `url` · `hash` · `cve` · `attack` · `asn` · `cidr` · `certificate` (`cert-sha256:&lt;64-hex&gt;`)<br/>
-<strong>MCP</strong> — `/mcp` · stateless `2026-07-28` profile · 13 grouped tools · same gateway bearer · registered-only execution<br/>
+<strong>MCP</strong> — `/mcp` · stateless `2026-07-28` profile · 13 grouped tools · OAuth 2.1/PKCE or gateway bearer · registered-only execution<br/>
 <strong>SCHEDULER</strong> — Provider Value Scheduler v1.0 · deterministic static ordering · profile admission stays separate<br/>
 <strong>IP REFERENCE</strong> — 24-provider IP workflow · 48-call ceiling · max 4 active · max 2 attempts/provider · 20 s request deadline<br/>
 <strong>INTELLIGENCE</strong> — Intelligence Kernel v1.0 on IP · deterministic derived context · no LLM · no synthetic threat score<br/>
@@ -82,8 +82,9 @@ Remote MCP flow:
 ```text
 MCP client
   -> POST /mcp
-  -> bearer + MCP routing-header validation
-  -> tool discovery / tools.call
+  -> public protocol/tool discovery with per-tool OAuth metadata
+  -> scoped OAuth access token or existing gateway bearer
+  -> MCP routing-header validation / tools.call
   -> existing PARA11AX handler or registered safe command
   -> same validators / fixed destinations / semantic boundaries
   -> structured MCP result
@@ -104,7 +105,9 @@ MCP is the remote **control plane over those capabilities**, not a fourth eviden
 <details>
 <summary><strong>Remote/API surface</strong></summary>
 
-- `POST /mcp` — authenticated stateless MCP control plane; current profile `2026-07-28`; functional analyst-tool parity without host shell/local-admin/filesystem escape.
+- `POST /mcp` — public metadata discovery plus authenticated stateless tool execution; current profile `2026-07-28`; functional analyst-tool parity without host shell/local-admin/filesystem escape.
+- `GET /.well-known/oauth-protected-resource` and `GET /.well-known/oauth-authorization-server` — MCP OAuth discovery metadata.
+- `GET|POST /oauth/authorize` and `POST /oauth/token` — ChatGPT CIMD + authorization-code/PKCE linking flow.
 - `GET /api/para11ax/meta` — public static capabilities and hard limits.
 - `GET /api/para11ax/health` — bearer-protected readiness.
 - `GET /api/para11ax/status` — bearer-protected aggregate runtime state.
@@ -172,7 +175,7 @@ No LLM, adaptive model, runtime learning or universal maliciousness score partic
 **ANALYST SURFACE** — [https://para11ax.vercel.app/app/](https://para11ax.vercel.app/app/)  
 **REMOTE MCP** — `https://para11ax.vercel.app/mcp`
 
-The terminal keeps the gateway bearer in volatile memory only, exposes the shared bounded command fabric documented in [`docs/SHELL.md`](docs/SHELL.md), and preserves the API semantic model. The IndexedDB-backed case workspace is browser-local; active-case state and gateway authentication remain runtime-only. MCP uses the same bearer but carries mission/investigation/case state explicitly in requests and responses; it does not borrow browser IndexedDB or hidden server sessions.
+The terminal keeps the gateway bearer in volatile memory only, exposes the shared bounded command fabric documented in [`docs/SHELL.md`](docs/SHELL.md), and preserves the API semantic model. The IndexedDB-backed case workspace is browser-local; active-case state and gateway authentication remain runtime-only. MCP accepts resource-bound scoped OAuth access tokens from the ChatGPT link flow while preserving the direct gateway bearer for existing clients. It carries mission/investigation/case state explicitly in requests and responses and does not borrow browser IndexedDB or hidden server sessions.
 
 Mission Workspace examples:
 
@@ -301,7 +304,7 @@ PARA11AX has **38 configured sources** (upstream APIs and feeds) in the canonica
 
 <sub><strong>06 // SECURITY & VERIFICATION</strong></sub>
 
-<sub><strong>AUTH</strong> — bearer protects MCP and private API surfaces including User Scanner, Shodan shell and GreyNoise Swarm; `/api/para11ax/meta` is intentionally public<br/>
+<sub><strong>AUTH</strong> — OAuth 2.1/PKCE or the existing bearer protects MCP tool execution; the bearer protects private REST surfaces; MCP discovery and `/api/para11ax/meta` are intentionally public<br/>
 <strong>MCP ROUTING</strong> — modern `Mcp-Method` must match JSON-RPC method; `Mcp-Name` must match `tools/call` name; mismatch fails closed<br/>
 <strong>EGRESS</strong> — exact declared provider hosts; Kernel/Scheduler add no new egress; Shodan shell uses exact `https://api.shodan.io`; Swarm uses exact `https://api.greynoise.io`; User Scanner uses its configured worker only<br/>
 <strong>SECRETS</strong> — `SHODAN_API_KEY`, `GREYNOISE_API_KEY` and all provider/worker credentials remain server-side; MCP does not expose environment-secret values<br/>

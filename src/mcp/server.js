@@ -1,4 +1,3 @@
-import { requireGatewayAuth } from '../core/auth.js';
 import { securityHeaders } from '../core/http.js';
 import { createApp } from '../app.js';
 import { createShodanCommandHandler } from '../shodan-command.js';
@@ -30,6 +29,7 @@ import {
   projectNodeReport,
 } from '../control/shell-report-node.js';
 import { GATEWAY_VERSION } from '../core/version.js';
+import { mcpWwwAuthenticate, verifyMcpAuthorization } from './oauth.js';
 
 export const MCP_PROTOCOL_VERSION = '2026-07-28';
 const LEGACY_PROTOCOL_VERSION = '2025-06-18';
@@ -254,6 +254,16 @@ function toolFailure(error) {
   return { content: [{ type: 'text', text: message }], structuredContent: { error: message }, isError: true };
 }
 
+function toolAuthRequired() {
+  const challenge = mcpWwwAuthenticate('invalid_token', 'Authorize PARA11AX to continue');
+  return {
+    content: [{ type: 'text', text: 'Authentication required. Link PARA11AX to continue.' }],
+    structuredContent: { error: 'authentication_required' },
+    _meta: { 'mcp/www_authenticate': [challenge] },
+    isError: true,
+  };
+}
+
 function remoteCommandAllowed(descriptor) {
   if (!descriptor || !descriptor.surfaces.includes('cli')) return false;
   if (DENIED_COMMAND_IDS.has(descriptor.id)) return false;
@@ -434,7 +444,6 @@ export function createMcpHttpHandler({
 
   return async function handleMcp(request) {
     if (request?.method !== 'POST') return response(405, { error: 'method_not_allowed' }, { allow: 'POST' });
-    if (!requireGatewayAuth(request, env.PARA11AX_TOKEN)) return response(401, { error: 'unauthorized' });
     const contentType = headerValue(request.headers, 'content-type');
     if (contentType && !String(contentType).toLowerCase().startsWith('application/json')) return response(415, { error: 'unsupported_media_type' });
 
@@ -448,6 +457,17 @@ export function createMcpHttpHandler({
     const requestedVersion = headerValue(request.headers, 'mcp-protocol-version');
     if (requestedVersion && ![MCP_PROTOCOL_VERSION, LEGACY_PROTOCOL_VERSION].includes(String(requestedVersion))) {
       return response(400, rpcError(id, -32602, 'Unsupported MCP protocol version', { supported: [MCP_PROTOCOL_VERSION, LEGACY_PROTOCOL_VERSION] }));
+    }
+
+    const discoveryMethod = body.method === 'server/discover'
+      || body.method === 'initialize'
+      || body.method === 'notifications/initialized'
+      || body.method === 'ping'
+      || body.method === 'tools/list';
+    const authorization = verifyMcpAuthorization(request, env.PARA11AX_TOKEN, nowMs());
+    if (!discoveryMethod && !authorization.authorized) {
+      if (body.method === 'tools/call') return response(200, rpcResult(id, toolAuthRequired()));
+      return response(401, { error: 'unauthorized' }, { 'www-authenticate': mcpWwwAuthenticate() });
     }
 
     if (body.method === 'server/discover' || body.method === 'initialize') {

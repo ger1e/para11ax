@@ -39,7 +39,7 @@ IDENTITY-OSINT.md
 
 | Document | Purpose |
 | --- | --- |
-| [`MCP.md`](MCP.md) | Authenticated stateless remote control plane, 13 grouped tools, transport rules, state model and remote safety boundary. |
+| [`MCP.md`](MCP.md) | OAuth-linked stateless remote control plane, 13 grouped tools, transport rules, state model and remote safety boundary. |
 | [`API.md`](API.md) | REST route inventory plus `/mcp` protocol surface and request/response contracts. |
 | [`SHELL.md`](SHELL.md) | Canonical registered analyst-shell grammar, pipelines and surface-specific command constraints. |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Shared domain logic, trust boundaries, Evidence v2 path, MCP delegation model and state separation. |

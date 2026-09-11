@@ -45,6 +45,26 @@
       }
     },
     {
+      "src": "/\\.well-known/oauth-protected-resource",
+      "dest": "/api/mcp.js?_para11ax_mcp_route=protected-resource"
+    },
+    {
+      "src": "/\\.well-known/oauth-protected-resource/mcp",
+      "dest": "/api/mcp.js?_para11ax_mcp_route=protected-resource"
+    },
+    {
+      "src": "/\\.well-known/oauth-authorization-server",
+      "dest": "/api/mcp.js?_para11ax_mcp_route=authorization-metadata"
+    },
+    {
+      "src": "/oauth/authorize",
+      "dest": "/api/mcp.js?_para11ax_mcp_route=authorize"
+    },
+    {
+      "src": "/oauth/token",
+      "dest": "/api/mcp.js?_para11ax_mcp_route=token"
+    },
+    {
       "src": "/mcp",
       "dest": "/api/mcp.js"
     },

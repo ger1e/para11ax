@@ -18,7 +18,7 @@ const request = (body, extraHeaders = {}) => ({
   body,
 });
 
-test('production Vercel bridge defaults to owned worker alias and forwards runtime workload identity header', async () => {
+test('production Vercel bridge uses the public production worker alias and forwards runtime workload identity', async () => {
   const calls = [];
   const handle = createUserScannerHandler({
     env: {
@@ -42,7 +42,7 @@ test('production Vercel bridge defaults to owned worker alias and forwards runti
   ));
   assert.equal(result.status, 200);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, 'https://user-scanner-git-main-geri6.vercel.app/scan');
+  assert.equal(calls[0].url, 'https://user-scanner-kappa.vercel.app/scan');
   assert.equal(calls[0].init.headers.Authorization, 'Bearer vercel-runtime-workload-jwt');
   assert.equal(calls[0].init.headers['x-vercel-trusted-oidc-idp-token'], 'vercel-runtime-workload-jwt');
 });

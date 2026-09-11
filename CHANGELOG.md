@@ -7,6 +7,8 @@ All notable repository changes should be recorded here. This project uses a ligh
 
 ##### Added
 
+- ChatGPT-ready MCP OAuth 2.1 authorization-code + `S256` PKCE linking with protected-resource/authorization-server metadata, fixed ChatGPT CIMD identity and redirect, resource/scope-bound signed access tokens, per-tool `securitySchemes`, and runtime `mcp/www_authenticate` challenges. Existing trusted gateway-bearer MCP clients remain compatible.
+
 - **GreyNoise Project Swarm integration** delivered across PRs #207–#209:
   - PR #207 / `dfb3ef854885321f175ef588d5b8398c86baedc2` upgraded canonical GreyNoise IP enrichment to the authenticated v3 IP Lookup and added bounded Project Swarm workspace-label handling (`greynoise,community,personal` by default, optional `GREYNOISE_WORKSPACE_LABELS`).
   - PR #208 / `76030561a6b4b78131d6a32f5084e0620535aad7` added the authenticated Web-only Swarm session route with `swarm search`, `swarm get`, and explicit single-session `swarm export` for PCAP/raw-source/raw-destination.
@@ -39,6 +41,8 @@ All notable repository changes should be recorded here. This project uses a ligh
 
 ##### Changed
 
+- Production User Scanner routing now uses the canonical public `user-scanner-kappa.vercel.app` alias instead of a branch alias that could be intercepted by Vercel deployment protection before worker identity validation.
+
 - Static browser security headers now run as the first continuing rule in Vercel's active legacy route pipeline, covering landing, app, assets, API, and branded errors instead of relying on an ineffective mixed-config top-level header rule.
 - README and API documentation now include the implemented authenticated `POST /api/para11ax/provider` boundary alongside the other nine public/protected routes.
 - The unified shell now documents GreyNoise Swarm as a Web-only specialist operator family distinct from the canonical GreyNoise Evidence v2 provider.
@@ -57,6 +61,8 @@ All notable repository changes should be recorded here. This project uses a ligh
 - Report generation remains offline-only, bounded and deterministic for a frozen gateway snapshot and supplied generation timestamp.
 
 ##### Security
+
+- The ChatGPT consent bridge validates the existing gateway credential without echoing or persisting it; ChatGPT receives only a signed, expiring token restricted to the PARA11AX MCP resource and `para11ax:use` scope.
 
 - Deployment regression coverage now requires CSP, anti-framing, MIME-sniffing, referrer, cross-origin, and permissions controls on the effective continuing legacy route rule used by production.
 - GreyNoise Swarm accepts only five bounded operations, fixed scopes and vetted pivot fields/intervals/export types; rejects caller-selected URL/method/header/credential/bulk-export behavior; keeps `GREYNOISE_API_KEY` server-side; refuses redirects; caps JSON and individual exports at 4 MiB; and preserves operational failures as failures rather than threat evidence.

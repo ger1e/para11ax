@@ -26,10 +26,17 @@ function toolNames(result) {
   return result.body.result.tools.map(tool => tool.name);
 }
 
-test('MCP is authenticated and supports current stateless discovery', async () => {
+test('MCP exposes stateless discovery before OAuth and protects tool execution', async () => {
   const handle = createMcpHttpHandler({ env: { PARA11AX_TOKEN: TOKEN } });
-  const denied = await handle(request('server/discover', {}, { token: null }));
-  assert.equal(denied.status, 401);
+  const publicDiscovery = await handle(request('server/discover', {}, { token: null }));
+  assert.equal(publicDiscovery.status, 200);
+
+  const denied = await handle(request('tools/call', {
+    name: 'para11ax_capabilities', arguments: { view: 'catalog' },
+  }, { token: null }));
+  assert.equal(denied.status, 200);
+  assert.equal(denied.body.result.isError, true);
+  assert.equal(denied.body.result.structuredContent.error, 'authentication_required');
 
   const result = await handle(request('server/discover'));
   assert.equal(result.status, 200);

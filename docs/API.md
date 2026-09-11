@@ -6,7 +6,7 @@ All responses are JSON unless a documented human-facing error representation is 
 PARA11AX has two remote protocol surfaces over the same bounded domain logic:
 
 - REST under `/api/para11ax/*`;
-- authenticated stateless MCP at `POST /mcp`.
+- OAuth-linked stateless MCP tool execution at `POST /mcp`, with public protocol/tool discovery.
 
 The MCP surface does not duplicate provider, scanner, mission, investigation, case, or report implementations. It delegates to the existing PARA11AX handlers/registered command catalog and preserves their input validation, fixed-host egress, evidence semantics, and side-effect boundaries. See [`MCP.md`](MCP.md) for the canonical MCP contract.
 
@@ -20,7 +20,11 @@ Email/username User Scanner operations, native Shodan commands, and GreyNoise Pr
 
 #### Route inventory
 
-- `POST /mcp` — bearer-protected stateless MCP control plane; current profile `2026-07-28`; 13 grouped tools over existing PARA11AX capabilities.
+- `POST /mcp` — public MCP discovery plus OAuth/bearer-protected stateless tool execution; current profile `2026-07-28`; 13 grouped tools over existing PARA11AX capabilities.
+- `GET /.well-known/oauth-protected-resource` and `/mcp` suffix variant — OAuth resource metadata.
+- `GET /.well-known/oauth-authorization-server` — OAuth authorization-server metadata.
+- `GET|POST /oauth/authorize` — fixed ChatGPT CIMD consent flow.
+- `POST /oauth/token` — public-client authorization-code exchange with `S256` PKCE.
 - `GET /api/para11ax/meta` — public static capabilities and hard limits, including scheduler policy metadata where applicable.
 - `GET /api/para11ax/health` — bearer-protected readiness; `Cache-Control: no-store`.
 - `GET /api/para11ax/status` — bearer-protected count-only runtime state; `Cache-Control: no-store`.
@@ -36,7 +40,7 @@ Unknown `/api/para11ax/*` paths fail closed. `/mcp` is routed explicitly before 
 
 #### `POST /mcp`
 
-MCP authentication uses the same gateway bearer as protected REST routes:
+ChatGPT uses authorization-code + `S256` PKCE to obtain a time-bounded `para11ax:use` access token bound to `https://para11ax.vercel.app/mcp`. Existing trusted MCP clients can continue using the same gateway bearer as protected REST routes:
 
 ```text
 Authorization: Bearer <PARA11AX_TOKEN>
@@ -45,6 +49,8 @@ MCP-Protocol-Version: 2026-07-28
 Mcp-Method: <json-rpc method>
 Mcp-Name: <tool name>   # tools/call only
 ```
+
+`server/discover`, `initialize`, `notifications/initialized`, `ping`, and `tools/list` are intentionally callable before linking and execute no analyst capability. Every tool descriptor declares the OAuth scope. An unauthenticated `tools/call` returns a bounded MCP authentication result with `_meta["mcp/www_authenticate"]`; other protected failures return `401` with `WWW-Authenticate` pointing to the protected-resource metadata.
 
 For the modern stateless profile, `Mcp-Method` must equal the JSON-RPC body method. On `tools/call`, `Mcp-Name` must equal `params.name`. Missing or mismatched routing headers fail closed. Successful modern responses use `resultType: "complete"`; `server/discover` and `tools/list` expose bounded private cache hints.
 

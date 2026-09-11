@@ -9,17 +9,38 @@ https://para11ax.vercel.app/mcp
 
 The MCP endpoint is a control plane over existing PARA11AX domain logic. It does **not** create a second implementation of enrichment, User Scanner, Shodan, GreyNoise Swarm, Mission Workspace, Investigation Workspace, cases, reports, or registered commands. Each MCP tool delegates into the same bounded validators/handlers used by the REST, Web, and CLI surfaces.
 
-Current production implementation: **live on protected `main`**. The transport implements the stateless `2026-07-28` profile and retains a bounded `2025-06-18` initialize compatibility response.
+The transport implements the stateless `2026-07-28` profile and retains a bounded `2025-06-18` initialize compatibility response. Repository, deployment, live-credential, and ChatGPT-connection proof remain separate states tracked in [`OPERATIONS.md`](OPERATIONS.md).
 
 #### Authentication and transport
 
-Every MCP request is authenticated with the PARA11AX gateway bearer:
+Protocol discovery is public so ChatGPT can initialize and inspect the 13 tool descriptors before account linking. Public methods are limited to `server/discover`, `initialize`, `notifications/initialized`, `ping`, and `tools/list`; they execute no PARA11AX capability. Every tool declares:
+
+```json
+{"type":"oauth2","scopes":["para11ax:use"]}
+```
+
+Tool execution accepts either a ChatGPT-issued OAuth session token from the PARA11AX authorization bridge or the existing gateway bearer used by trusted non-OAuth clients:
 
 ```text
 Authorization: Bearer <PARA11AX_TOKEN>
 Content-Type: application/json
 MCP-Protocol-Version: 2026-07-28
 ```
+
+ChatGPT discovers and runs the authorization-code + PKCE flow through:
+
+```text
+GET  /.well-known/oauth-protected-resource
+GET  /.well-known/oauth-protected-resource/mcp
+GET  /.well-known/oauth-authorization-server
+GET  /oauth/authorize
+POST /oauth/authorize
+POST /oauth/token
+```
+
+The authorization server accepts the fixed ChatGPT Client ID Metadata Document, exact stable ChatGPT redirect URI, `S256` PKCE, the exact `https://para11ax.vercel.app/mcp` resource, and the `para11ax:use` scope. The consent page validates the existing gateway access token without echoing or persisting it. The exchanged access token is signed, time-bounded, scope-bound, audience-bound to `/mcp`, and invalidated when the gateway secret rotates. The gateway secret itself is never returned to ChatGPT.
+
+An unauthenticated tool call returns the MCP `_meta["mcp/www_authenticate"]` challenge required to open ChatGPT's linking UI. Non-tool authentication failures use HTTP `401` with the same protected-resource metadata challenge.
 
 Modern requests also use the protocol routing headers enforced by the transport:
 
@@ -42,7 +63,7 @@ server/discover
   -> tools/call
 ```
 
-`server/discover` returns the supported protocol version, server identity, capabilities, and private TTL hints. `tools/list` returns the grouped PARA11AX tools and schemas. The MCP tool catalog is the authoritative remote capability inventory; browser-only presentation controls and local-administration commands are intentionally absent.
+`server/discover` returns the supported protocol version, server identity, capabilities, and private TTL hints. `tools/list` returns the grouped PARA11AX tools, schemas, annotations, and per-tool OAuth policy. The MCP tool catalog is the authoritative remote capability inventory; browser-only presentation controls and local-administration commands are intentionally absent.
 
 #### Functional surface
 

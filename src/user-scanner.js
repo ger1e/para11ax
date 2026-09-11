@@ -8,7 +8,10 @@ const MAX_RESULTS = 1000;
 const MAX_ERRORED_SITES = 512;
 const DEFAULT_TIMEOUT_MS = 55_000;
 const SAFE_NAME = /^[a-z0-9._-]{1,64}$/i;
-const DEFAULT_PRODUCTION_WORKER_URL = 'https://user-scanner-git-main-geri6.vercel.app/scan';
+// Use the canonical production domain. Branch aliases can inherit Vercel
+// deployment protection and reject service-to-service calls before the worker
+// gets a chance to verify the gateway's workload identity.
+const DEFAULT_PRODUCTION_WORKER_URL = 'https://user-scanner-kappa.vercel.app/scan';
 
 function response(status, body, extraHeaders = {}) {
   return {

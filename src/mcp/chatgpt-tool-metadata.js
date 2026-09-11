@@ -1,3 +1,5 @@
+import { MCP_OAUTH_SCOPE } from './oauth.js';
+
 const TOOL_METADATA = Object.freeze({
   para11ax_capabilities: {
     description: 'Use this when you need to inspect the authenticated PARA11AX capability catalog, health, status, metadata, or remotely exposed registered commands before choosing another tool.',
@@ -73,6 +75,7 @@ export function applyChatGptToolMetadata(tools) {
     if (!metadata) continue;
     tool.description = metadata.description;
     tool.annotations = { ...metadata.annotations };
+    tool.securitySchemes = [{ type: 'oauth2', scopes: [MCP_OAUTH_SCOPE] }];
     if (tool.name === 'para11ax_user_scan') tool.inputSchema = USER_SCAN_SCHEMA;
   }
   return tools;
