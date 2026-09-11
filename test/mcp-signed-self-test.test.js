@@ -174,3 +174,64 @@ test('valid signature runs only fixed MCP catalog, public IP enrichment and self
     if (call.body.method === 'tools/call') assert.equal(call.headers['mcp-name'], call.body.params.name);
   }
 });
+
+test('enrichment failure does not suppress User Scanner and remains a bounded partial diagnostic', async () => {
+  const calls = [];
+  const mcpHandler = async req => {
+    calls.push(structuredClone(req));
+    const body = req.body;
+    if (body.method === 'tools/list') {
+      return { status: 200, body: { jsonrpc: '2.0', id: body.id, result: { tools: [
+        { name: 'para11ax_enrich' }, { name: 'para11ax_user_scan' },
+        ...Array.from({ length: 11 }, (_, i) => ({ name: `tool_${i}` })),
+      ] } } };
+    }
+    if (body.params?.name === 'para11ax_enrich') {
+      return { status: 200, body: { jsonrpc: '2.0', id: body.id, result: {
+        isError: true,
+        structuredContent: { error: 'gateway_unavailable' },
+        content: [{ type: 'text', text: 'must-not-be-reflected-verbatim-beyond-bounded-code' }],
+      } } };
+    }
+    if (body.params?.name === 'para11ax_user_scan') {
+      return { status: 200, body: { jsonrpc: '2.0', id: body.id, result: {
+        isError: false,
+        structuredContent: { result: {
+          summary: { totalScanned: 455, found: 21, notFound: 417, errors: 9, skipped: 8 },
+          results: [{ siteName: 'secret-detail', url: 'https://example.invalid/raw' }],
+          durationMs: 987,
+        } },
+      } } };
+    }
+    throw new Error('unexpected MCP request');
+  };
+
+  const handle = createSignedProductionSelfTestHandler({
+    env: { PARA11AX_TOKEN: TOKEN },
+    nowMs: () => NOW_MS,
+    mcpHandler,
+  });
+  const result = await handle(request());
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.status, 'partial');
+  assert.deepEqual(result.body.mcp, { authenticated: true, toolCount: 13 });
+  assert.deepEqual(result.body.enrichment, {
+    target: '1.1.1.1',
+    profile: 'fast',
+    status: 'fail',
+    error: 'gateway_unavailable',
+  });
+  assert.deepEqual(result.body.userScanner, {
+    target: 'ger1e',
+    totalScanned: 455,
+    found: 21,
+    notFound: 417,
+    errors: 9,
+    skipped: 8,
+    durationMs: 987,
+  });
+  assert.equal(calls.length, 3);
+  assert.equal(JSON.stringify(result.body).includes('secret-detail'), false);
+  assert.equal(JSON.stringify(result.body).includes('must-not-be-reflected-verbatim'), false);
+});
