@@ -62,6 +62,23 @@ function providerStatus(adapter, env) {
   return { configured: true, auth: 'none' };
 }
 
+function credentialStatus(adapter, env) {
+  if (adapter.requiredEnv) return env[adapter.requiredEnv] ? 'configured_unverified' : 'missing';
+  if (adapter.optionalEnv) return env[adapter.optionalEnv] ? 'configured_unverified' : 'optional_not_configured';
+  return 'not_required';
+}
+
+function providerRuntimeHealth({ configured, active, outcomes }) {
+  if (!active) return 'inactive';
+  if (!configured) return 'unconfigured';
+  const success = Number(outcomes?.success) || 0;
+  const failures = (Number(outcomes?.failure) || 0) + (Number(outcomes?.timeout) || 0) + (Number(outcomes?.rate_limited) || 0);
+  if (success > 0 && failures === 0) return 'healthy';
+  if (success > 0 && failures > 0) return 'degraded';
+  if (success === 0 && failures > 0) return 'failing';
+  return 'untested';
+}
+
 function schedulerMetadata(adapter) {
   const invalid = new Set(adapter.schedulerMetadataInvalidTypes ?? []);
   const byType = Object.fromEntries([...adapter.types].sort().map(type => {
@@ -195,9 +212,22 @@ export function createApp({
     async handleStatus(request) {
       if (request?.method !== 'GET') return renderHttpError(request, 405, 'method_not_allowed', { headers: { allow: 'GET' } });
       if (!requireGatewayAuth(request, env.PARA11AX_TOKEN)) return renderHttpError(request, 401, 'unauthorized');
+      const telemetryStats = typeof events?.stats === 'function'
+        ? events.stats()
+        : { events: 0, sinkErrors: 0, byEvent: {}, providerOutcomes: {} };
       const providers = Object.fromEntries(registry.names().map(name => {
         const adapter = registry.get(name);
-        return [name, { ...providerStatus(adapter, env), parserVersion: adapter.parserVersion, active: adapter.active !== false }];
+        const readiness = providerStatus(adapter, env);
+        const active = adapter.active !== false;
+        const runtimeOutcomes = telemetryStats.providerOutcomes?.[name] ?? { success: 0, failure: 0, timeout: 0, rate_limited: 0, skipped: 0 };
+        return [name, {
+          ...readiness,
+          parserVersion: adapter.parserVersion,
+          active,
+          credentialStatus: credentialStatus(adapter, env),
+          runtimeHealth: providerRuntimeHealth({ configured: readiness.configured, active, outcomes: runtimeOutcomes }),
+          runtimeOutcomes,
+        }];
       }));
       return response(200, {
         gatewayVersion, schemaVersion: EVIDENCE_SCHEMA_VERSION,
@@ -205,7 +235,7 @@ export function createApp({
         gatewayAuthConfigured: Boolean(env.PARA11AX_TOKEN), providers,
         cache: typeof cache?.stats === 'function' ? cache.stats() : { entries: 0, inflight: 0, hits: 0, misses: 0, evictions: 0, expirations: 0 },
         circuit: typeof breaker?.stats === 'function' ? breaker.stats() : { providers: 0, open: 0 },
-        telemetry: typeof events?.stats === 'function' ? events.stats() : { events: 0, sinkErrors: 0, byEvent: {} },
+        telemetry: telemetryStats,
       }, { 'cache-control': 'no-store' });
     },
 
