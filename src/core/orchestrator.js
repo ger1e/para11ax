@@ -205,11 +205,7 @@ export async function enrich({
       continue;
     }
     executedProviders.add(item.provider);
-    const adapter = registry.get(item.provider);
-    const result = item.result;
-    const ttl = cacheTtlFor(adapter, result);
-    if (ttl != null) cache?.set(cacheKey(item.provider, type, indicator), result, ttl);
-    records.set(item.provider, { result, cacheState: 'miss', attempts: item.attempts });
+    records.set(item.provider, { result: item.result, cacheState: 'miss', attempts: item.attempts });
   }
 
   for (const name of providerNames) {
@@ -227,18 +223,33 @@ export async function enrich({
 
     const result = record.result;
     cacheMeta[name] = record.cacheState;
-    if (record.cacheState === 'hit') summary.cached += 1;
     if (result?.ok) {
-      summary.ok += 1;
-      providerHealth[name] = 'ok';
-      telemetry?.emit?.({ event: 'provider_outcome', requestId, type, provider: name, status: 'success' });
-      const item = normalizeEvidence(name, indicator, type, result.data, {
-        retrievedAt: result.retrievedAt, rawHash: result.rawHash, parserVersion: adapter?.parserVersion ?? '1',
-        cacheState: record.cacheState, durationMs: record.cacheState === 'hit' ? 0 : result.durationMs,
-        sourceRole: adapter?.sourceRole ?? 'community',
-      });
-      evidence.push(item);
-      relationships.push(...item.relationships.map(rel => ({ ...rel, provider: rel.provider ?? name })));
+      try {
+        const item = normalizeEvidence(name, indicator, type, result.data, {
+          retrievedAt: result.retrievedAt, rawHash: result.rawHash, parserVersion: adapter?.parserVersion ?? '1',
+          cacheState: record.cacheState, durationMs: record.cacheState === 'hit' ? 0 : result.durationMs,
+          sourceRole: adapter?.sourceRole ?? 'community',
+        });
+        evidence.push(item);
+        relationships.push(...item.relationships.map(rel => ({ ...rel, provider: rel.provider ?? name })));
+
+        const ttl = cacheTtlFor(adapter, result);
+        if (record.cacheState !== 'hit' && ttl != null) cache?.set(cacheKey(name, type, indicator), result, ttl);
+
+        summary.ok += 1;
+        if (record.cacheState === 'hit') summary.cached += 1;
+        providerHealth[name] = 'ok';
+        telemetry?.emit?.({ event: 'provider_outcome', requestId, type, provider: name, status: 'success' });
+      } catch {
+        const failure = { reason: 'evidence_normalization_error' };
+        const retrievedAt = result?.retrievedAt ?? now();
+        cache?.delete?.(cacheKey(name, type, indicator));
+        record.result = { ok: false, provider: name, failure, retrievedAt, durationMs: result?.durationMs ?? 0 };
+        summary.failed += 1;
+        providerHealth[name] = failure.reason;
+        failures.push({ provider: name, ...failure, retrievedAt });
+        telemetry?.emit?.({ event: 'provider_outcome', requestId, type, provider: name, status: 'failure', reason: failure.reason });
+      }
     } else {
       summary.failed += 1;
       const failure = result?.failure ?? { reason: 'provider_error' };
