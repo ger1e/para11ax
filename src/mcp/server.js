@@ -289,7 +289,8 @@ function innerRequest(env, body = undefined, method = 'POST') {
   };
 }
 
-async function unwrap(result) {
+async function unwrap(resultOrPromise) {
+  const result = await resultOrPromise;
   if (!result || result.status < 200 || result.status >= 300) {
     const message = typeof result?.body?.error === 'string' ? result.body.error : `operation_failed_${result?.status ?? 500}`;
     throw new Error(message);

@@ -1,1 +1,2 @@
 user-scanner==1.5.1
+PyJWT[crypto]==2.10.1
