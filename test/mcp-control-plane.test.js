@@ -6,15 +6,19 @@ import { createMcpHttpHandler, MCP_PROTOCOL_VERSION } from '../src/mcp/server.js
 
 const TOKEN = 'test-mcp-token';
 
-function request(method, params = {}, { token = TOKEN, id = 1 } = {}) {
+function request(method, params = {}, { token = TOKEN, id = 1, protocolVersion = MCP_PROTOCOL_VERSION, methodHeader = method, nameHeader } = {}) {
+  const body = { jsonrpc: '2.0', id, method, params };
+  const mirroredName = nameHeader ?? (method === 'tools/call' ? params?.name : undefined);
   return {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'mcp-protocol-version': MCP_PROTOCOL_VERSION,
+      'mcp-protocol-version': protocolVersion,
+      'mcp-method': methodHeader,
+      ...(mirroredName === undefined ? {} : { 'mcp-name': mirroredName }),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
-    body: { jsonrpc: '2.0', id, method, params },
+    body,
   };
 }
 
@@ -22,7 +26,7 @@ function toolNames(result) {
   return result.body.result.tools.map(tool => tool.name);
 }
 
-test('MCP is authenticated and supports stateless discovery', async () => {
+test('MCP is authenticated and supports current stateless discovery', async () => {
   const handle = createMcpHttpHandler({ env: { PARA11AX_TOKEN: TOKEN } });
   const denied = await handle(request('server/discover', {}, { token: null }));
   assert.equal(denied.status, 401);
@@ -30,15 +34,39 @@ test('MCP is authenticated and supports stateless discovery', async () => {
   const result = await handle(request('server/discover'));
   assert.equal(result.status, 200);
   assert.equal(result.body.jsonrpc, '2.0');
-  assert.equal(result.body.result.protocolVersion, MCP_PROTOCOL_VERSION);
+  assert.equal(result.body.result.resultType, 'complete');
+  assert.deepEqual(result.body.result.supportedVersions, [MCP_PROTOCOL_VERSION]);
   assert.equal(result.body.result.serverInfo.name, 'para11ax');
   assert.equal(result.body.result.capabilities.tools.listChanged, false);
+  assert.equal(result.body.result.cacheScope, 'private');
+  assert.ok(Number.isSafeInteger(result.body.result.ttlMs));
 });
 
-test('tools/list exposes the complete functional control plane without local-admin escape hatches', async () => {
+test('modern HTTP requests fail closed when standard MCP routing headers are absent or disagree with the body', async () => {
+  const handle = createMcpHttpHandler({ env: { PARA11AX_TOKEN: TOKEN } });
+
+  const missing = request('tools/list');
+  delete missing.headers['mcp-method'];
+  const missingResult = await handle(missing);
+  assert.equal(missingResult.status, 400);
+  assert.equal(missingResult.body.error.code, -32001);
+
+  const wrongMethod = await handle(request('tools/list', {}, { methodHeader: 'tools/call' }));
+  assert.equal(wrongMethod.status, 400);
+  assert.equal(wrongMethod.body.error.code, -32001);
+
+  const wrongName = await handle(request('tools/call', { name: 'para11ax_capabilities', arguments: {} }, { nameHeader: 'para11ax_enrich' }));
+  assert.equal(wrongName.status, 400);
+  assert.equal(wrongName.body.error.code, -32001);
+});
+
+test('tools/list exposes the complete functional control plane with deterministic private cache hints', async () => {
   const handle = createMcpHttpHandler({ env: { PARA11AX_TOKEN: TOKEN } });
   const result = await handle(request('tools/list'));
   assert.equal(result.status, 200);
+  assert.equal(result.body.result.resultType, 'complete');
+  assert.equal(result.body.result.cacheScope, 'private');
+  assert.ok(Number.isSafeInteger(result.body.result.ttlMs));
   const names = toolNames(result);
   for (const expected of [
     'para11ax_capabilities', 'para11ax_enrich', 'para11ax_batch', 'para11ax_provider',
@@ -57,6 +85,7 @@ test('registered command fallback executes safe PARA11AX commands and denies loc
     arguments: { commandId: 'intel.validate', args: ['8.8.8.8'] },
   }));
   assert.equal(ok.status, 200);
+  assert.equal(ok.body.result.resultType, 'complete');
   assert.equal(ok.body.result.isError, false);
   assert.deepEqual(ok.body.result.structuredContent.output.value, { valid: true, type: 'ip', value: '8.8.8.8' });
 
