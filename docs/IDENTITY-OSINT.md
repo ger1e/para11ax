@@ -132,3 +132,7 @@ Authorised OSINT Toolkit
 ```
 
 The design goal is maximum useful recall with minimum attribution error: User Scanner increases discovery breadth; the Authorised OSINT Toolkit and PARA11AX semantic firewall prevent that breadth from becoming false certainty.
+
+---
+
+<p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
