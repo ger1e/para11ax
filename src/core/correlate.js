@@ -6,9 +6,7 @@ const MAX_CORROBORATED_FACTS = 50;
 const MAX_ASSESSMENT_PROVIDERS = 25;
 const MAX_LIMITATIONS = 16;
 const NETWORK_TYPES = new Set(['ip', 'domain', 'url', 'asn', 'cidr']);
-const STATEFUL_OBSERVATION_KINDS = new Set([
-  'known_exploited', 'exploit_probability', 'vulnerability_metadata', 'vulnerability_catalog', 'open_source_vulnerability',
-]);
+const STATEFUL_OBSERVATION_KINDS = new Set(['known_exploited']);
 const INFRASTRUCTURE_RELATIONSHIP_TYPES = new Set([
   'asn', 'hostname', 'domain', 'ip', 'cidr', 'netblock', 'registration', 'nameserver', 'mx',
   'resolves_to', 'cname', 'mail_exchanger', 'certificate',
@@ -209,7 +207,7 @@ function huntability(type, evidence) {
 
 function normalizedCvss(item) {
   const raw = item?.observation?.attributes?.cvss;
-  if (Number.isFinite(Number(raw))) return { score: Number(raw), version: null, severity: null, vector: null, provider: item.provider };
+  if (Number.isFinite(Number(raw))) return { score: Number(raw), provider: item.provider };
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !Number.isFinite(Number(raw.score))) return null;
   return {
     score: Number(raw.score),
