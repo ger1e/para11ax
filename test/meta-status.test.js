@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../src/app.js';
+import { sanitizePublicMeta } from '../api/para11ax/meta.js';
 import { TtlCache } from '../src/core/cache.js';
 import { createTelemetry } from '../src/core/telemetry.js';
 
@@ -20,7 +21,7 @@ function get(token = null) { return { method: 'GET', headers: token ? { authoriz
 
 test('public meta is a minimal capability contract and does not expose provider topology or internal limits', async () => {
   const app = createApp({ env: { PARA11AX_TOKEN: 'gateway', RDAP_SECRET_TEST: 'actual-secret' }, adapters: [adapter()] });
-  const out = await app.handleMeta(get());
+  const out = sanitizePublicMeta(await app.handleMeta(get()));
   assert.equal(out.status, 200);
   assert.deepEqual(Object.keys(out.body).sort(), [
     'documentation',
