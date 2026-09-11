@@ -40,6 +40,18 @@ A public live probe of `/mcp` returned the expected fail-closed method behavior:
 
 The same deployed source includes Provider Value Scheduler v1.0, Intelligence Kernel v1.0, User Scanner, Shodan, GreyNoise Project Swarm, Mission Workspace, Investigation Workspace v2, cases/reports, defensive identity-OSINT documentation, and the MCP control plane. Re-check GitHub/Vercel metadata before making a future “current production” claim.
 
+#### Historical Scheduler / Kernel repository baseline — 2026-08-30
+
+Retain this record as historical release provenance, not as the current production state. The Unified Intelligence Kernel / Provider Value Scheduler release merged to protected `main` as:
+
+```text
+11d7b861d9f626c45f44c138c8d72cee9493efdf
+```
+
+That exact SHA passed the historical hosted gates recorded in `QA-REPORT.md` (`Tooling smoke 1374` and `CodeQL 962`). It established Provider Value Scheduler v1.0 and the IP-reference Intelligence Kernel v1.0 without adding providers, hosts, dependencies, egress, credential reads, or persistence surfaces.
+
+At that historical point a Vercel **build-rate limit** prevented immediate production advancement. That event is retained because it is the canonical example of why repository/CI proof and deployment proof must stay separate. It has been superseded as the current runtime baseline by the 2026-09-11 MCP production deployment above.
+
 #### MCP control-plane operations
 
 Reference topology:
@@ -164,7 +176,7 @@ When a canonical source changes, update the relevant documentation and drift tes
 
 This public repository runs one bounded Ubuntu `Tooling smoke` job for pull requests targeting `main`, pushes to `main`, and manual dispatch. CodeQL runs separately for JavaScript/TypeScript and Python analysis.
 
-Vercel Git deployment is narrower than CI. A protected verified merge to `main` is not production acceptance by itself. Accept production only when deployment metadata reports that exact `main` SHA in `READY` state. A quota/build-rate rejection is a deployment failure state, not a code/test failure and not permission to pretend the previous deployment contains the new code.
+Vercel Git deployment is narrower than CI. A protected verified merge to `main` is not production acceptance by itself. Accept production only when deployment metadata reports that exact `main` SHA in `READY` state. A quota/build-rate limit or rejection is a deployment failure state, not a code/test failure and not permission to pretend the previous deployment contains the new code.
 
 #### User Scanner hosted wiring
 
