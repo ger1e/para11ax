@@ -92,6 +92,16 @@ function boundedToolError(result, fallback) {
   return fallback;
 }
 
+function classifyToolFailure(result) {
+  if (!result) return 'transport_exception';
+  if (result.status !== 200) return 'transport_http_error';
+  if (result.body?.error) return 'rpc_error';
+  const payload = result.body?.result;
+  if (!payload) return 'missing_result';
+  if (payload.isError === true) return 'tool_error';
+  return 'shape_error';
+}
+
 function evidenceCount(enrichment) {
   if (Array.isArray(enrichment?.evidence)) return enrichment.evidence.length;
   if (Array.isArray(enrichment?.evidenceV2?.observations)) return enrichment.evidenceV2.observations.length;
@@ -196,6 +206,26 @@ export function createSignedProductionSelfTestHandler({
       };
     }
 
+    let diagnostics;
+    if (!enrichmentOk && !userScannerOk) {
+      enrichmentSummary.failureClass = classifyToolFailure(enrichResult);
+      userScannerSummary.failureClass = classifyToolFailure(userResult);
+      let genericToolCall = 'fail';
+      try {
+        const probeResult = await mcp(mcpRequest(token, 'tools/call', {
+          name: 'para11ax_command',
+          arguments: { commandId: 'intel.validate', args: [TEST_IP] },
+        }, 4, 'para11ax_command'));
+        const probe = toolPayload(probeResult, 'mcp_generic_probe');
+        if (probe.structuredContent?.command === 'intel.validate') genericToolCall = 'pass';
+      } catch {}
+      diagnostics = {
+        genericToolCall,
+        userScannerUrlConfigured: Boolean(env.PARA11AX_USER_SCANNER_URL),
+        userScannerTokenConfigured: Boolean(env.PARA11AX_USER_SCANNER_TOKEN),
+      };
+    }
+
     return response(200, {
       status: enrichmentOk && userScannerOk ? 'pass' : enrichmentOk || userScannerOk ? 'partial' : 'fail',
       authorization,
@@ -205,6 +235,7 @@ export function createSignedProductionSelfTestHandler({
       mcp: { authenticated: true, toolCount: tools.length },
       enrichment: enrichmentSummary,
       userScanner: userScannerSummary,
+      ...(diagnostics ? { diagnostics } : {}),
     });
   };
 }
