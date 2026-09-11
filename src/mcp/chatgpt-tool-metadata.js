@@ -24,7 +24,7 @@ const TOOL_METADATA = Object.freeze({
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true, idempotentHint: false },
   },
   para11ax_user_scan: {
-    description: 'Use this when you have explicit authorization to perform defensive identity OSINT for one email address or username using the isolated, bounded User Scanner worker. Treat matches as investigative indicators, not proof of identity or activity.',
+    description: 'Use this when you need authorized defensive identity OSINT for one email address or username, and you have explicit permission to use the isolated, bounded User Scanner worker. Treat matches as investigative indicators, not proof of identity or activity.',
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true, idempotentHint: false },
   },
   para11ax_stix: {
