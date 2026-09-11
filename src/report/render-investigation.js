@@ -110,7 +110,8 @@ export function buildInvestigationManifest(input, { generatedAt } = {}) {
   // investigation that cannot produce the corresponding report artifact.
   const content = renderInvestigationText(investigation);
   const reportSha256 = sha256Hex(content);
-  const timestamp = generatedAt ?? investigation.updatedAt;
+  const injectedTimestamp = typeof generatedAt === 'function' ? generatedAt() : generatedAt;
+  const timestamp = injectedTimestamp ?? investigation.updatedAt;
   if (typeof timestamp !== 'string' || !Number.isFinite(Date.parse(timestamp))) {
     throw new TypeError('invalid investigation manifest timestamp');
   }
