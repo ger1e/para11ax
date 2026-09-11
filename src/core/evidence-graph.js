@@ -41,9 +41,17 @@ function normalizedText(value) {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
+function canonicalObservableValue(type, value) {
+  const normalizedType = String(type ?? '').toLowerCase();
+  const text = String(value ?? '').trim();
+  if (normalizedType === 'hash' || normalizedType === 'domain') return text.toLowerCase();
+  if (normalizedType === 'cve' || normalizedType === 'asn') return text.toUpperCase();
+  return text;
+}
+
 function observableNode(type, value) {
   const normalizedType = String(type ?? '').toLowerCase();
-  const normalizedValue = String(value ?? '');
+  const normalizedValue = canonicalObservableValue(normalizedType, value);
   if (!normalizedType || !normalizedValue) fail('evidence_graph_observable_invalid');
   return {
     id: `observable:${normalizedType}:${sha256Hex(`${normalizedType}\u0000${normalizedValue}`).slice(0, 24)}`,
@@ -67,6 +75,10 @@ function attackNode(id) {
   return { id: `attack:${attackId}`, type: 'attack', attackId };
 }
 
+function relationshipKind(relation) {
+  return normalizedText(relation?.type) ?? normalizedText(relation?.relationship) ?? null;
+}
+
 function relationTargetType(relation) {
   const explicit = normalizedText(relation?.targetType)?.toLowerCase() ?? null;
   if (explicit) {
@@ -74,7 +86,7 @@ function relationTargetType(relation) {
     if (OBSERVABLE_TYPES.has(explicit) || ['attack', 'actor', 'malware'].includes(explicit)) return explicit;
     return null;
   }
-  const relationType = normalizedText(relation?.type)?.toLowerCase() ?? null;
+  const relationType = relationshipKind(relation)?.toLowerCase() ?? null;
   return relationType ? (RELATION_TYPE_MAP[relationType] ?? null) : null;
 }
 
@@ -100,15 +112,15 @@ export function buildEvidenceGraph({
 
   function indexNode(node) {
     if (node.type === 'observable') {
-      const key = String(node.value);
+      const key = `${node.observableType}\u0000${canonicalObservableValue(node.observableType, node.value)}`;
       if (!exactValueIndex.has(key)) exactValueIndex.set(key, []);
       exactValueIndex.get(key).push(node.id);
     } else if (node.type === 'actor' || node.type === 'malware') {
-      const key = String(node.name);
+      const key = `${node.type}\u0000${String(node.name)}`;
       if (!exactValueIndex.has(key)) exactValueIndex.set(key, []);
       exactValueIndex.get(key).push(node.id);
     } else if (node.type === 'attack') {
-      const key = String(node.attackId);
+      const key = `attack\u0000${String(node.attackId).toUpperCase()}`;
       if (!exactValueIndex.has(key)) exactValueIndex.set(key, []);
       exactValueIndex.get(key).push(node.id);
     }
@@ -129,7 +141,7 @@ export function buildEvidenceGraph({
   }
 
   function addEdge(typeName, source, target, data = {}) {
-    if (!source || !target || !nodes.has(source) || !nodes.has(target)) return null;
+    if (!source || !target || source === target || !nodes.has(source) || !nodes.has(target)) return null;
     const cleanData = canonicalize(Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined && value !== null && value !== '')));
     const id = edgeIdentity(typeName, source, target, cleanData);
     if (edges.has(id)) return id;
@@ -214,9 +226,10 @@ export function buildEvidenceGraph({
     return null;
   }
 
-  function resolveExistingSource(source) {
-    if (source == null || String(source) === String(indicator)) return rootId;
-    const candidates = exactValueIndex.get(String(source)) ?? [];
+  function resolveExistingSource(source, sourceType = type) {
+    if (source == null || canonicalObservableValue(type, source) === canonicalObservableValue(type, indicator)) return rootId;
+    const key = `${sourceType}\u0000${canonicalObservableValue(sourceType, source)}`;
+    const candidates = exactValueIndex.get(key) ?? [];
     return candidates.length === 1 ? candidates[0] : null;
   }
 
@@ -227,11 +240,11 @@ export function buildEvidenceGraph({
     if (!targetType || target == null || target === '') continue;
     const targetNode = relationTargetNode(targetType, target);
     if (!targetNode) continue;
-    const sourceId = resolveExistingSource(relation?.source);
+    const sourceId = resolveExistingSource(relation?.source, type);
     if (!sourceId) continue;
     const targetId = addNode(targetNode);
     addEdge('related_to', sourceId, targetId, {
-      relationshipType: normalizedText(relation?.type) ?? 'related_to',
+      relationshipType: relationshipKind(relation) ?? 'related_to',
       provider: normalizedText(relation?.provider),
     });
   }
