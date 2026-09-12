@@ -43,8 +43,11 @@ function authorizeParams() {
 }
 
 function tamper(token) {
-  const last = token.at(-1);
-  return `${token.slice(0, -1)}${last === 'A' ? 'B' : 'A'}`;
+  const parts = token.split('.');
+  const tag = Buffer.from(parts[3], 'base64url');
+  tag[0] ^= 0x01;
+  parts[3] = tag.toString('base64url');
+  return parts.join('.');
 }
 
 test('gateway bearer comparison is direct constant-time bytes without fast hashing', () => {
