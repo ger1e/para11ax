@@ -2,6 +2,7 @@
   "name": "para11ax",
   "private": true,
   "version": "2.0.0",
+  "description": "PARA11AX is a provenance-first cyber threat intelligence and analyst operations platform for deterministic enrichment, correlation, identity OSINT, threat hunting, STIX 2.1, and bounded MCP workflows in ChatGPT.",
   "type": "module",
   "bin": {
     "para11ax": "./bin/para11ax.mjs"

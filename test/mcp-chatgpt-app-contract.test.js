@@ -58,6 +58,10 @@ test('ChatGPT-facing MCP server advertises the canonical PARA11AX brand icon', a
   assert.equal(result.status, 200);
   assert.equal(result.body.result.serverInfo.name, 'para11ax');
   assert.equal(result.body.result.serverInfo.title, 'PARA11AX');
+  assert.equal(
+    result.body.result.serverInfo.description,
+    'PARA11AX is a provenance-first cyber threat intelligence and analyst operations platform for deterministic enrichment, correlation, identity OSINT, threat hunting, STIX 2.1, and bounded MCP workflows in ChatGPT.',
+  );
   assert.equal(result.body.result.serverInfo.websiteUrl, 'https://para11ax.vercel.app/');
   assert.deepEqual(result.body.result.serverInfo.icons, [{
     src: 'https://para11ax.vercel.app/assets/brand/para11ax-mark.svg',
