@@ -9,6 +9,7 @@ export const SELF_TEST_MESSAGE_PREFIX = 'para11ax-production-self-test:v1:';
 const MAX_SKEW_SECONDS = 120;
 const TEST_IP = '1.1.1.1';
 const TEST_USERNAME = 'ger1e';
+const MAX_PROVIDER_FAILURE_DIAGNOSTICS = 8;
 
 function response(status, body, extraHeaders = {}) {
   return {
@@ -119,6 +120,19 @@ function failureCount(enrichment) {
   return Number.isSafeInteger(failed) && failed >= 0 ? failed : 0;
 }
 
+function boundedProviderFailures(enrichment) {
+  if (!Array.isArray(enrichment?.failures)) return [];
+  return enrichment.failures.slice(0, MAX_PROVIDER_FAILURE_DIAGNOSTICS).map(failure => {
+    const provider = typeof failure?.provider === 'string' && /^[a-z0-9][a-z0-9._-]{0,63}$/i.test(failure.provider)
+      ? failure.provider
+      : 'unknown';
+    const reason = typeof failure?.reason === 'string' && /^[a-z0-9][a-z0-9_:-]{0,63}$/i.test(failure.reason)
+      ? failure.reason
+      : 'provider_error';
+    return { provider, reason };
+  });
+}
+
 export function createSignedProductionSelfTestHandler({
   env = process.env,
   fetchImpl = fetch,
@@ -175,6 +189,7 @@ export function createSignedProductionSelfTestHandler({
         status: String(enrichment.status ?? 'unknown').slice(0, 32),
         evidenceCount: evidenceCount(enrichment),
         failureCount: failureCount(enrichment),
+        providerFailures: boundedProviderFailures(enrichment),
       };
     } catch {
       enrichmentSummary = {

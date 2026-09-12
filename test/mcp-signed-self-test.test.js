@@ -58,7 +58,10 @@ function fakeMcp(calls) {
                 status: 'partial',
                 subject: { type: 'ip', value: '1.1.1.1' },
                 evidence: [{ provider: 'fixture-a' }, { provider: 'fixture-b' }],
-                failures: [{ provider: 'fixture-c' }],
+                failures: [
+                  { provider: 'fixture-c', reason: 'timeout', raw: 'must-not-leak' },
+                  { provider: 'unsafe provider name', reason: 'HTTP 500 / secret detail' },
+                ],
               },
             },
           },
@@ -143,7 +146,11 @@ test('valid signature runs only fixed MCP catalog, public IP enrichment and self
     profile: 'fast',
     status: 'partial',
     evidenceCount: 2,
-    failureCount: 1,
+    failureCount: 2,
+    providerFailures: [
+      { provider: 'fixture-c', reason: 'timeout' },
+      { provider: 'unknown', reason: 'provider_error' },
+    ],
   });
   assert.deepEqual(result.body.userScanner, {
     target: 'ger1e',
@@ -155,6 +162,7 @@ test('valid signature runs only fixed MCP catalog, public IP enrichment and self
     durationMs: 1234,
   });
   assert.equal(JSON.stringify(result.body).includes('must-not-leak'), false);
+  assert.equal(JSON.stringify(result.body).includes('secret detail'), false);
   assert.equal(JSON.stringify(result.body).includes(TOKEN), false);
 
   assert.equal(calls.length, 3);
