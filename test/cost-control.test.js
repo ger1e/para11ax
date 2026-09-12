@@ -16,14 +16,20 @@ test('public hosted CI runs only for pull requests to main, pushes to main, or m
   assert.doesNotMatch(workflow, /^\s+repository_dispatch:/m);
 });
 
-test('hosted CI is bounded to one fail-fast Ubuntu runner without package installation churn', () => {
-  const runners = workflow.match(/^\s+runs-on:/gm) ?? [];
-  assert.equal(runners.length, 1);
-  assert.match(workflow, /runs-on: ubuntu-latest/);
+test('hosted CI is bounded to one validation runner plus one lightweight status publisher', () => {
+  const runners = [...workflow.matchAll(/^\s+runs-on:\s*([^\n]+)/gm)].map(match => match[1].trim());
+  assert.deepEqual(runners, ['ubuntu-latest', 'ubuntu-latest']);
+  assert.match(workflow, /\n  validate:\n/);
+  assert.match(workflow, /\n  publish_status:\n/);
+  assert.match(workflow, /publish_status:[\s\S]*?needs: validate/);
+  assert.match(workflow, /publish_status:[\s\S]*?timeout-minutes: 2/);
   assert.doesNotMatch(workflow, /continue-on-error:\s*true/);
   assert.doesNotMatch(workflow, /apt-get|brew\s+install|winget\s+install/i);
-  assert.match(workflow, /timeout-minutes: 10/);
+  assert.match(workflow, /validate:[\s\S]*?timeout-minutes: 10/);
   assert.match(workflow, /cancel-in-progress: true/);
+
+  const publisher = workflow.slice(workflow.indexOf('\n  publish_status:\n'));
+  assert.doesNotMatch(publisher, /actions\/checkout|setup-node|npm\s|python3\s+-m|shellcheck|pwsh/);
 });
 
 test('automatic Vercel Git deployment is limited to protected main including slash branches', () => {
