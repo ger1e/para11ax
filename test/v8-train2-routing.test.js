@@ -5,8 +5,8 @@ import { buildDecisionSupport } from '../src/core/decision-engine.js';
 import { ALL_PROVIDERS } from '../src/providers/index.js';
 import { WORKFLOWS, WORKFLOW_CALL_LIMITS } from '../src/workflows.js';
 
-test('Train 2 activates exactly 38 providers and nine bounded server workflows', () => {
-  assert.equal(ALL_PROVIDERS.length, 38);
+test('Train 2 activates exactly 39 providers and nine bounded server workflows', () => {
+  assert.equal(ALL_PROVIDERS.length, 39);
   assert.equal(Object.keys(WORKFLOWS).length, 9);
   assert.deepEqual(WORKFLOWS.certificate, ['censys', 'virustotal']);
   assert.equal(WORKFLOW_CALL_LIMITS.certificate, WORKFLOWS.certificate.length * 2);

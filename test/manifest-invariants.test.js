@@ -16,7 +16,7 @@ function packageJson() {
 }
 
 test('every active workflow adapter is registered supports its routed type and fits the static call ceiling', () => {
-  assert.equal(registry.names().length, 38);
+  assert.equal(registry.names().length, 39);
   assert.equal(Object.keys(WORKFLOWS).length, 9);
   for (const [type, names] of Object.entries(WORKFLOWS)) {
     assert.ok(Number.isInteger(WORKFLOW_CALL_LIMITS[type]) && WORKFLOW_CALL_LIMITS[type] >= names.length, `${type} call ceiling too small`);

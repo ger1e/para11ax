@@ -35,6 +35,7 @@ const EXPECTED = Object.freeze({
   malpedia: ['contextual', 'reference'],
   'hybrid-analysis': ['first_party', 'near_real_time'],
   'cisa-kev': ['authoritative', 'periodic'],
+  'cisa-adp': ['authoritative', 'near_real_time'],
   epss: ['authoritative', 'periodic'],
   'circl-vulnerability': ['aggregator', 'periodic'],
   nvd: ['authoritative', 'periodic'],
@@ -45,8 +46,8 @@ const EXPECTED = Object.freeze({
   'ransomware-live': ['contextual', 'near_real_time'],
 });
 
-test('all 38 canonical providers have the approved v8 source and execution admission semantics', () => {
-  assert.equal(Object.keys(PROVIDER_MANIFEST).length, 38);
+test('all 39 canonical providers have the approved v8 source and execution admission semantics', () => {
+  assert.equal(Object.keys(PROVIDER_MANIFEST).length, 39);
   assert.deepEqual(Object.keys(PROVIDER_MANIFEST).sort(), Object.keys(EXPECTED).sort());
   for (const [name, [sourceRole, freshnessClass]] of Object.entries(EXPECTED)) {
     const policy = PROVIDER_MANIFEST[name];
@@ -58,7 +59,7 @@ test('all 38 canonical providers have the approved v8 source and execution admis
 });
 
 test('runtime adapters project exactly the canonical v8 admission metadata', () => {
-  assert.equal(ALL_PROVIDERS.length, 38);
+  assert.equal(ALL_PROVIDERS.length, 39);
   for (const provider of ALL_PROVIDERS) {
     const policy = PROVIDER_MANIFEST[provider.name];
     assert.equal(provider.sourceRole, policy.sourceRole, `${provider.name}.sourceRole`);
