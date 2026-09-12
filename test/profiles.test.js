@@ -37,15 +37,28 @@ test('fast excludes scarce and high-cost broad enrichment but preserves sole kno
   assert.deepEqual(selectProviders({ type: 'attack', profile: 'fast', workflow: ['attack-taxii'], registry: attackReg }), ['attack-taxii']);
 });
 
-test('real fast IP profile excludes heavyweight MISP feeds while standard retains them', () => {
+test('fast respects an explicit operational fast-profile opt-out without removing standard/full coverage', () => {
+  const operational = registry([
+    { name: 'fast-ok', types: ['ip'], tier: 2, costClass: 'free' },
+    { name: 'slow-upstream', types: ['ip'], tier: 2, costClass: 'free', fastProfileEligible: false },
+  ]);
+  const names = ['fast-ok', 'slow-upstream'];
+  assert.deepEqual(selectProviders({ type: 'ip', profile: 'fast', workflow: names, registry: operational }), ['fast-ok']);
+  assert.deepEqual(selectProviders({ type: 'ip', profile: 'standard', workflow: names, registry: operational }), names);
+  assert.deepEqual(selectProviders({ type: 'ip', profile: 'full', workflow: names, registry: operational }), names);
+});
+
+test('real fast IP profile excludes heavyweight MISP feeds and ThreatMiner while standard retains them', () => {
   const providerRegistry = registry(ALL_PROVIDERS);
   const fast = selectProviders({ type: 'ip', profile: 'fast', workflow: WORKFLOWS.ip, registry: providerRegistry });
   const standard = selectProviders({ type: 'ip', profile: 'standard', workflow: WORKFLOWS.ip, registry: providerRegistry });
 
   assert.equal(fast.includes('misp-circl-osint'), false);
   assert.equal(fast.includes('misp-botvrij-osint'), false);
+  assert.equal(fast.includes('threatminer'), false);
   assert.equal(standard.includes('misp-circl-osint'), true);
   assert.equal(standard.includes('misp-botvrij-osint'), true);
+  assert.equal(standard.includes('threatminer'), true);
 });
 
 test('scheduler descriptors cannot re-admit providers excluded by profile', () => {
