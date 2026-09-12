@@ -77,7 +77,7 @@ test('active workflows preserve MAX routing order', () => {
   assert.deepEqual(WORKFLOWS.domain, ['threatminer', 'cloudflare-dns', 'openphish', 'misp-circl-osint', 'misp-botvrij-osint', 'tweetfeed', 'ransomlook', 'urlscan', 'webamon', 'modat', 'ransomware-live', 'virustotal', 'otx', 'threatfox', 'pulsedive']);
   assert.deepEqual(WORKFLOWS.url, ['openphish', 'threatminer', 'misp-circl-osint', 'misp-botvrij-osint', 'tweetfeed', 'ransomlook', 'urlscan', 'webamon', 'urlhaus', 'ransomware-live', 'virustotal', 'otx', 'threatfox', 'pulsedive']);
   assert.deepEqual(WORKFLOWS.hash, ['circl-hashlookup', 'threatminer', 'misp-circl-osint', 'misp-botvrij-osint', 'tweetfeed', 'ransomlook', 'malwarebazaar', 'malpedia', 'virustotal', 'hybrid-analysis', 'otx', 'threatfox']);
-  assert.deepEqual(WORKFLOWS.cve, ['cisa-kev', 'epss', 'circl-vulnerability', 'misp-circl-osint', 'misp-botvrij-osint', 'nvd', 'osv', 'otx']);
+  assert.deepEqual(WORKFLOWS.cve, ['cisa-kev', 'cisa-adp', 'epss', 'circl-vulnerability', 'misp-circl-osint', 'misp-botvrij-osint', 'nvd', 'osv', 'otx']);
   assert.deepEqual(WORKFLOWS.attack, ['attack-taxii']);
   assert.deepEqual(WORKFLOWS.asn, ['rdap', 'ripestat', 'spamhaus-drop']);
   assert.deepEqual(WORKFLOWS.cidr, ['rdap', 'ripestat', 'spamhaus-drop']);

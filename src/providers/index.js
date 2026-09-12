@@ -27,6 +27,7 @@ import { malwarebazaarProvider as rawMalwarebazaarProvider } from './malwarebaza
 import { malpediaProvider as rawMalpediaProvider } from './malpedia.js';
 import { hybridAnalysisProvider as rawHybridAnalysisProvider } from './hybrid-analysis.js';
 import { cisaKevProvider as rawCisaKevProvider } from './cisa-kev.js';
+import { cisaAdpProvider as rawCisaAdpProvider } from './cisa-adp.js';
 import { epssProvider as rawEpssProvider } from './epss.js';
 import { circlVulnerabilityProvider as rawCirclVulnerabilityProvider } from './circl-vulnerability.js';
 import { nvdProvider as rawNvdProvider } from './nvd.js';
@@ -67,6 +68,7 @@ export const malwarebazaarProvider = withProviderMetadata(rawMalwarebazaarProvid
 export const malpediaProvider = withProviderMetadata(rawMalpediaProvider);
 export const hybridAnalysisProvider = withProviderMetadata(rawHybridAnalysisProvider);
 export const cisaKevProvider = withProviderMetadata(rawCisaKevProvider);
+export const cisaAdpProvider = withProviderMetadata(rawCisaAdpProvider);
 export const epssProvider = withProviderMetadata(rawEpssProvider);
 export const circlVulnerabilityProvider = withProviderMetadata(rawCirclVulnerabilityProvider);
 export const nvdProvider = withProviderMetadata(rawNvdProvider);
@@ -82,7 +84,7 @@ export const ALL_PROVIDERS = Object.freeze([
   greynoiseProvider, abuseipdbProvider, shodanProvider, censysProvider, modatProvider, cloudflareRadarProvider,
   cloudflareDnsProvider, virustotalProvider, otxProvider, threatfoxProvider, urlscanProvider, webamonProvider,
   pulsediveProvider, openphishProvider, urlhausProvider, circlHashlookupProvider,
-  malwarebazaarProvider, malpediaProvider, hybridAnalysisProvider, cisaKevProvider, epssProvider,
+  malwarebazaarProvider, malpediaProvider, hybridAnalysisProvider, cisaKevProvider, cisaAdpProvider, epssProvider,
   circlVulnerabilityProvider, nvdProvider, osvProvider, attackTaxiiProvider,
   tweetfeedProvider, ransomlookProvider, ransomwareLiveProvider,
 ]);

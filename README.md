@@ -283,10 +283,10 @@ para11ax mission import --file mission.json '|' mission show
 
 <sub><strong>05 // PROVIDER FABRIC</strong></sub>
 
-PARA11AX has **38 configured sources** (upstream APIs and feeds) in the canonical Evidence v2 provider fabric. Shodan and GreyNoise are fixed providers for canonical enrichment; their specialist operator routes are distinct explicit surfaces and do not increase the provider count. MCP is a control plane over existing capabilities and is not an additional provider.
+PARA11AX has **39 configured sources** (upstream APIs and feeds) in the canonical Evidence v2 provider fabric. Shodan and GreyNoise are fixed providers for canonical enrichment; their specialist operator routes are distinct explicit surfaces and do not increase the provider count. MCP is a control plane over existing capabilities and is not an additional provider.
 
 <details>
-<summary><strong>38 upstream APIs and feeds</strong></summary>
+<summary><strong>39 upstream APIs and feeds</strong></summary>
 
 **Identity / routing / exposure:** IPinfo · RDAP · RIPEstat · Shodan · Censys · Modat Magnify · Cloudflare Radar · Cloudflare DNS · Tor Exit · Spamhaus DROP / ASN-DROP.
 
@@ -294,7 +294,7 @@ PARA11AX has **38 configured sources** (upstream APIs and feeds) in the canonica
 
 **File / malware:** CIRCL Hashlookup · MalwareBazaar · Malpedia · Hybrid Analysis.
 
-**Vulnerability / ATT&CK:** CISA KEV · FIRST EPSS · CIRCL Vulnerability-Lookup · NVD · OSV · MITRE ATT&CK TAXII.
+**Vulnerability / ATT&CK:** CISA KEV · CISA ADP SSVC · FIRST EPSS · CIRCL Vulnerability-Lookup · NVD · OSV · MITRE ATT&CK TAXII.
 
 **Ransomware:** RansomLook · Ransomware.live API-PRO.
 

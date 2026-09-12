@@ -22,7 +22,7 @@ function feedContext(fetchImpl, feedCache = new Map()) {
 }
 
 test('all approved public intelligence providers are registered without credentials', () => {
-  for (const name of ['threatminer', 'dshield', 'circl-vulnerability', 'spamhaus-drop', 'tor-exit', 'openphish', 'feodo-tracker', 'misp-circl-osint', 'misp-botvrij-osint', 'attack-taxii', 'tweetfeed', 'ransomlook']) {
+  for (const name of ['threatminer', 'dshield', 'cisa-adp', 'circl-vulnerability', 'spamhaus-drop', 'tor-exit', 'openphish', 'feodo-tracker', 'misp-circl-osint', 'misp-botvrij-osint', 'attack-taxii', 'tweetfeed', 'ransomlook']) {
     const p = provider(name);
     assert.equal(p.requiredEnv, undefined, `${name} must not require a secret`);
     assert.equal(p.optionalEnv, undefined, `${name} must not require an optional secret`);
@@ -187,6 +187,6 @@ test('MAX workflows place public sources by semantics before scarce enrichment',
   assert.deepEqual(WORKFLOWS.domain, ['threatminer', 'cloudflare-dns', 'openphish', 'misp-circl-osint', 'misp-botvrij-osint', 'tweetfeed', 'ransomlook', 'urlscan', 'webamon', 'modat', 'ransomware-live', 'virustotal', 'otx', 'threatfox', 'pulsedive']);
   assert.deepEqual(WORKFLOWS.url, ['openphish', 'threatminer', 'misp-circl-osint', 'misp-botvrij-osint', 'tweetfeed', 'ransomlook', 'urlscan', 'webamon', 'urlhaus', 'ransomware-live', 'virustotal', 'otx', 'threatfox', 'pulsedive']);
   assert.deepEqual(WORKFLOWS.hash, ['circl-hashlookup', 'threatminer', 'misp-circl-osint', 'misp-botvrij-osint', 'tweetfeed', 'ransomlook', 'malwarebazaar', 'malpedia', 'virustotal', 'hybrid-analysis', 'otx', 'threatfox']);
-  assert.deepEqual(WORKFLOWS.cve, ['cisa-kev', 'epss', 'circl-vulnerability', 'misp-circl-osint', 'misp-botvrij-osint', 'nvd', 'osv', 'otx']);
+  assert.deepEqual(WORKFLOWS.cve, ['cisa-kev', 'cisa-adp', 'epss', 'circl-vulnerability', 'misp-circl-osint', 'misp-botvrij-osint', 'nvd', 'osv', 'otx']);
   assert.deepEqual(WORKFLOWS.attack, ['attack-taxii']);
 });

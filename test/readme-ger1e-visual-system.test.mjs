@@ -92,7 +92,7 @@ test('README adopts GER1E-style numbered information hierarchy without losing co
   assert.match(readme, /Evidence Graph v1\.0/i);
   assert.match(readme, /Guidance v1\.0/i);
   assert.match(readme, /safeFetch/i);
-  assert.match(readme, /38\s+(?:configured\s+)?sources/i);
+  assert.match(readme, /39\s+(?:configured\s+)?sources/i);
   assert.match(readme, /OBSERVED ≠ INFERRED ≠ CONTEXTUAL/i);
   assert.match(readme, /No universal maliciousness score/i);
 });
