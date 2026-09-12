@@ -155,7 +155,7 @@ No provider API secret is stored in this directory or in the generated MTZ.
 
 #### CI verification
 
-The authoritative repository `Tooling smoke` workflow runs one bounded Ubuntu job. It executes the Maltego Python regression suite, compiles the Python package, validates the Unix installer with bash/ShellCheck, and parses the Windows PowerShell installer syntax. Platform-specific installer behavior remains covered by the repository's static/regression contract without claiming recurring hosted macOS/Windows runners.
+The authoritative repository `Tooling smoke` workflow runs one bounded Ubuntu validation job plus one lightweight Ubuntu status-publisher job. The validation job executes the Maltego Python regression suite, compiles the Python package, validates the Unix installer with bash/ShellCheck, and parses the Windows PowerShell installer syntax. The status publisher never checks out or executes repository code; it only publishes the validation result for the exact source SHA. Platform-specific installer behavior remains covered by the repository's static/regression contract without claiming recurring hosted macOS/Windows runners.
 
 #### Developer commands
 
@@ -178,5 +178,3 @@ Windows:
 ```
 
 ---
-
-<p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
