@@ -1,0 +1,60 @@
+name: CodeQL SARIF diagnostic
+
+on:
+  push:
+    branches:
+      - diag/codeql-pr244-20260912
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63
+        with:
+          languages: javascript-typescript, python
+
+      - name: Analyze without upload
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63
+        with:
+          output: ../results
+          upload: never
+
+      - name: Print SARIF findings
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          shopt -s nullglob
+          files=(../results/*.sarif)
+          if (( ${#files[@]} == 0 )); then
+            echo 'NO_SARIF_FILES'
+            exit 1
+          fi
+          for file in "${files[@]}"; do
+            echo "SARIF_FILE=$(basename "$file")"
+            jq -r '
+              .runs[] as $run
+              | ($run.tool.driver.rules // []) as $rules
+              | ($run.results // [])[]
+              | . as $result
+              | ($rules | map(select(.id == $result.ruleId)) | .[0]) as $rule
+              | [
+                  ($result.ruleId // "unknown"),
+                  ($result.level // "none"),
+                  ($rule.properties."security-severity" // $rule.properties.precision // "none"),
+                  ($result.locations[0].physicalLocation.artifactLocation.uri // "unknown"),
+                  (($result.locations[0].physicalLocation.region.startLine // 0) | tostring),
+                  (($result.message.text // "") | gsub("[\\r\\n\\t]+"; " "))
+                ]
+              | @tsv
+            ' "$file"
+          done
