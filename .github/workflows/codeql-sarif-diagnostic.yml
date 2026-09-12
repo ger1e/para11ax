@@ -29,7 +29,7 @@ jobs:
           output: ../results
           upload: never
 
-      - name: Print SARIF findings
+      - name: Export SARIF findings
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -39,8 +39,8 @@ jobs:
             echo 'NO_SARIF_FILES'
             exit 1
           fi
+          : > ../results/findings.tsv
           for file in "${files[@]}"; do
-            echo "SARIF_FILE=$(basename "$file")"
             jq -r '
               .runs[] as $run
               | ($run.tool.driver.rules // []) as $rules
@@ -56,5 +56,14 @@ jobs:
                   (($result.message.text // "") | gsub("[\\r\\n\\t]+"; " "))
                 ]
               | @tsv
-            ' "$file"
+            ' "$file" >> ../results/findings.tsv
           done
+          cat ../results/findings.tsv
+
+      - name: Upload diagnostic SARIF
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif-diagnostic
+          path: ../results/
+          if-no-files-found: error
+          retention-days: 1
