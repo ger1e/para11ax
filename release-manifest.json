@@ -29,6 +29,11 @@
       "active": true
     },
     {
+      "name": "cisa-adp",
+      "parserVersion": "5.2-cisa-adp-2026-09-12.1",
+      "active": true
+    },
+    {
       "name": "cisa-kev",
       "parserVersion": "1",
       "active": true
