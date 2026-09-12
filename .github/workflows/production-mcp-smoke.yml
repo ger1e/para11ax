@@ -69,6 +69,7 @@ jobs:
           jq -r '
             "PRODUCTION_MCP_DIAGNOSTIC SHA=\(.deploymentSha) AUTH=\(.authorization) TOOLS=\(.mcp.toolCount) " +
             "IP_STATUS=\(.enrichment.status // "missing") IP_ERROR=\(.enrichment.error // "none") IP_CLASS=\(.enrichment.failureClass // "none") " +
+            "IP_PROVIDER_FAILURES=\((.enrichment.providerFailures // []) | map(.provider + ":" + .reason) | join(",")) " +
             "USER_STATUS=\(.userScanner.status // "ok") USER_ERROR=\(.userScanner.error // "none") USER_CLASS=\(.userScanner.failureClass // "none") " +
             "GA_STATUS=\(.conformance.status // "missing") GA_FAILED=\((.conformance.failed // []) | join(",")) " +
             "INV_ERROR=\(.conformance.surfaces.para11ax_investigation.error // "none") REPORT_ERROR=\(.conformance.surfaces.para11ax_report.error // "none") " +

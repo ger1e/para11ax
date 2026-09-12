@@ -9,3 +9,9 @@ test('production MCP smoke emits bounded per-surface conformance error codes', (
   assert.ok(workflow.includes('REPORT_ERROR=\\(.conformance.surfaces.para11ax_report.error // "none")'));
   assert.doesNotMatch(workflow, /cat\s+["']?\$?\{?response_file/i);
 });
+
+test('production MCP smoke emits only bounded provider failure diagnostics', () => {
+  assert.ok(workflow.includes('IP_PROVIDER_FAILURES=\\((.enrichment.providerFailures // []) | map(.provider + ":" + .reason) | join(","))'));
+  assert.doesNotMatch(workflow, /\.enrichment\.failures/);
+  assert.doesNotMatch(workflow, /tojson|@json/);
+});
