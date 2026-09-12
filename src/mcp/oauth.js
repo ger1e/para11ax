@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 import { requireGatewayAuth } from '../core/auth.js';
 import { securityHeaders } from '../core/http.js';
@@ -115,35 +115,37 @@ function validAuthorizeValues(value) {
     && value.codeChallengeMethod === 'S256';
 }
 
-function encode(value) {
-  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
+const TOKEN_PREFIX = 'p1';
+const TOKEN_AAD = Buffer.from('para11ax:mcp-oauth:sealed-token:v2', 'utf8');
+
+function tokenKey(secret) {
+  return scryptSync(secret, 'para11ax:mcp-oauth:token-key:v2', 32);
 }
 
-function signingKey(secret) {
-  return scryptSync(secret, 'para11ax:mcp-oauth:signing-key:v1', 32);
+function sealToken(payload, secret) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', tokenKey(secret), iv);
+  cipher.setAAD(TOKEN_AAD);
+  const plaintext = Buffer.from(JSON.stringify(payload), 'utf8');
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${TOKEN_PREFIX}.${iv.toString('base64url')}.${ciphertext.toString('base64url')}.${tag.toString('base64url')}`;
 }
 
-function sign(payload, secret) {
-  const header = encode({ alg: 'HS256', kid: 'para11ax-mcp-oauth-v1', typ: 'JWT' });
-  const encodedPayload = encode(payload);
-  const value = `${header}.${encodedPayload}`;
-  const signature = createHmac('sha256', signingKey(secret)).update(value, 'utf8').digest('base64url');
-  return `${value}.${signature}`;
-}
-
-function verifySignature(token, secret) {
+function openSealedToken(token, secret) {
   if (typeof token !== 'string' || token.length < 32 || token.length > 8192) return null;
   const parts = token.split('.');
-  if (parts.length !== 3 || parts.some(part => !part)) return null;
-  const value = `${parts[0]}.${parts[1]}`;
-  const expected = createHmac('sha256', signingKey(secret)).update(value, 'utf8').digest();
-  let supplied;
-  try { supplied = Buffer.from(parts[2], 'base64url'); } catch { return null; }
-  if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return null;
+  if (parts.length !== 4 || parts[0] !== TOKEN_PREFIX || parts.slice(1).some(part => !part)) return null;
   try {
-    const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-    if (!header || header.alg !== 'HS256' || header.kid !== 'para11ax-mcp-oauth-v1' || header.typ !== 'JWT') return null;
+    const iv = Buffer.from(parts[1], 'base64url');
+    const ciphertext = Buffer.from(parts[2], 'base64url');
+    const tag = Buffer.from(parts[3], 'base64url');
+    if (iv.length !== 12 || tag.length !== 16 || ciphertext.length < 2 || ciphertext.length > 6144) return null;
+    const decipher = createDecipheriv('aes-256-gcm', tokenKey(secret), iv);
+    decipher.setAAD(TOKEN_AAD);
+    decipher.setAuthTag(tag);
+    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    const payload = JSON.parse(plaintext.toString('utf8'));
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
     return payload;
   } catch {
@@ -161,7 +163,7 @@ function validTimes(payload, nowSeconds, maxLifetime) {
 }
 
 function issueAuthorizationCode(value, secret, nowSeconds) {
-  return sign({
+  return sealToken({
     v: 1,
     typ: 'authorization_code',
     iss: MCP_AUTH_ISSUER,
@@ -178,7 +180,7 @@ function issueAuthorizationCode(value, secret, nowSeconds) {
 }
 
 function readAuthorizationCode(code, secret, nowSeconds) {
-  const payload = verifySignature(code, secret);
+  const payload = openSealedToken(code, secret);
   if (!payload
     || payload.v !== 1
     || payload.typ !== 'authorization_code'
@@ -195,7 +197,7 @@ function readAuthorizationCode(code, secret, nowSeconds) {
 }
 
 function issueAccessToken(secret, nowSeconds, scope = MCP_OAUTH_SCOPE) {
-  return sign({
+  return sealToken({
     v: 1,
     typ: 'access_token',
     iss: MCP_AUTH_ISSUER,
@@ -211,7 +213,7 @@ function issueAccessToken(secret, nowSeconds, scope = MCP_OAUTH_SCOPE) {
 }
 
 function readAccessToken(token, secret, nowSeconds) {
-  const payload = verifySignature(token, secret);
+  const payload = openSealedToken(token, secret);
   if (!payload
     || payload.v !== 1
     || payload.typ !== 'access_token'
@@ -228,7 +230,7 @@ function readAccessToken(token, secret, nowSeconds) {
 }
 
 function issueRefreshToken(secret, nowSeconds, scope) {
-  return sign({
+  return sealToken({
     v: 1,
     typ: 'refresh_token',
     iss: MCP_AUTH_ISSUER,
@@ -244,7 +246,7 @@ function issueRefreshToken(secret, nowSeconds, scope) {
 }
 
 function readRefreshToken(token, secret, nowSeconds) {
-  const payload = verifySignature(token, secret);
+  const payload = openSealedToken(token, secret);
   if (!payload
     || payload.v !== 1
     || payload.typ !== 'refresh_token'
