@@ -178,3 +178,5 @@ Windows:
 ```
 
 ---
+
+<p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
