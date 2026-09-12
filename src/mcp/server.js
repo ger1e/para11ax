@@ -9,6 +9,7 @@ import {
   deriveInvestigationStatus,
   exportInvestigation,
   importInvestigation,
+  INVESTIGATION_LIMITS,
   reduceInvestigation,
 } from '../core/investigation/index.js';
 import {
@@ -38,6 +39,7 @@ import { mcpWwwAuthenticate, verifyMcpAuthorization } from './oauth.js';
 export const MCP_PROTOCOL_VERSION = '2026-07-28';
 const LEGACY_PROTOCOL_VERSION = '2025-06-18';
 const MAX_BODY_BYTES = 128 * 1024;
+const MAX_INVESTIGATION_IMPORT_BODY_BYTES = (2 * INVESTIGATION_LIMITS.bundleBytes) + (64 * 1024);
 const DENIED_COMMAND_IDS = new Set([
   'system.doctor', 'system.setup', 'system.repair', 'system.release-verify', 'system.maltego-check',
   'provider.probe', 'provider.env-template', 'report.compile', 'report.diff',
@@ -214,17 +216,28 @@ function headerValue(headers, name) {
   return headers[name] ?? headers[name.toLowerCase()] ?? headers[name.toUpperCase()];
 }
 
-function parseBody(request) {
+function parseBody(request, maxBodyBytes = MAX_BODY_BYTES) {
   const declared = Number(headerValue(request?.headers, 'content-length'));
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) throw Object.assign(new Error('payload_too_large'), { status: 413 });
+  if (Number.isFinite(declared) && declared > maxBodyBytes) throw Object.assign(new Error('payload_too_large'), { status: 413 });
   let body = request?.body;
+  let bodyBytes;
   if (typeof body === 'string') {
-    if (Buffer.byteLength(body, 'utf8') > MAX_BODY_BYTES) throw Object.assign(new Error('payload_too_large'), { status: 413 });
+    bodyBytes = Buffer.byteLength(body, 'utf8');
+    if (bodyBytes > maxBodyBytes) throw Object.assign(new Error('payload_too_large'), { status: 413 });
     try { body = JSON.parse(body); } catch { throw Object.assign(new Error('parse_error'), { status: 400 }); }
   }
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw Object.assign(new Error('invalid_request'), { status: 400 });
-  if (Buffer.byteLength(JSON.stringify(body), 'utf8') > MAX_BODY_BYTES) throw Object.assign(new Error('payload_too_large'), { status: 413 });
-  return body;
+  if (bodyBytes === undefined) bodyBytes = Buffer.byteLength(JSON.stringify(body), 'utf8');
+  if (bodyBytes > maxBodyBytes) throw Object.assign(new Error('payload_too_large'), { status: 413 });
+  return { body, bodyBytes };
+}
+
+function isLargeInvestigationImport(body, authorization) {
+  return authorization?.authorized === true
+    && body?.method === 'tools/call'
+    && body?.params?.name === 'para11ax_investigation'
+    && body?.params?.arguments?.operation === 'import'
+    && typeof body.params.arguments.bundle === 'string';
 }
 
 function rpcResult(id, result) {
@@ -451,11 +464,17 @@ export function createMcpHttpHandler({
     const contentType = headerValue(request.headers, 'content-type');
     if (contentType && !String(contentType).toLowerCase().startsWith('application/json')) return response(415, { error: 'unsupported_media_type' });
 
+    const authorization = verifyMcpAuthorization(request, env.PARA11AX_TOKEN, nowMs());
+    const parseLimit = authorization.authorized ? MAX_INVESTIGATION_IMPORT_BODY_BYTES : MAX_BODY_BYTES;
     let body;
-    try { body = parseBody(request); }
+    let bodyBytes;
+    try { ({ body, bodyBytes } = parseBody(request, parseLimit)); }
     catch (error) { return response(error.status ?? 400, rpcError(null, -32700, error.message === 'payload_too_large' ? 'Payload too large' : 'Parse error')); }
 
     const id = body.id ?? null;
+    if (bodyBytes > MAX_BODY_BYTES && !isLargeInvestigationImport(body, authorization)) {
+      return response(413, rpcError(id, -32700, 'Payload too large'));
+    }
     if (body.jsonrpc !== '2.0' || typeof body.method !== 'string') return response(400, rpcError(id, -32600, 'Invalid Request'));
 
     const requestedVersion = headerValue(request.headers, 'mcp-protocol-version');
@@ -468,7 +487,6 @@ export function createMcpHttpHandler({
       || body.method === 'notifications/initialized'
       || body.method === 'ping'
       || body.method === 'tools/list';
-    const authorization = verifyMcpAuthorization(request, env.PARA11AX_TOKEN, nowMs());
     if (!discoveryMethod && !authorization.authorized) {
       if (body.method === 'tools/call') return response(200, rpcResult(id, toolAuthRequired()));
       return response(401, { error: 'unauthorized' }, { 'www-authenticate': mcpWwwAuthenticate() });
