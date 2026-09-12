@@ -71,6 +71,7 @@ jobs:
             "IP_STATUS=\(.enrichment.status // "missing") IP_ERROR=\(.enrichment.error // "none") IP_CLASS=\(.enrichment.failureClass // "none") " +
             "USER_STATUS=\(.userScanner.status // "ok") USER_ERROR=\(.userScanner.error // "none") USER_CLASS=\(.userScanner.failureClass // "none") " +
             "GA_STATUS=\(.conformance.status // "missing") GA_FAILED=\((.conformance.failed // []) | join(",")) " +
+            "INV_ERROR=\(.conformance.surfaces.para11ax_investigation.error // "none") REPORT_ERROR=\(.conformance.surfaces.para11ax_report.error // "none") " +
             "USER_TOTAL=\(.userScanner.totalScanned // -1) USER_FOUND=\(.userScanner.found // -1) " +
             "USER_ERRORS=\(.userScanner.errors // -1) USER_SKIPPED=\(.userScanner.skipped // -1)"
           ' "${response_file}"
