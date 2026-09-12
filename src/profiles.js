@@ -13,6 +13,7 @@ function included(adapter, profile) {
   if (profile === 'standard') return adapter.costClass !== 'scarce';
   if (profile === 'fast') {
     if (adapter.costClass === 'scarce') return false;
+    if (adapter.fastProfileEligible === false) return false;
     return adapter.tier <= 2 || isKnowledgeOnly(adapter);
   }
   return false;

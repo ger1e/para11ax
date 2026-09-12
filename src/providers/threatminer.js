@@ -54,7 +54,7 @@ function seen(results, field) {
 }
 
 export const threatminerProvider = Object.freeze({
-  name: 'threatminer', types: ['ip', 'domain', 'url', 'hash'], cacheTtlMs: 6 * 60 * 60 * 1000, negativeCacheTtlMs: 60 * 60 * 1000, costClass: 'free', timeoutMs: 5000, parserVersion: '2026-08-22.1',
+  name: 'threatminer', types: ['ip', 'domain', 'url', 'hash'], cacheTtlMs: 6 * 60 * 60 * 1000, negativeCacheTtlMs: 60 * 60 * 1000, costClass: 'free', timeoutMs: 5000, parserVersion: '2026-08-22.1', fastProfileEligible: false,
   coverageObservationTypesByType: COVERAGE_OBSERVATION_TYPES,
   async run(input, context = {}) {
     const { url, kind, pivot } = endpoint(input);
