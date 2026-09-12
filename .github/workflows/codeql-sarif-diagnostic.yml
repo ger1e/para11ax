@@ -39,7 +39,7 @@ jobs:
             echo 'NO_SARIF_FILES'
             exit 1
           fi
-          : > ../results/findings.tsv
+          : > codeql-findings.tsv
           for file in "${files[@]}"; do
             jq -r '
               .runs[] as $run
@@ -56,14 +56,14 @@ jobs:
                   (($result.message.text // "") | gsub("[\\r\\n\\t]+"; " "))
                 ]
               | @tsv
-            ' "$file" >> ../results/findings.tsv
+            ' "$file" >> codeql-findings.tsv
           done
-          cat ../results/findings.tsv
+          cat codeql-findings.tsv
 
-      - name: Upload diagnostic SARIF
+      - name: Upload diagnostic findings
         uses: actions/upload-artifact@v4
         with:
-          name: codeql-sarif-diagnostic
-          path: ../results/
+          name: codeql-findings
+          path: codeql-findings.tsv
           if-no-files-found: error
           retention-days: 1
