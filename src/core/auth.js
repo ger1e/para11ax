@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from 'node:crypto';
 
 function readAuthorization(headers) {
   if (!headers) return '';
@@ -6,14 +6,11 @@ function readAuthorization(headers) {
   return headers.authorization ?? headers.Authorization ?? '';
 }
 
-function digest(value) {
-  return createHash('sha256').update(value, 'utf8').digest();
-}
-
 export function requireGatewayAuth(request, secret) {
   if (typeof secret !== 'string' || secret.length < 1) return false;
   const authorization = readAuthorization(request?.headers);
   if (typeof authorization !== 'string' || !authorization.startsWith('Bearer ')) return false;
-  const supplied = authorization.slice(7);
-  return timingSafeEqual(digest(supplied), digest(secret));
+  const supplied = Buffer.from(authorization.slice(7), 'utf8');
+  const expected = Buffer.from(secret, 'utf8');
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
 }

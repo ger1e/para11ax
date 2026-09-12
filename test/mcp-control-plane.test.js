@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { createMcpHttpHandler, MCP_PROTOCOL_VERSION } from '../src/mcp/transport.js';
 
 const TOKEN = 'test-mcp-token';
+const SERVER_INFO_META_KEY = 'io.modelcontextprotocol/serverInfo';
 
 function request(method, params = {}, { token = TOKEN, id = 1, protocolVersion = MCP_PROTOCOL_VERSION, methodHeader = method, nameHeader } = {}) {
   const body = { jsonrpc: '2.0', id, method, params };
@@ -43,7 +44,7 @@ test('MCP exposes stateless discovery before OAuth and protects tool execution',
   assert.equal(result.body.jsonrpc, '2.0');
   assert.equal(result.body.result.resultType, 'complete');
   assert.deepEqual(result.body.result.supportedVersions, [MCP_PROTOCOL_VERSION]);
-  assert.equal(result.body.result.serverInfo.name, 'para11ax');
+  assert.equal(result.body.result._meta?.[SERVER_INFO_META_KEY]?.name, 'para11ax');
   assert.equal(result.body.result.capabilities.tools.listChanged, false);
   assert.equal(result.body.result.cacheScope, 'private');
   assert.ok(Number.isSafeInteger(result.body.result.ttlMs));
@@ -56,15 +57,15 @@ test('modern HTTP requests fail closed when standard MCP routing headers are abs
   delete missing.headers['mcp-method'];
   const missingResult = await handle(missing);
   assert.equal(missingResult.status, 400);
-  assert.equal(missingResult.body.error.code, -32001);
+  assert.equal(missingResult.body.error.code, -32020);
 
   const wrongMethod = await handle(request('tools/list', {}, { methodHeader: 'tools/call' }));
   assert.equal(wrongMethod.status, 400);
-  assert.equal(wrongMethod.body.error.code, -32001);
+  assert.equal(wrongMethod.body.error.code, -32020);
 
   const wrongName = await handle(request('tools/call', { name: 'para11ax_capabilities', arguments: {} }, { nameHeader: 'para11ax_enrich' }));
   assert.equal(wrongName.status, 400);
-  assert.equal(wrongName.body.error.code, -32001);
+  assert.equal(wrongName.body.error.code, -32020);
 });
 
 test('tools/list exposes the complete functional control plane with deterministic private cache hints', async () => {

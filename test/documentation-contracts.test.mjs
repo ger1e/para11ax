@@ -123,8 +123,8 @@ test('Maltego CI documentation matches the bounded Ubuntu workflow', () => {
   const workflow = read('.github/workflows/tooling-smoke.yml');
   const maltegoReadme = read('maltego/README.md');
   const runsOn = [...workflow.matchAll(/runs-on:\s*([^\n]+)/g)].map(match => match[1].trim());
-  assert.deepEqual(runsOn, ['ubuntu-latest']);
-  assert.ok(maltegoReadme.includes('one bounded Ubuntu job'));
+  assert.deepEqual(runsOn, ['ubuntu-latest', 'ubuntu-latest']);
+  assert.ok(maltegoReadme.includes('one bounded Ubuntu validation job plus one lightweight Ubuntu status-publisher job'));
   assert.doesNotMatch(maltegoReadme, /Ubuntu, macOS and Windows/i);
 });
 

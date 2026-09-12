@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 import { requireGatewayAuth } from '../core/auth.js';
 import { securityHeaders } from '../core/http.js';
@@ -6,6 +6,7 @@ import { securityHeaders } from '../core/http.js';
 export const MCP_RESOURCE = 'https://para11ax.vercel.app/mcp';
 export const MCP_AUTH_ISSUER = 'https://para11ax.vercel.app';
 export const MCP_OAUTH_SCOPE = 'para11ax:use';
+export const MCP_OFFLINE_SCOPE = 'offline_access';
 export const MCP_PROTECTED_RESOURCE_METADATA = `${MCP_AUTH_ISSUER}/.well-known/oauth-protected-resource`;
 
 const AUTHORIZATION_ENDPOINT = `${MCP_AUTH_ISSUER}/oauth/authorize`;
@@ -14,9 +15,11 @@ const CHATGPT_CLIENT_ID = 'https://chatgpt.com/oauth/client.json';
 const CHATGPT_REDIRECT_URI = 'https://chatgpt.com/connector_platform_oauth_redirect';
 const CODE_TTL_SECONDS = 180;
 const ACCESS_TTL_SECONDS = 30 * 24 * 60 * 60;
+const REFRESH_TTL_SECONDS = 180 * 24 * 60 * 60;
 const MAX_FORM_BYTES = 16 * 1024;
 const PKCE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
 const PKCE_VERIFIER = /^[A-Za-z0-9._~-]{43,128}$/;
+const AUTHORIZATION_SCOPES = new Set([MCP_OAUTH_SCOPE, MCP_OFFLINE_SCOPE]);
 
 function response(status, body, extraHeaders = {}) {
   return {
@@ -54,6 +57,17 @@ function scalar(value) {
   return String(value);
 }
 
+function normalizeScope(value) {
+  if (typeof value !== 'string') return null;
+  const requested = [...new Set(value.trim().split(/\s+/).filter(Boolean))];
+  if (!requested.includes(MCP_OAUTH_SCOPE) || requested.some(scope => !AUTHORIZATION_SCOPES.has(scope))) return null;
+  return [MCP_OAUTH_SCOPE, ...(requested.includes(MCP_OFFLINE_SCOPE) ? [MCP_OFFLINE_SCOPE] : [])].join(' ');
+}
+
+function hasScope(scopeValue, required) {
+  return typeof scopeValue === 'string' && scopeValue.split(/\s+/).includes(required);
+}
+
 function queryValues(request) {
   if (request?.query && typeof request.query === 'object') return request.query;
   try {
@@ -79,7 +93,7 @@ function authorizeValues(source) {
     clientId: scalar(source.client_id),
     redirectUri: scalar(source.redirect_uri),
     resource: scalar(source.resource),
-    scope: scalar(source.scope),
+    scope: normalizeScope(scalar(source.scope)),
     state: scalar(source.state),
     codeChallenge: scalar(source.code_challenge),
     codeChallengeMethod: scalar(source.code_challenge_method),
@@ -91,7 +105,8 @@ function validAuthorizeValues(value) {
     && value.clientId === CHATGPT_CLIENT_ID
     && value.redirectUri === CHATGPT_REDIRECT_URI
     && value.resource === MCP_RESOURCE
-    && value.scope === MCP_OAUTH_SCOPE
+    && typeof value.scope === 'string'
+    && value.scope.length > 0
     && typeof value.state === 'string'
     && value.state.length >= 1
     && value.state.length <= 2048
@@ -100,35 +115,37 @@ function validAuthorizeValues(value) {
     && value.codeChallengeMethod === 'S256';
 }
 
-function encode(value) {
-  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
+const TOKEN_PREFIX = 'p1';
+const TOKEN_AAD = Buffer.from('para11ax:mcp-oauth:sealed-token:v2', 'utf8');
+
+function tokenKey(secret) {
+  return scryptSync(secret, 'para11ax:mcp-oauth:token-key:v2', 32);
 }
 
-function signingKey(secret) {
-  return scryptSync(secret, 'para11ax:mcp-oauth:signing-key:v1', 32);
+function sealToken(payload, secret) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', tokenKey(secret), iv);
+  cipher.setAAD(TOKEN_AAD);
+  const plaintext = Buffer.from(JSON.stringify(payload), 'utf8');
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${TOKEN_PREFIX}.${iv.toString('base64url')}.${ciphertext.toString('base64url')}.${tag.toString('base64url')}`;
 }
 
-function sign(payload, secret) {
-  const header = encode({ alg: 'HS256', kid: 'para11ax-mcp-oauth-v1', typ: 'JWT' });
-  const encodedPayload = encode(payload);
-  const value = `${header}.${encodedPayload}`;
-  const signature = createHmac('sha256', signingKey(secret)).update(value, 'utf8').digest('base64url');
-  return `${value}.${signature}`;
-}
-
-function verifySignature(token, secret) {
+function openSealedToken(token, secret) {
   if (typeof token !== 'string' || token.length < 32 || token.length > 8192) return null;
   const parts = token.split('.');
-  if (parts.length !== 3 || parts.some(part => !part)) return null;
-  const value = `${parts[0]}.${parts[1]}`;
-  const expected = createHmac('sha256', signingKey(secret)).update(value, 'utf8').digest();
-  let supplied;
-  try { supplied = Buffer.from(parts[2], 'base64url'); } catch { return null; }
-  if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return null;
+  if (parts.length !== 4 || parts[0] !== TOKEN_PREFIX || parts.slice(1).some(part => !part)) return null;
   try {
-    const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-    if (!header || header.alg !== 'HS256' || header.kid !== 'para11ax-mcp-oauth-v1' || header.typ !== 'JWT') return null;
+    const iv = Buffer.from(parts[1], 'base64url');
+    const ciphertext = Buffer.from(parts[2], 'base64url');
+    const tag = Buffer.from(parts[3], 'base64url');
+    if (iv.length !== 12 || tag.length !== 16 || ciphertext.length < 2 || ciphertext.length > 6144) return null;
+    const decipher = createDecipheriv('aes-256-gcm', tokenKey(secret), iv);
+    decipher.setAAD(TOKEN_AAD);
+    decipher.setAuthTag(tag);
+    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    const payload = JSON.parse(plaintext.toString('utf8'));
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
     return payload;
   } catch {
@@ -146,7 +163,7 @@ function validTimes(payload, nowSeconds, maxLifetime) {
 }
 
 function issueAuthorizationCode(value, secret, nowSeconds) {
-  return sign({
+  return sealToken({
     v: 1,
     typ: 'authorization_code',
     iss: MCP_AUTH_ISSUER,
@@ -163,7 +180,7 @@ function issueAuthorizationCode(value, secret, nowSeconds) {
 }
 
 function readAuthorizationCode(code, secret, nowSeconds) {
-  const payload = verifySignature(code, secret);
+  const payload = openSealedToken(code, secret);
   if (!payload
     || payload.v !== 1
     || payload.typ !== 'authorization_code'
@@ -172,15 +189,15 @@ function readAuthorizationCode(code, secret, nowSeconds) {
     || payload.client_id !== CHATGPT_CLIENT_ID
     || payload.redirect_uri !== CHATGPT_REDIRECT_URI
     || payload.resource !== MCP_RESOURCE
-    || payload.scope !== MCP_OAUTH_SCOPE
+    || normalizeScope(payload.scope) !== payload.scope
     || typeof payload.jti !== 'string'
     || !PKCE_CHALLENGE.test(String(payload.code_challenge ?? ''))
     || !validTimes(payload, nowSeconds, CODE_TTL_SECONDS)) return null;
   return payload;
 }
 
-function issueAccessToken(secret, nowSeconds) {
-  return sign({
+function issueAccessToken(secret, nowSeconds, scope = MCP_OAUTH_SCOPE) {
+  return sealToken({
     v: 1,
     typ: 'access_token',
     iss: MCP_AUTH_ISSUER,
@@ -191,12 +208,12 @@ function issueAccessToken(secret, nowSeconds) {
     exp: nowSeconds + ACCESS_TTL_SECONDS,
     jti: randomBytes(18).toString('base64url'),
     client_id: CHATGPT_CLIENT_ID,
-    scope: MCP_OAUTH_SCOPE,
+    scope,
   }, secret);
 }
 
 function readAccessToken(token, secret, nowSeconds) {
-  const payload = verifySignature(token, secret);
+  const payload = openSealedToken(token, secret);
   if (!payload
     || payload.v !== 1
     || payload.typ !== 'access_token'
@@ -204,11 +221,44 @@ function readAccessToken(token, secret, nowSeconds) {
     || payload.aud !== MCP_RESOURCE
     || payload.sub !== 'para11ax-owner'
     || payload.client_id !== CHATGPT_CLIENT_ID
-    || payload.scope !== MCP_OAUTH_SCOPE
+    || !hasScope(payload.scope, MCP_OAUTH_SCOPE)
     || typeof payload.jti !== 'string'
     || !Number.isSafeInteger(payload.nbf)
     || payload.nbf > nowSeconds
     || !validTimes(payload, nowSeconds, ACCESS_TTL_SECONDS)) return null;
+  return payload;
+}
+
+function issueRefreshToken(secret, nowSeconds, scope) {
+  return sealToken({
+    v: 1,
+    typ: 'refresh_token',
+    iss: MCP_AUTH_ISSUER,
+    aud: TOKEN_ENDPOINT,
+    sub: 'para11ax-owner',
+    iat: nowSeconds,
+    exp: nowSeconds + REFRESH_TTL_SECONDS,
+    jti: randomBytes(18).toString('base64url'),
+    client_id: CHATGPT_CLIENT_ID,
+    resource: MCP_RESOURCE,
+    scope,
+  }, secret);
+}
+
+function readRefreshToken(token, secret, nowSeconds) {
+  const payload = openSealedToken(token, secret);
+  if (!payload
+    || payload.v !== 1
+    || payload.typ !== 'refresh_token'
+    || payload.iss !== MCP_AUTH_ISSUER
+    || payload.aud !== TOKEN_ENDPOINT
+    || payload.sub !== 'para11ax-owner'
+    || payload.client_id !== CHATGPT_CLIENT_ID
+    || payload.resource !== MCP_RESOURCE
+    || normalizeScope(payload.scope) !== payload.scope
+    || !hasScope(payload.scope, MCP_OFFLINE_SCOPE)
+    || typeof payload.jti !== 'string'
+    || !validTimes(payload, nowSeconds, REFRESH_TTL_SECONDS)) return null;
   return payload;
 }
 
@@ -313,6 +363,16 @@ export function createMcpOAuthHandlers({ env = process.env, nowMs = () => Date.n
     return true;
   }
 
+  function tokenSuccess(scope, nowSeconds, { includeRefresh = false } = {}) {
+    return oauthJson(200, {
+      access_token: issueAccessToken(env.PARA11AX_TOKEN, nowSeconds, scope),
+      token_type: 'Bearer',
+      expires_in: ACCESS_TTL_SECONDS,
+      scope,
+      ...(includeRefresh ? { refresh_token: issueRefreshToken(env.PARA11AX_TOKEN, nowSeconds, scope) } : {}),
+    });
+  }
+
   return {
     handleProtectedResource(request) {
       if (request?.method !== 'GET') return methodNotAllowed('GET');
@@ -331,12 +391,12 @@ export function createMcpOAuthHandlers({ env = process.env, nowMs = () => Date.n
         authorization_endpoint: AUTHORIZATION_ENDPOINT,
         token_endpoint: TOKEN_ENDPOINT,
         response_types_supported: ['code'],
-        grant_types_supported: ['authorization_code'],
+        grant_types_supported: ['authorization_code', 'refresh_token'],
         code_challenge_methods_supported: ['S256'],
         token_endpoint_auth_methods_supported: ['none'],
         client_id_metadata_document_supported: true,
         authorization_response_iss_parameter_supported: true,
-        scopes_supported: [MCP_OAUTH_SCOPE],
+        scopes_supported: [MCP_OAUTH_SCOPE, MCP_OFFLINE_SCOPE],
         resource_parameter_supported: true,
       });
     },
@@ -374,16 +434,33 @@ export function createMcpOAuthHandlers({ env = process.env, nowMs = () => Date.n
       catch { return tokenError(413, 'invalid_request', 'Request is too large'); }
 
       const grantType = scalar(source.grant_type);
-      const code = scalar(source.code);
       const clientId = scalar(source.client_id);
-      const redirectUri = scalar(source.redirect_uri);
       const resource = scalar(source.resource);
-      const verifier = scalar(source.code_verifier);
-      if (grantType !== 'authorization_code' || !code || !verifier) return tokenError(400, 'invalid_request', 'Authorization code and PKCE verifier are required');
       if (clientId !== CHATGPT_CLIENT_ID) return tokenError(401, 'invalid_client', 'Unknown OAuth client');
-      if (redirectUri !== CHATGPT_REDIRECT_URI || resource !== MCP_RESOURCE) return tokenError(400, 'invalid_grant', 'Authorization binding does not match');
+      if (resource !== null && resource !== MCP_RESOURCE) return tokenError(400, 'invalid_grant', 'Authorization binding does not match');
 
       const nowSeconds = Math.floor(nowMs() / 1000);
+
+      if (grantType === 'refresh_token') {
+        const refreshToken = scalar(source.refresh_token);
+        if (!refreshToken) return tokenError(400, 'invalid_request', 'Refresh token is required');
+        const claims = readRefreshToken(refreshToken, env.PARA11AX_TOKEN, nowSeconds);
+        if (!claims || claims.client_id !== clientId || claims.resource !== MCP_RESOURCE) {
+          return tokenError(400, 'invalid_grant', 'Refresh token is invalid or expired');
+        }
+        const requestedScope = scalar(source.scope);
+        if (requestedScope !== null && normalizeScope(requestedScope) !== claims.scope) {
+          return tokenError(400, 'invalid_scope', 'Refresh scope cannot expand or alter the original grant');
+        }
+        return tokenSuccess(claims.scope, nowSeconds, { includeRefresh: true });
+      }
+
+      const code = scalar(source.code);
+      const redirectUri = scalar(source.redirect_uri);
+      const verifier = scalar(source.code_verifier);
+      if (grantType !== 'authorization_code' || !code || !verifier) return tokenError(400, 'invalid_request', 'Authorization code and PKCE verifier are required');
+      if (redirectUri !== CHATGPT_REDIRECT_URI || resource !== MCP_RESOURCE) return tokenError(400, 'invalid_grant', 'Authorization binding does not match');
+
       const claims = readAuthorizationCode(code, env.PARA11AX_TOKEN, nowSeconds);
       if (!claims
         || claims.client_id !== clientId
@@ -394,12 +471,7 @@ export function createMcpOAuthHandlers({ env = process.env, nowMs = () => Date.n
       }
       if (!consumeAuthorizationCode(claims, nowSeconds)) return tokenError(400, 'invalid_grant', 'Authorization code was already used');
 
-      return oauthJson(200, {
-        access_token: issueAccessToken(env.PARA11AX_TOKEN, nowSeconds),
-        token_type: 'Bearer',
-        expires_in: ACCESS_TTL_SECONDS,
-        scope: MCP_OAUTH_SCOPE,
-      });
+      return tokenSuccess(claims.scope, nowSeconds, { includeRefresh: hasScope(claims.scope, MCP_OFFLINE_SCOPE) });
     },
   };
 }

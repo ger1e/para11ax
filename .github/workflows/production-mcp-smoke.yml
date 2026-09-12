@@ -28,7 +28,7 @@ jobs:
       - name: Request short-lived GitHub OIDC token and verify production MCP
         env:
           AUDIENCE: para11ax-production-smoke
-          SELF_TEST_URL: https://para11ax.vercel.app/api/para11ax/self-test
+          SELF_TEST_URL: https://para11ax.vercel.app/api/para11ax/self-test?mode=full
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -Eeuo pipefail
@@ -70,12 +70,13 @@ jobs:
             "PRODUCTION_MCP_DIAGNOSTIC SHA=\(.deploymentSha) AUTH=\(.authorization) TOOLS=\(.mcp.toolCount) " +
             "IP_STATUS=\(.enrichment.status // "missing") IP_ERROR=\(.enrichment.error // "none") IP_CLASS=\(.enrichment.failureClass // "none") " +
             "USER_STATUS=\(.userScanner.status // "ok") USER_ERROR=\(.userScanner.error // "none") USER_CLASS=\(.userScanner.failureClass // "none") " +
-            "GENERIC_TOOL=\(.diagnostics.genericToolCall // "not_run") SCANNER_URL=\(.diagnostics.userScannerUrlConfigured // false) SCANNER_TOKEN=\(.diagnostics.userScannerTokenConfigured // false) " +
+            "GA_STATUS=\(.conformance.status // "missing") GA_FAILED=\((.conformance.failed // []) | join(",")) " +
             "USER_TOTAL=\(.userScanner.totalScanned // -1) USER_FOUND=\(.userScanner.found // -1) " +
             "USER_ERRORS=\(.userScanner.errors // -1) USER_SKIPPED=\(.userScanner.skipped // -1)"
           ' "${response_file}"
 
           jq -e '
+            .status == "pass" and
             .authorization == "github_oidc" and
             .mcp.authenticated == true and
             .mcp.toolCount == 13 and
@@ -86,11 +87,16 @@ jobs:
             .userScanner.status != "fail" and
             (.userScanner.totalScanned | type == "number") and
             (.userScanner.found | type == "number") and
-            (.userScanner.errors | type == "number")
+            (.userScanner.errors | type == "number") and
+            .conformance.status == "pass" and
+            .conformance.toolCount == 13 and
+            (.conformance.failed | length) == 0 and
+            ([.conformance.surfaces[] | .status] | all(. == "pass"))
           ' "${response_file}" >/dev/null
 
           jq -r '
             "PRODUCTION_MCP_SMOKE=PASS SHA=\(.deploymentSha) AUTH=\(.authorization) TOOLS=\(.mcp.toolCount) " +
+            "GA=\(.conformance.status) GA_SURFACES=\(.conformance.toolCount) " +
             "IP_STATUS=\(.enrichment.status) IP_EVIDENCE=\(.enrichment.evidenceCount) IP_FAILURES=\(.enrichment.failureCount) " +
             "USER_SCANNER_TOTAL=\(.userScanner.totalScanned) USER_SCANNER_FOUND=\(.userScanner.found) " +
             "USER_SCANNER_ERRORS=\(.userScanner.errors) USER_SCANNER_SKIPPED=\(.userScanner.skipped)"

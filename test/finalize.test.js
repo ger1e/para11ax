@@ -79,8 +79,8 @@ test('Tooling smoke gates PRs and attests exact merged main while remaining boun
   assert.match(workflow, /^\s+push:\s*$/m);
   assert.match(workflow, /push:\s*\n\s+branches:\s*\n\s+- main/);
   assert.match(workflow, /cancel-in-progress: true/);
-  assert.equal(runnerLines.length, 1);
-  assert.match(workflow, /runs-on: ubuntu-latest/);
+  assert.equal(runnerLines.length, 2);
+  assert.equal((workflow.match(/runs-on: ubuntu-latest/g) ?? []).length, 2);
   assert.doesNotMatch(workflow, /runs-on: macos-latest/);
   assert.doesNotMatch(workflow, /runs-on: windows-latest/);
   assert.doesNotMatch(workflow, /^\s+schedule:/m);
@@ -88,17 +88,29 @@ test('Tooling smoke gates PRs and attests exact merged main while remaining boun
   assert.doesNotMatch(workflow, /apt-get/);
 });
 
-test('Tooling smoke uses the native PR check and publishes classic status only for trusted exact-SHA runs', () => {
+test('Tooling smoke isolates write permission from all checked-out PR code', () => {
   const workflow = read(workflowPath);
+  const marker = '\n  publish_status:\n';
+  const splitAt = workflow.indexOf(marker);
+  assert.ok(splitAt > 0, 'privileged publisher job must exist');
 
-  assert.match(workflow, /name: Mark Tooling smoke pending for trusted exact SHA/);
-  assert.match(workflow, /name: Publish authoritative Tooling smoke status for trusted exact SHA/);
-  assert.match(workflow, /if: \$\{\{ github\.event_name != 'pull_request' \}\}/);
-  assert.match(workflow, /if: \$\{\{ always\(\) && github\.event_name != 'pull_request' \}\}/);
-  assert.match(workflow, /STATUS_SHA: \$\{\{ github\.sha \}\}/);
-  assert.doesNotMatch(workflow, /github\.event\.pull_request\.head\.sha/);
-  assert.match(workflow, /statuses\/\$\{STATUS_SHA\}/);
-  assert.match(workflow, /steps\.node_checks\.outcome/);
-  assert.match(workflow, /steps\.maltego_tests\.outcome/);
-  assert.match(workflow, /permissions:\s*\n\s+contents: read\s*\n\s+statuses: write/);
+  const validation = workflow.slice(0, splitAt);
+  const publisher = workflow.slice(splitAt);
+
+  assert.match(validation, /permissions:\s*\n\s+contents: read/);
+  assert.doesNotMatch(validation, /statuses: write/);
+  assert.doesNotMatch(validation, /GH_TOKEN:/);
+  assert.match(validation, /uses: actions\/checkout@/);
+  assert.match(validation, /npm run check/);
+
+  assert.match(publisher, /needs: validate/);
+  assert.match(publisher, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(publisher, /permissions:\s*\n\s+contents: read\s*\n\s+statuses: write/);
+  assert.match(publisher, /STATUS_SHA: \$\{\{ github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
+  assert.match(publisher, /VALIDATION_RESULT: \$\{\{ needs\.validate\.result \}\}/);
+  assert.match(publisher, /statuses\/\$\{STATUS_SHA\}/);
+  assert.doesNotMatch(publisher, /actions\/checkout/);
+  assert.doesNotMatch(publisher, /npm\s/);
+  assert.doesNotMatch(publisher, /scripts\//);
+  assert.equal((workflow.match(/statuses: write/g) ?? []).length, 1);
 });
