@@ -171,9 +171,27 @@ async function missionCheck(invoke) {
 async function investigationCheck(invoke, enrichment) {
   requireObject(enrichment, 'investigation_enrichment_missing');
   let calls = 0;
+  const invocationCode = (operation, args, error) => {
+    const message = String(error?.message ?? '');
+    const kind = message.endsWith('_transport_failed')
+      ? 'transport'
+      : message.endsWith('_failed')
+        ? 'tool'
+        : 'exception';
+    const action = operation === 'dispatch'
+      ? String(args?.action?.type ?? 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 24) || 'unknown'
+      : null;
+    return safeCode(new Error(['investigation', operation, action, kind].filter(Boolean).join('_')), 'investigation_invoke_failed');
+  };
   const call = async (operation, args = {}) => {
     calls += 1;
-    return requireObject(await invoke('para11ax_investigation', { operation, ...args }), `investigation_${operation}_shape`);
+    let result;
+    try {
+      result = await invoke('para11ax_investigation', { operation, ...args });
+    } catch (error) {
+      fail(invocationCode(operation, args, error));
+    }
+    return requireObject(result, `investigation_${operation}_shape`);
   };
 
   let value = await call('create', { title: 'PARA11AX GA Investigation' });
