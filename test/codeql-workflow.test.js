@@ -11,7 +11,7 @@ test('CodeQL preserves the main baseline configuration during per-language migra
 });
 
 test('CodeQL publishes stable per-language configurations for PR comparison', () => {
-  assert.match(workflow, /analyze_by_language:[\s\S]*?strategy:\s*\n\s+fail-fast:\s*false\s*\n\s+matrix:\s*\n\s+language:\s*\[javascript-typescript, python\]/);
+  assert.match(workflow, /analyze_by_language:[\s\S]*?strategy:\s*\n\s+fail-fast:\s*false\s*\n\s+max-parallel:\s*2\s*\n\s+matrix:\s*\n\s+language:\s*\[javascript-typescript, python\]/);
   assert.match(workflow, /languages:\s*\$\{\{ matrix\.language \}\}/);
   assert.match(workflow, /category:\s*["']?\/language:\$\{\{ matrix\.language \}\}["']?/);
 });
