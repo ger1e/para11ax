@@ -78,6 +78,7 @@ test('OAuth grants use a sealed authenticated envelope and reject tampering', ()
   assert.equal(exchange.status, 200);
   assert.match(exchange.body.access_token, /^p1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
   assert.match(exchange.body.refresh_token, /^p1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+  assert.notEqual(exchange.body.access_token, exchange.body.refresh_token);
 
   const badAccess = tamper(exchange.body.access_token);
   assert.equal(verifyMcpAuthorization({ headers: { authorization: `Bearer ${badAccess}` } }, SECRET, NOW_MS).authorized, false);
