@@ -70,3 +70,7 @@ Run the targeted regression, then the full `npm run check`, Maltego tests, shell
 - [ ] **Step 1: Merge only on green exact-head gates**
 - [ ] **Step 2: Confirm Vercel READY on the exact merge SHA**
 - [ ] **Step 3: Require `PRODUCTION_MCP_SMOKE=PASS`, `GA=pass`, `GA_SURFACES=13`, and zero failed conformance surfaces**
+
+---
+
+PΛRΛ11ΛX // PER ASPERA AD ASTRA
