@@ -1,3 +1,6 @@
+<!-- PARA11AX-DOC-STANDARD: GER1E/PARA11AX v1 -->
+> **Document status:** Historical design record. Preserved for implementation history; current behavior is defined by [docs/ARCHITECTURE.md](https://github.com/ger1e/para11ax/blob/main/docs/ARCHITECTURE.md), [docs/DOMAIN-INVESTIGATION.md](https://github.com/ger1e/para11ax/blob/main/docs/DOMAIN-INVESTIGATION.md), and the current README.
+
 # Domain Investigation v1 Implementation Plan
 
 > **For Codex:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
