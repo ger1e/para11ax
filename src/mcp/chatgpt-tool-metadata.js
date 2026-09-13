@@ -9,6 +9,10 @@ const TOOL_METADATA = Object.freeze({
     description: 'Use this when you need policy-bound Evidence v2 enrichment for one observable through the configured PARA11AX intelligence providers.',
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true, idempotentHint: false },
   },
+  para11ax_intelligence: {
+    description: 'Use this when you need a normalized PARA11AX intelligence pivot, search, identity, asset, supply-chain, malware, or knowledge operation without selecting raw providers or supplying authorization claims.',
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true, idempotentHint: false },
+  },
   para11ax_batch: {
     description: 'Use this when you need bounded Evidence v2 enrichment for 1 to 20 observables in one request.',
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true, idempotentHint: false },

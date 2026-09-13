@@ -21,10 +21,15 @@ function validHttpUrl(value) {
   }
 }
 
+function isExportableEvidence(item) {
+  return item?.policy?.distribution !== 'internal_only';
+}
+
 function externalReferences(evidence) {
   const seen = new Set();
   const output = [];
   for (const item of Array.isArray(evidence) ? evidence : []) {
+    if (!isExportableEvidence(item)) continue;
     for (const value of Array.isArray(item?.references) ? item.references : []) {
       const url = validHttpUrl(value);
       if (!url) continue;
@@ -119,7 +124,7 @@ function primaryObject(enrichment, now, uuid) {
 
 function attackObject(enrichment) {
   const evidence = (Array.isArray(enrichment.evidence) ? enrichment.evidence : [])
-    .find(item => item?.observation?.kind === 'attack_knowledge' && item?.observation?.attributes?.stixId);
+    .find(item => isExportableEvidence(item) && item?.observation?.kind === 'attack_knowledge' && item?.observation?.attributes?.stixId);
   if (!evidence) return null;
   const a = evidence.observation.attributes ?? {};
   const type = String(a.stixType ?? '');

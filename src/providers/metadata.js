@@ -1,6 +1,6 @@
-import { PROVIDER_MANIFEST, providerPolicy } from './manifest.js';
+import { INTELLIGENCE_PROVIDER_MANIFEST, intelligenceProviderPolicy } from './intelligence-manifest.js';
 
-export const PROVIDER_METADATA = PROVIDER_MANIFEST;
+export const PROVIDER_METADATA = INTELLIGENCE_PROVIDER_MANIFEST;
 
 function schedulerByType(policy) {
   return Object.freeze(Object.fromEntries(Object.entries(policy.schedulerByType ?? {}).map(([type, descriptor]) => [
@@ -10,7 +10,7 @@ function schedulerByType(policy) {
 }
 
 export function withProviderMetadata(adapter) {
-  const policy = providerPolicy(adapter?.name);
+  const policy = intelligenceProviderPolicy(adapter?.name);
   const credentialFields = policy.credentialEnv
     ? policy.optionalCredential
       ? { requiredEnv: undefined, optionalEnv: policy.credentialEnv }
@@ -44,6 +44,14 @@ export function withProviderMetadata(adapter) {
     freshnessClass: policy.freshnessClass,
     admissionVersion: policy.admissionVersion,
     executionPolicy: policy.executionPolicy,
+    mode: policy.mode,
+    fanoutEligible: policy.fanoutEligible,
+    sensitivity: policy.sensitivity,
+    authorization: policy.authorization,
+    retentionClass: policy.retentionClass,
+    providerFamily: policy.providerFamily,
+    maxPages: policy.maxPages,
+    maxRelationships: policy.maxRelationships,
     schedulerByType: schedulerByType(policy),
     schedulerMetadataInvalidTypes: Object.freeze([...(policy.schedulerMetadataInvalidTypes ?? [])]),
   });

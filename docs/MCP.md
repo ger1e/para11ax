@@ -1,29 +1,33 @@
 <!-- PARA11AX-DOC-STANDARD: GER1E/PARA11AX v1 -->
-# MCP control plane
+### MCP control plane
 
-PARA11AX exposes its functional analyst surface through one authenticated remote Model Context Protocol endpoint:
+PARA11AX exposes its functional analyst surface through one authenticated remote Model Context Protocol endpoint at:
 
 ```text
 https://para11ax.vercel.app/mcp
 ```
 
-MCP is a control plane over existing PARA11AX domain logic, not a second implementation. Enrichment, User Scanner, Shodan, GreyNoise Swarm, Mission Workspace, Investigation Workspace, cases, reports and registered commands delegate into the same bounded handlers used elsewhere.
+The MCP endpoint is a control plane over existing PARA11AX domain logic. It does **not** create a second implementation of enrichment, User Scanner, Shodan, GreyNoise Swarm, Mission Workspace, Investigation Workspace, cases, reports, or registered commands. Each MCP tool delegates into the same bounded validators/handlers used by the REST, Web, and CLI surfaces.
 
-The transport implements the stateless `2026-07-28` profile and retains bounded `2025-06-18` initialize compatibility. Repository, CI, deployment, OAuth transport, live credential capability and ChatGPT-connection proof are separate states.
+The transport implements the stateless `2026-07-28` profile and retains a bounded `2025-06-18` initialize compatibility response. Repository, deployment, live-credential, and ChatGPT-connection proof remain separate states tracked in [`OPERATIONS.md`](OPERATIONS.md).
 
-## Authentication and transport
+#### Authentication and transport
 
-Protocol discovery is public so a client can initialize and inspect the 13 tool descriptors before linking. Public methods are limited to `server/discover`, `initialize`, `notifications/initialized`, `ping`, and `tools/list`; they execute no analyst capability.
+Protocol discovery is public so ChatGPT can initialize and inspect the 13 tool descriptors before account linking. Public methods are limited to `server/discover`, `initialize`, `notifications/initialized`, `ping`, and `tools/list`; they execute no PARA11AX capability. Every tool declares:
 
-Protected execution accepts either a PARA11AX OAuth access token or the existing gateway bearer for trusted non-OAuth clients.
+```json
+{"type":"oauth2","scopes":["para11ax:use"]}
+```
+
+Tool execution accepts either a ChatGPT-issued OAuth session token from the PARA11AX authorization bridge or the existing gateway bearer used by trusted non-OAuth clients:
 
 ```text
-Authorization: Bearer <token>
+Authorization: Bearer <PARA11AX_TOKEN>
 Content-Type: application/json
 MCP-Protocol-Version: 2026-07-28
 ```
 
-OAuth discovery and linking use:
+ChatGPT discovers and runs the authorization-code + PKCE flow through:
 
 ```text
 GET  /.well-known/oauth-protected-resource
@@ -34,21 +38,24 @@ POST /oauth/authorize
 POST /oauth/token
 ```
 
-The current authorization server uses authorization-code + `S256` PKCE, the exact `https://para11ax.vercel.app/mcp` resource, `para11ax:use`, and optional `offline_access`. When `offline_access` is granted, refresh-token flow is supported so a correctly linked client can maintain connectivity without repeatedly handling the gateway credential.
+The authorization server accepts the fixed ChatGPT Client ID Metadata Document, exact stable ChatGPT redirect URI, `S256` PKCE, the exact `https://para11ax.vercel.app/mcp` resource, and the `para11ax:use` scope. The consent page validates the existing gateway access token without echoing or persisting it. The exchanged access token is signed, time-bounded, scope-bound, audience-bound to `/mcp`, and invalidated when the gateway secret rotates. The gateway secret itself is never returned to ChatGPT.
 
-Current OAuth tokens are **sealed**, not HMAC-signed JWT lookalikes. Token confidentiality/integrity uses AES-256-GCM with a random nonce, authenticated additional data and purpose-separated scrypt-derived key material. Access and refresh tokens have distinct purposes and bounded lifetimes. The gateway secret is never returned to the MCP client. Rotating the relevant server secret invalidates issued material.
+An unauthenticated tool call returns the MCP `_meta["mcp/www_authenticate"]` challenge required to open ChatGPT's linking UI. Non-tool authentication failures use HTTP `401` with the same protected-resource metadata challenge.
 
-Legacy pre-refresh sessions cannot be silently upgraded because the old authorization server did not issue refresh tokens. The obsolete HMAC token format is not re-enabled as a compatibility shortcut.
+Modern requests also use the protocol routing headers enforced by the transport:
 
-Core MCP tool-auth failures preserve the result-level `_meta["mcp/www_authenticate"]` challenge. At the canonical external `/mcp` edge, a valid authentication-required result is normalized to HTTP `401` with `WWW-Authenticate`, which is friendlier to external clients while preserving the internal MCP result model. Malformed, non-Bearer, control-character or oversized challenges are rejected rather than reflected.
+```text
+Mcp-Method: <json-rpc method>
+Mcp-Name: <tool name>   # required for tools/call
+```
 
-Modern routing also validates `Mcp-Method`; `Mcp-Name` is required for `tools/call` and must match `params.name`. Mismatches fail closed.
+`Mcp-Method` must match the JSON-RPC method. For `tools/call`, `Mcp-Name` must match `params.name`. Mismatches fail closed with a protocol error. Successful modern responses use `resultType: "complete"`; discovery/list responses publish bounded private cache hints.
 
-The endpoint is stateless. Mission, investigation and analyst-case state is returned to the client and supplied on subsequent related calls. `/mcp` has no hidden cross-user workflow session.
+The endpoint is stateless. Mission, investigation, and analyst-case state is returned to the client and must be supplied on the next related call. No hidden cross-user workflow state is persisted by `/mcp`.
 
-## Discovery and schemas
+#### Discovery
 
-Canonical sequence:
+The canonical modern discovery sequence is:
 
 ```text
 server/discover
@@ -56,37 +63,31 @@ server/discover
   -> tools/call
 ```
 
-`tools/list` returns all 13 tools with schemas and annotations. The catalog is the authoritative remote capability inventory. Bounded operator tools advertise bounded schemas as well as enforcing runtime validation. In particular, `para11ax_swarm` and `para11ax_user_scan` use `additionalProperties: false`; supported enums, fields and numeric/string limits are explicit. This prevents the tool model from advertising a looser contract than the server actually accepts.
+`server/discover` returns the supported protocol version, server identity, capabilities, and private TTL hints. `tools/list` returns the grouped PARA11AX tools, schemas, annotations, and per-tool OAuth policy. The MCP tool catalog is the authoritative remote capability inventory; browser-only presentation controls and local-administration commands are intentionally absent.
 
-Schema metadata is not the security boundary by itself. Runtime validators remain authoritative and reject unsupported command/field combinations, oversize input and invalid ranges even if a client ignores JSON Schema.
+#### Functional surface
 
-## Functional surface
-
-| Tool | Capability | Authority / side effect |
+| Tool | PARA11AX capability | Authority / side effect |
 | --- | --- | --- |
-| `para11ax_capabilities` | catalog, registered safe commands, health/status/meta | read-only |
-| `para11ax_enrich` | Evidence v2 single-observable enrichment | bounded external lookup |
-| `para11ax_batch` | bounded batch enrichment | bounded external lookup |
-| `para11ax_provider` | one registered provider | bounded external lookup |
-| `para11ax_shodan` | bounded Shodan operator operations | external lookup; some operations consume credits |
-| `para11ax_swarm` | Swarm search/get/export/unique/timeseries/diff | read/pivot plus explicit export |
-| `para11ax_user_scan` | isolated email/username OSINT scanner | active open-world OSINT |
-| `para11ax_stix` | deterministic STIX object projection from enrichment | read-only projection |
-| `para11ax_mission` | mission profile/context/relevance/hunt/KQL/result/ServiceNow workflow | explicit client-carried state |
-| `para11ax_investigation` | Investigation Workspace create/status/mutate/report/import/export | explicit client-carried state |
-| `para11ax_case` | portable analyst case operations | explicit client-carried state |
-| `para11ax_report` | deterministic report render/quality/manifest | read-only projection |
-| `para11ax_command` | exact registered server-safe command | policy-dependent registered operation |
+| `para11ax_capabilities` | MCP catalog, registered safe commands, authenticated gateway health/status/meta | read-only |
+| `para11ax_enrich` | Evidence v2 single-observable enrichment | read-only external lookup |
+| `para11ax_batch` | bounded 1..20 observable batch enrichment | read-only external lookup |
+| `para11ax_provider` | one registered provider through the provider gateway | read-only external lookup |
+| `para11ax_shodan` | bounded Shodan operator surface | read-only external lookup; some operations can consume query credits |
+| `para11ax_swarm` | GreyNoise Project Swarm search/get/export/unique/timeseries/diff | read operations plus explicit bounded export semantics |
+| `para11ax_user_scan` | isolated email/username OSINT scanner | active OSINT / open-world lookup |
+| `para11ax_stix` | deterministic STIX 2.1 generation from PARA11AX enrichment | read-only projection |
+| `para11ax_mission` | profile/context/relevance/hunt/KQL/result/ServiceNow mission workflow | explicit client-carried state mutation |
+| `para11ax_investigation` | Investigation Workspace v2 create/status/mutate/report/import/export | explicit client-carried state mutation |
+| `para11ax_case` | portable analyst case create/note/pin/capture/graph/diff/export | explicit client-carried state mutation |
+| `para11ax_report` | deterministic report render/quality/manifest projections | read-only projection |
+| `para11ax_command` | exact registered-command fallback for server-safe commands | policy-dependent registered operation |
 
-This is functional parity, not UI mirroring. Browser theme/audio/focus/history controls and local administration are not remote analyst capabilities.
+This is **functional parity**, not UI mirroring. Terminal theme/audio, volatile login UI, focus/history controls, local download buttons, and other browser cosmetics are not remote analyst capabilities and are not modeled as MCP tools.
 
-## Bounded operator schemas
+#### High-value examples
 
-### User Scanner
-
-Required: `scanType`, `target`.
-
-Optional bounded fields: `category`, `module`, `crossScan`, `noNsfw`. `scanType` is `email|username`; target is capped at 320 characters; category/module use a safe 64-character identifier grammar. Runtime validation also rejects category+module conflicts and invalid control characters.
+Identity OSINT through the actual User Scanner:
 
 ```json
 {
@@ -98,19 +99,31 @@ Optional bounded fields: `category`, `module`, `crossScan`, `noNsfw`. `scanType`
 }
 ```
 
-The result is an investigative lead. Upstream `rawFound` is not accepted as proof; normalized `found` counts only exact target matches while ambiguous matches remain `unverified`.
+```json
+{
+  "name": "para11ax_user_scan",
+  "arguments": {
+    "scanType": "email",
+    "target": "analyst@example.com"
+  }
+}
+```
 
-### GreyNoise Project Swarm
+The User Scanner result is an investigative lead, not proof of identity or compromise. Apply the entity-resolution rules in [`IDENTITY-OSINT.md`](IDENTITY-OSINT.md) and the passive search layer in [`GOOGLE-DORKING.md`](GOOGLE-DORKING.md).
 
-Commands: `search`, `get`, `export`, `unique`, `timeseries`, `diff`.
+Evidence enrichment:
 
-The schema advertises the bounded command fields for session ID, scope, time range, query, page/page size, export type, pivot field/counts, interval, size, diff workspaces/mode and pagination token. Runtime validation enforces command-specific combinations. Arbitrary fields do not pass through to GreyNoise.
+```json
+{
+  "name": "para11ax_enrich",
+  "arguments": {
+    "indicator": "203.0.113.10",
+    "profile": "standard"
+  }
+}
+```
 
-Swarm is operator context, not another Evidence v2 provider. Workspace/demo capability depends on upstream entitlement. Individual JSON/binary responses remain bounded by the underlying Swarm handler.
-
-## State round trips
-
-Mission example:
+Mission state round trip:
 
 ```text
 1. para11ax_mission { operation: "new" }
@@ -120,62 +133,76 @@ Mission example:
 5. continue relevance -> hunt_build -> kql_validate -> result_analyze -> servicenow/export
 ```
 
-Investigations and cases follow the same state-in/state-out pattern. KQL is validated/projected, not executed. ServiceNow-ready output is projected, not submitted automatically.
+Investigations and cases follow the same explicit state-in/state-out model. This makes serverless invocations reproducible and prevents later calls from depending on hidden process memory.
 
-## Registered-command boundary
+#### User Scanner + dorking OSINT route
 
-`para11ax_command` resolves exact IDs from the registered command catalog. Remote policy denies browser-session-only commands, local-admin, filesystem, credential-template and other host-local effects. Unknown IDs do not fall back to arbitrary shell execution.
+The preferred identity workflow is:
 
-Intentionally local-only operations include setup, repair, release verification, local provider probes, environment templates, filesystem report compilation and report diff operations.
+```text
+authorised identifier
+  -> defensive exact-identifier dorks / passive indexed discovery
+  -> para11ax_user_scan
+  -> candidate account/profile/social leads
+  -> de-duplicate and reject collisions
+  -> independent public-source corroboration
+  -> explicit operator-context capture
+  -> finding / remediation / re-test
+```
 
-## Safety boundary
+Dorking and User Scanner are complementary. Search engines improve historical/indexed recall; User Scanner improves structured platform/account recall. Neither is a truth source and neither automatically becomes Evidence v2.
 
-MCP does not expose:
+#### Registered-command parity
+
+`para11ax_command` resolves exact IDs from the same registered command catalog used by PARA11AX. The remote policy denies commands that are browser-session-only or require filesystem/local-admin effects. This gives MCP broad functional parity without turning PARA11AX into a shell or arbitrary execution service.
+
+Examples of intentionally local-only operations include setup, repair, release verification, local provider probes, environment templates, filesystem report compilation, and report diff operations.
+
+#### Safety boundary
+
+The MCP endpoint does not expose:
 
 - arbitrary host shell execution;
-- caller-selected provider destinations or arbitrary HTTP;
+- arbitrary outbound HTTP or caller-selected provider destinations;
 - arbitrary filesystem paths;
 - environment-secret values;
 - credential persistence;
 - provider host/method/credential overrides;
 - automatic KQL execution;
 - automatic ServiceNow submission;
-- automatic Evidence v2 promotion of User Scanner/Shodan/Swarm context.
+- automatic Evidence v2 promotion of User Scanner/Shodan/Swarm operator context.
 
-Provider and OSINT work continues through existing fixed-host policies, timeouts, response limits, provenance, parser semantics and gateway authentication.
+Provider and OSINT work continues through existing PARA11AX validators, fixed-host policies, timeouts, response limits, circuit breakers, provenance, and gateway authentication. Local-admin/filesystem commands remain unreachable over MCP even when a similarly named local CLI operation exists.
 
-## Error semantics
+#### Error and cache semantics
 
-Protocol errors use JSON-RPC errors. Tool failures are bounded MCP results with `isError: true`. Provider-specific errors are normalized by the underlying handler. A successful HTTP exchange is not proof of complete evidence coverage; batch callers inspect per-item `ok|partial|error` and enrichment limitations.
+Protocol errors use JSON-RPC errors. Tool execution failures are returned as MCP tool results with `isError: true` and a bounded safe message. Provider-specific errors remain normalized by the underlying PARA11AX handler. The existing REST catch-all remains fail closed and is not used as an MCP dispatcher.
 
-`GET /mcp` is expected to return `405 Method Not Allowed` with `Allow: POST`. The live route is `Cache-Control: no-store` and retains hardened response headers.
+`GET /mcp` is expected to return `405 Method Not Allowed` with `Allow: POST`. The live route is `Cache-Control: no-store` and uses the same hardened response-header posture as the REST gateway.
 
-## Proof-state rules
+#### Proof-state rules
 
 Do not collapse these claims:
 
-- **implemented**: code/tool exists;
-- **CI-proven**: exact SHA passed repository gates;
-- **deployment-proven**: exact SHA is READY in production;
-- **transport-proven**: `/mcp` behaves correctly at protocol level;
-- **OAuth-proven**: authorization/token exchange works;
-- **credential-capability-proven**: a protected call actually reaches and succeeds for the relevant provider/worker/entitlement;
-- **ChatGPT-connected**: that particular client/session can dispatch protected tools.
+- **implemented** — code/tool exists in the repository;
+- **CI-proven** — exact SHA passed Tooling smoke/CodeQL;
+- **deployment-proven** — Vercel reports that exact SHA as READY;
+- **transport-proven** — `/mcp` responds with the expected MCP method/header behavior;
+- **credential-capability-proven** — an authenticated tool call actually succeeds for the relevant configured provider/worker/entitlement;
+- **ChatGPT-connected** — the MCP server has been installed/configured as a ChatGPT plugin/connector and authentication succeeds from that client.
 
-A successful token exchange with no subsequent `/mcp` request is a client/session binding issue, not proof of a PARA11AX backend failure. A live `/mcp` route does not prove every tier-3 provider or third-party entitlement.
+A live `/mcp` endpoint does not by itself prove that every credentialed provider, User Scanner worker, GreyNoise entitlement, or third-party MCP client is configured.
 
-## Related documentation
+#### Related documentation
 
-- [`README.md`](../README.md)
-- [`API.md`](API.md)
-- [`ARCHITECTURE.md`](ARCHITECTURE.md)
-- [`PROVIDERS.md`](PROVIDERS.md)
-- [`IDENTITY-OSINT.md`](IDENTITY-OSINT.md)
-- [`GREYNOISE-SWARM.md`](GREYNOISE-SWARM.md)
-- [`OPERATIONS.md`](OPERATIONS.md)
-- [`SECURITY-CONTROLS.md`](SECURITY-CONTROLS.md)
-- [`THREAT-MODEL.md`](THREAT-MODEL.md)
-- [`CODE-REVIEW-2026-09-13.md`](CODE-REVIEW-2026-09-13.md)
+- [`README.md`](../README.md) — product/operator overview.
+- [`API.md`](API.md) — REST + MCP transport inventory.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — trust boundaries and delegation model.
+- [`IDENTITY-OSINT.md`](IDENTITY-OSINT.md) — User Scanner/entity-resolution workflow.
+- [`GOOGLE-DORKING.md`](GOOGLE-DORKING.md) — defensive indexed-discovery playbook.
+- [`OPERATIONS.md`](OPERATIONS.md) — deployment/acceptance proof states.
+- [`SECURITY-CONTROLS.md`](SECURITY-CONTROLS.md) — security-control mapping.
+- [`THREAT-MODEL.md`](THREAT-MODEL.md) — MCP/remote-tool threat boundary.
 
 ---
 

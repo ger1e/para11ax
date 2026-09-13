@@ -74,6 +74,13 @@ function parseEnrichArgs(args, fallbackProfile) {
   return { indicator, profile: args.length === 2 ? parseProfile([args[1]], fallbackProfile) : fallbackProfile };
 }
 
+function parseIntelligenceArgs(args, operation, fallbackProfile) {
+  if (!args.length || args.length > 2) invalid(`usage: intel ${operation} <observable> [--fast|--standard|--full]`);
+  const indicator = String(args[0] ?? '').trim();
+  if (!indicator) invalid('observable required');
+  return { indicator, profile: args.length === 2 ? parseProfile([args[1]], fallbackProfile) : fallbackProfile };
+}
+
 function parseUserScannerArgs(args) {
   if (args.length < 2) invalid('usage: user-scanner <email|username> <target> [options]');
   const scanType = String(args[0]).toLowerCase();
@@ -315,6 +322,12 @@ export function createNodeShellExecutor({
       const value = await unwrap(app.handleEnrich(request({ indicator: options.indicator, profile: options.profile })));
       state.currentResult = value;
       return { type: 'enrichment', value };
+    }
+    if (handler === 'intelligence') {
+      const operation = String(descriptor.tokens[1] ?? '');
+      const options = parseIntelligenceArgs(args, operation, state.profile);
+      const value = await unwrap(app.handleIntelligence(request({ operation, indicator: options.indicator, profile: options.profile })));
+      return record(value);
     }
     if (handler === 'intel-typed') {
       if (args.length !== 1) invalid(`usage: ${descriptor.tokens.join(' ')} <observable>`);
