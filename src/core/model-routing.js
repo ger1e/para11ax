@@ -1,6 +1,8 @@
-const TASK_CLASSES = new Set(['simple_transform', 'research', 'coding', 'security_analysis', 'cyber_research', 'deep_reasoning', 'long_context', 'review', 'analysis']);
+import { isAgentRiskLevel, isAgentTaskClass } from './agent-policy.js';
+
 const LEVEL = Object.freeze({ economy: 0, balanced: 1, frontier: 2, frontier_max: 3 });
 const EFFORT = Object.freeze(['low', 'medium', 'high', 'max']);
+const COMPLEXITIES = new Set(['low', 'medium', 'high']);
 const WEIGHTS = Object.freeze({
   simple_transform: { coding: 0.05, reasoning: 0.10, knowledge: 0.10, longContext: 0.05, speed: 0.30, costEfficiency: 0.40 },
   research: { coding: 0.05, reasoning: 0.25, knowledge: 0.30, longContext: 0.20, speed: 0.05, costEfficiency: 0.15 },
@@ -13,13 +15,12 @@ const WEIGHTS = Object.freeze({
   analysis: { coding: 0.10, reasoning: 0.35, knowledge: 0.25, longContext: 0.10, speed: 0.05, costEfficiency: 0.15 },
 });
 
-function enumValue(value, allowed, field) {
-  if (!allowed.has(value)) throw new TypeError(`invalid model route: ${field}`);
-  return value;
-}
-
 function atLeast(current, minimum) {
   return LEVEL[current] >= LEVEL[minimum] ? current : minimum;
+}
+
+function invalid(field) {
+  throw new TypeError(`invalid model route: ${field}`);
 }
 
 export function routeModelTask({
@@ -31,11 +32,11 @@ export function routeModelTask({
   costSensitive = false,
   failures = 0,
 } = {}) {
-  enumValue(taskClass, TASK_CLASSES, 'taskClass');
-  enumValue(complexity, new Set(['low', 'medium', 'high']), 'complexity');
-  enumValue(risk, new Set(['low', 'medium', 'high']), 'risk');
-  if (!Number.isSafeInteger(failures) || failures < 0) throw new TypeError('invalid model route: failures');
-  if (!Number.isFinite(contextTokens) || contextTokens < 0) throw new TypeError('invalid model route: contextTokens');
+  if (!isAgentTaskClass(taskClass)) invalid('taskClass');
+  if (!COMPLEXITIES.has(complexity)) invalid('complexity');
+  if (!isAgentRiskLevel(risk)) invalid('risk');
+  if (!Number.isSafeInteger(failures) || failures < 0) invalid('failures');
+  if (!Number.isFinite(contextTokens) || contextTokens < 0) invalid('contextTokens');
 
   let tier = 'balanced';
   let reasoningEffort = 'medium';
@@ -155,10 +156,10 @@ export function rankModelCandidates(models, {
   excludeFamilies = [],
   requiredSpecialty = null,
 } = {}) {
-  enumValue(taskClass, TASK_CLASSES, 'taskClass');
+  if (!isAgentTaskClass(taskClass)) invalid('taskClass');
   if (!Array.isArray(models) || !Array.isArray(excludeFamilies)) throw new TypeError('invalid model candidates');
-  if (!Number.isFinite(contextTokens) || contextTokens < 0) throw new TypeError('invalid model route: contextTokens');
-  if (requiredSpecialty !== null && (typeof requiredSpecialty !== 'string' || !requiredSpecialty.trim())) throw new TypeError('invalid model route: requiredSpecialty');
+  if (!Number.isFinite(contextTokens) || contextTokens < 0) invalid('contextTokens');
+  if (requiredSpecialty !== null && (typeof requiredSpecialty !== 'string' || !requiredSpecialty.trim())) invalid('requiredSpecialty');
   const excluded = new Set(excludeFamilies);
   const specialty = requiredSpecialty?.trim() ?? null;
   const weights = WEIGHTS[taskClass];
