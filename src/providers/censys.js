@@ -7,7 +7,7 @@ const SEARCH_RELATIONSHIP_LIMIT = 75;
 const HISTORY_PAGE_SIZE = 50;
 const HISTORY_RELATIONSHIP_LIMIT = 50;
 const SHA256_RE = /^[a-f0-9]{64}$/;
-const ORG_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ORG_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function certificateFingerprint(value) {
   return typeof value === 'string' && /^cert-sha256:[a-f0-9]{64}$/.test(value)
