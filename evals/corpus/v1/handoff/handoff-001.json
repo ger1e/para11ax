@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "para11ax-eval-case-v1.0",
+  "caseId": "handoff-001",
+  "domain": "handoff",
+  "weight": 1,
+  "input": {
+    "event": "simulated-context-reset"
+  },
+  "expected": {
+    "objective": "Complete the synthetic investigation without changing accepted scope.",
+    "constraints": ["Preserve provenance.", "Do not treat missing evidence as benign."],
+    "decisions": ["Use DeviceProcessEvents as the primary synthetic telemetry source."],
+    "nextActions": ["validate-kql", "analyze-results"],
+    "allowCompleted": false
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "para11ax-eval-case-v1.0",
+  "caseId": "cti-001",
+  "domain": "cti",
+  "weight": 1,
+  "input": {
+    "evidence": [
+      {"id": "src-1", "text": "Synthetic actor ORCHID used TEST-RAT in a lab campaign."},
+      {"id": "src-2", "text": "TEST-RAT exploited CVE-2026-12345 in the synthetic scenario."}
+    ]
+  },
+  "expected": {
+    "entities": ["actor:ORCHID", "malware:TEST-RAT", "cve:CVE-2026-12345"],
+    "relationships": ["uses:ORCHID:TEST-RAT", "exploits:TEST-RAT:CVE-2026-12345"]
+  }
+}

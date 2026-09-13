@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "para11ax-eval-case-v1.0",
+  "caseId": "coding-001",
+  "domain": "coding",
+  "weight": 1,
+  "input": {
+    "reviewTarget": "A synthetic reducer accepts unvalidated input and reads Date.now() inside a deterministic transition."
+  },
+  "expected": {
+    "defects": ["missing-input-validation", "nondeterministic-wall-clock"],
+    "forbiddenFalsePositives": ["sql-injection"]
+  }
+}

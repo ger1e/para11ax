@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "para11ax-eval-corpus-manifest-v1.0",
+  "corpusId": "para11ax-internal-v1",
+  "corpusVersion": "1.0.0",
+  "releasedAt": "2026-09-13",
+  "weights": {
+    "provenance": 0.2,
+    "kql": 0.15,
+    "cti": 0.15,
+    "handoff": 0.15,
+    "attack": 0.1,
+    "classification": 0.1,
+    "context": 0.05,
+    "routing": 0.05,
+    "coding": 0.05
+  },
+  "scorerVersions": {
+    "cti": "1.0.0",
+    "provenance": "1.0.0",
+    "classification": "1.0.0",
+    "attack": "1.0.0",
+    "kql": "1.0.0",
+    "handoff": "1.0.0",
+    "context": "1.0.0",
+    "routing": "1.0.0",
+    "coding": "1.0.0"
+  },
+  "promotionPolicy": {
+    "provenanceMaxRegression": 0.02,
+    "handoffMaxRegression": 0.02,
+    "kqlMaxRegression": 0.03,
+    "minimumWeightedImprovement": 0.02,
+    "maximumWeightedRegressionForEfficiency": 0.01,
+    "minimumEfficiencyReductionRatio": 0.2,
+    "requireHumanReviewComplete": true
+  },
+  "cases": [
+    {"caseId": "attack-001", "domain": "attack", "path": "attack/attack-001.json", "sha256": "sha256:98eaa5a43d80552244487dbf89c85f7e190347685c59febe5fb79bd505133a77"},
+    {"caseId": "classification-001", "domain": "classification", "path": "classification/classification-001.json", "sha256": "sha256:e483f58b88ba7c92b0d0b2ea96c92a9029a555c0d07c40eeac22ce872966e5f8"},
+    {"caseId": "coding-001", "domain": "coding", "path": "coding/coding-001.json", "sha256": "sha256:93737ea9a312516fe183145cdb12d14316f428730f1e1c750f46aeccb4c0396e"},
+    {"caseId": "context-001", "domain": "context", "path": "context/context-001.json", "sha256": "sha256:b5bb895f124f17c74451fe0eb47d6ae1682719c3e35c0104f03a37b1beb27f87"},
+    {"caseId": "cti-001", "domain": "cti", "path": "cti/cti-001.json", "sha256": "sha256:30e96c511c163ea970cd576a02f4093d5892e44b699aec8ee71be159943da7e7"},
+    {"caseId": "handoff-001", "domain": "handoff", "path": "handoff/handoff-001.json", "sha256": "sha256:0a718e2d5f07b8a81e00277efd5de107dd23b43b140a4913fe6e0e6790e04acf"},
+    {"caseId": "kql-001", "domain": "kql", "path": "kql/kql-001.json", "sha256": "sha256:b1aba1caf81202d8fe0415b67bdc7eab231f0a244297592680a261e88d6d5cf0"},
+    {"caseId": "provenance-001", "domain": "provenance", "path": "provenance/provenance-001.json", "sha256": "sha256:a259af8cdb4b092fb33e8f4c878d8b13982af027068fbf8850f52dcd2708d1ef"},
+    {"caseId": "routing-001", "domain": "routing", "path": "routing/routing-001.json", "sha256": "sha256:9fa182629294a5d5b0c439e1e1f9c81e535ac589b0c299bdd6f95abeac6cd9e7"}
+  ],
+  "corpusHash": "sha256:0fe21a3b86fd1933d077d8824fb4645b38c48974e1fdf663cda4c6376b25c25e"
+}

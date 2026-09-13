@@ -174,6 +174,16 @@ Public leaderboards are priors. Prefer a frozen internal eval corpus for:
 
 A generic coding benchmark does not prove a model is the best CTI analyst. Humanity continues to require domain-specific evaluation. Tragic, but manageable.
 
+### 6.1 Internal eval evidence boundary
+
+The offline harness accepts `para11ax-eval-result-v1.0` result bundles and emits `para11ax-eval-scorecard-v1.0` scorecards. Eval v1 has no model API calls and does not execute model-provider requests.
+
+Public benchmarks do not directly change routes. An internal scorecard is advisory evidence for a separately reviewed source change, never a runtime instruction. There is no automatic routing mutation from scorecard or comparison output.
+
+Production routing has no runtime dependency on eval results. `src/core/model-routing.js` remains normative; the evaluator may import production routing to score compliance, but production routing never imports the evaluator.
+
+The operator contract, corpus policy, privacy rules, CLI, and manifest-driven promotion thresholds are documented in `docs/PARA11AX-EVALS.md`.
+
 ## 7. Completion gate
 
 A task is complete only when:
