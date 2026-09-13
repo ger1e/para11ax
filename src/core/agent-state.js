@@ -46,6 +46,11 @@ function handoffUniqueText(values, field) {
   try { return uniqueText(values, field); } catch { handoffFail(field); }
 }
 
+function ensureUniqueIds(values, field, error = fail) {
+  const ids = values.map(value => value.id);
+  if (new Set(ids).size !== ids.length) error(`${field} duplicate id`);
+}
+
 function canonicalize(value) {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (!value || typeof value !== 'object') return value;
@@ -170,6 +175,9 @@ export function importAgentState(input) {
     timeline: Array.isArray(value.timeline) && value.timeline.length <= MAX_TIMELINE ? value.timeline.map(validateTimeline) : fail('timeline'),
   };
 
+  ensureUniqueIds(normalized.artifacts, 'artifacts');
+  ensureUniqueIds(normalized.handoffs, 'handoffs');
+  ensureUniqueIds(normalized.timeline, 'timeline');
   if (!isAgentTaskClass(normalized.taskClass)) fail('task class');
   if (!isAgentRiskLevel(normalized.risk)) fail('risk');
   if (!Number.isSafeInteger(normalized.revision) || normalized.revision < 0) fail('revision');
@@ -391,6 +399,7 @@ export function importHandoffEnvelope(input) {
     sourceStateHash: handoffText(value.sourceStateHash, 'source state hash', 64),
     handoffHash: handoffText(value.handoffHash, 'handoff hash', 64),
   };
+  ensureUniqueIds(normalized.artifacts, 'artifacts', handoffFail);
   for (const field of ['invariantHash', 'sourceStateHash', 'handoffHash']) {
     if (!/^[a-f0-9]{64}$/.test(normalized[field])) handoffFail(field);
   }
