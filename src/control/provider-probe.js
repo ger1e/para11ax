@@ -12,6 +12,7 @@ export const PROBE_SAMPLE_BY_TYPE = Object.freeze({
   asn: 'AS15169',
   cidr: '8.8.8.0/24',
   package: 'pkg:npm/lodash@4.17.21',
+  'tls-fingerprint': 'ja3:72a589da586844d7f0818ce684948eea',
 });
 
 const STATUS_PRIORITY = Object.freeze({
