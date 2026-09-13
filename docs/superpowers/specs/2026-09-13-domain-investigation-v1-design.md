@@ -151,3 +151,7 @@ CLI may additionally accept exact `--file`/`--stdin` transports where the existi
 ## Tests
 
 Tests cover domain/enrichment identity mismatch, bounds, hostile nested import data, IOC normalization/deduplication, Webamon detection, authority separation, recommendation rules, contradiction downgrade, report invariants, STIX validity/determinism/object cap, handoff continuity/context bounds, shell registration, MCP stateless contract, and documentation drift.
+
+---
+
+<p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
