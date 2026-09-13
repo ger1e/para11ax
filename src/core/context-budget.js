@@ -77,6 +77,9 @@ export function selectContextItems(items, { maxTokens } = {}) {
   if (!Array.isArray(items)) throw new TypeError('invalid context budget: items');
   const limit = positiveInteger(maxTokens, 'maxTokens');
   const normalized = items.map(normalizeItem);
+  const ids = normalized.map(item => item.id);
+  if (new Set(ids).size !== ids.length) throw new TypeError('duplicate context item id');
+
   const durable = normalized.filter(item => DURABLE_KINDS.has(item.kind));
   const durableTokens = durable.reduce((sum, item) => sum + item.tokens, 0);
   if (durableTokens > limit) throw new RangeError('durable context exceeds budget');
