@@ -170,7 +170,7 @@ async function missionCheck(invoke) {
 
 async function domainInvestigationCheck(invoke, nowIso) {
   const enrichment = {
-    schemaVersion: 'evidence-v2.0',
+    schemaVersion: '2.0',
     gatewayVersion: 'ga-conformance',
     requestId: 'ga-domain',
     indicator: 'suspicious.example',
