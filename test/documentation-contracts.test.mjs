@@ -27,9 +27,17 @@ test('architecture and API document all canonical workflow types', () => {
   requireTokens(api, workflowTokens(), 'API workflow contract');
 });
 
-test('README provider count and production identity match canonical policy', () => {
+test('README and provider docs match canonical provider policy', () => {
   const readme = read('README.md');
+  const providers = read('docs/PROVIDERS.md');
   assert.ok(readme.includes(`${providerCount} upstream APIs and feeds`), 'README provider count drifted');
+  assert.ok(providers.includes(`**${providerCount} providers**`), 'PROVIDERS provider count drifted');
+  requireTokens(providers, [
+    'CISA ADP SSVC',
+    'Exploitation',
+    'Automatable',
+    'Technical Impact',
+  ], 'CISA ADP provider documentation');
   assert.match(
     readme,
     /https:\/\/para11ax\.vercel\.app(?:\/app\/|\/)?/,

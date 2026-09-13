@@ -1,7 +1,7 @@
 <!-- PARA11AX-DOC-STANDARD: GER1E/PARA11AX v1 -->
 ### Providers
 
-The executable provider registry is the source of truth for the canonical Evidence v2 enrichment fabric. The active registry contains **38 providers**. `release-manifest.json` records active adapter/parser versions, and `/api/para11ax/meta` exposes static capabilities without credential values or secret configuration state.
+The executable provider registry is the source of truth for the canonical Evidence v2 enrichment fabric. The active registry contains **39 providers**. `release-manifest.json` records active adapter/parser versions, and `/api/para11ax/meta` exposes static capabilities without credential values or secret configuration state.
 
 #### Registry contract
 
@@ -17,7 +17,7 @@ A canonical workflow cannot route to an unregistered provider or a provider that
 
 **File / malware:** CIRCL Hashlookup · MalwareBazaar · Malpedia · Hybrid Analysis.
 
-**Vulnerability / ATT&CK:** CISA KEV · FIRST EPSS · CIRCL Vulnerability-Lookup · NVD · OSV · MITRE ATT&CK TAXII.
+**Vulnerability / ATT&CK:** CISA KEV · CISA ADP SSVC · FIRST EPSS · CIRCL Vulnerability-Lookup · NVD · OSV · MITRE ATT&CK TAXII.
 
 **Ransomware:** RansomLook · Ransomware.live API-PRO.
 
@@ -79,6 +79,7 @@ Provider observations preserve their own meaning. Examples:
 - Spamhaus DROP/ASN-DROP: netblock/ASN listing context.
 - Tor exit: Tor infrastructure context.
 - CISA KEV: known exploited status.
+- CISA ADP SSVC: CISA Stakeholder-Specific Vulnerability Categorization context from the CVE record's CISA ADP container; upstream `Exploitation`, `Automatable`, and `Technical Impact` decisions remain separate axes and are not collapsed into a score.
 - EPSS: exploitation probability.
 - NVD/CIRCL/OSV: vulnerability metadata.
 - MITRE ATT&CK TAXII: knowledge/mapping context.
@@ -97,10 +98,10 @@ The Kernel consumes normalized evidence/coverage after provider execution. It ca
 
 Shodan appears in PARA11AX in two deliberately separate ways.
 
-1. **Evidence v2 provider adapter** — Shodan is one of the 38 fixed providers used where the canonical workflow/profile allows it. Its observations enter the normal provider parser/evidence/correlation path with exposure semantics and can support deterministic derived context without becoming a reputation vote by themselves.
+1. **Evidence v2 provider adapter** — Shodan is one of the 39 fixed providers used where the canonical workflow/profile allows it. Its observations enter the normal provider parser/evidence/correlation path with exposure semantics and can support deterministic derived context without becoming a reputation vote by themselves.
 2. **Native analyst-shell utility** — `POST /api/para11ax/shodan` implements explicit bounded operator lookups for `shodan host`, `search`, `count`, `stats`, `domain`, and `info`.
 
-The shell utility does **not** add a 39th provider, does not change the provider registry/scheduler, and does not automatically promote its output into Evidence v2 or Intelligence Kernel input.
+The shell utility does **not** add a 40th provider, does not change the provider registry/scheduler, and does not automatically promote its output into Evidence v2 or Intelligence Kernel input.
 
 Both surfaces use server-side `SHODAN_API_KEY`; the browser never receives that key. The shell route contacts only `https://api.shodan.io`, rejects arbitrary destinations/options, caps returned data, removes large raw service/banner bodies, keeps search first-page only, and disables `shodan download`.
 
@@ -108,12 +109,12 @@ Credit handling is explicit on the shell route: host/count/stats/info are no-que
 
 #### GreyNoise: canonical provider plus Project Swarm operator surface
 
-GreyNoise also appears in two distinct ways without increasing the 38-provider count.
+GreyNoise also appears in two distinct ways without increasing the 39-provider count.
 
 1. **Evidence v2 provider adapter** — canonical IP enrichment uses authenticated GreyNoise v3 IP Lookup at the fixed GreyNoise API origin. The default workspace-label request is `greynoise,community,personal`, optionally overridden by `GREYNOISE_WORKSPACE_LABELS`. Returned tags, CVEs and scanned ports can become normalized provider observations; PARA11AX only asserts dataset/workspace provenance when the upstream response explicitly supplies matching label information.
 2. **GreyNoise Project Swarm operator utility** — `POST /api/para11ax/swarm` implements bounded Web-only session `search`, `get`, allowlisted `unique`, allowlisted `timeseries`, and explicit single-session `export` operations.
 
-The Swarm utility is not a 39th provider, is not scheduled by Provider Value Scheduler v1.0, and does not automatically promote session/pivot/export output into Evidence v2 or Intelligence Kernel input. Successful `search`, `get`, `unique`, and `timeseries` results can be explicitly captured as Investigation Workspace operator context; PCAP/raw export remains an explicit browser download outside automatic capture.
+The Swarm utility is not a 40th provider, is not scheduled by Provider Value Scheduler v1.0, and does not automatically promote session/pivot/export output into Evidence v2 or Intelligence Kernel input. Successful `search`, `get`, `unique`, and `timeseries` results can be explicitly captured as Investigation Workspace operator context; PCAP/raw export remains an explicit browser download outside automatic capture.
 
 Both GreyNoise surfaces use server-side `GREYNOISE_API_KEY`; the browser never receives it. Swarm egress is fixed to `https://api.greynoise.io`, redirects are refused, search/pivot ranges and fields are bounded, JSON and individual binary export are capped at 4 MiB, bulk session export is omitted, and `scope=demo` export is rejected before egress.
 

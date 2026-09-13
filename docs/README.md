@@ -1,7 +1,7 @@
 <!-- PARA11AX-DOC-STANDARD: GER1E/PARA11AX v1 -->
 # PARA11AX documentation
 
-This directory is the canonical documentation set for PARA11AX. Start with the control plane that matches how you intend to operate the platform, then follow the authority/security documents before interpreting results.
+This directory is the canonical current documentation set for PARA11AX. Read the control plane that matches how you operate the platform, then follow the authority/security documents before interpreting results. Dated files under `docs/superpowers/plans/` and `docs/superpowers/specs/` are historical design records and are intentionally not rewritten to impersonate current behavior.
 
 ## Fast path
 
@@ -49,7 +49,7 @@ IDENTITY-OSINT.md
 | Document | Purpose |
 | --- | --- |
 | [`EVIDENCE-SCHEMA.md`](EVIDENCE-SCHEMA.md) | Evidence v2 authority, semantic classes, provenance, graph/guidance boundaries and absence/failure semantics. |
-| [`PROVIDERS.md`](PROVIDERS.md) | Canonical 38-source provider fabric, workflow admission and scheduler metadata. |
+| [`PROVIDERS.md`](PROVIDERS.md) | Canonical 39-provider fabric, workflow admission, source semantics and scheduler metadata. |
 | [`END-TO-END-EXAMPLE.md`](END-TO-END-EXAMPLE.md) | Worked enrichment/analysis example through the deterministic evidence path. |
 | [`ANALYST-MISSION-PACK.md`](ANALYST-MISSION-PACK.md) | Client relevance → hunt → KQL validation → result analysis → ServiceNow-ready projection. |
 
@@ -68,16 +68,11 @@ IDENTITY-OSINT.md
 | --- | --- |
 | [`SECURITY-CONTROLS.md`](SECURITY-CONTROLS.md) | Control-to-risk mapping including MCP, provider, User Scanner, Shodan, Swarm and state boundaries. |
 | [`THREAT-MODEL.md`](THREAT-MODEL.md) | Assets, adversaries, failure modes, residual risk and out-of-scope capabilities. |
-| [`OPERATIONS.md`](OPERATIONS.md) | Proof-state model, current production baseline, deployment acceptance and MCP verification sequence. |
+| [`OPERATIONS.md`](OPERATIONS.md) | Proof-state model, production acceptance, provider diagnostics and MCP verification sequence. |
 | [`QA-REPORT.md`](QA-REPORT.md) | Verification evidence and explicit limits of what a QA pass proves. |
+| [`CODE-REVIEW-2026-09-13.md`](CODE-REVIEW-2026-09-13.md) | Full repository audit ledger for the 2026-09-13 hardening pass. |
 | [`PUBLIC-RELEASE-CHECKLIST.md`](PUBLIC-RELEASE-CHECKLIST.md) | Public-release and publication guardrails. |
 | [`../SECURITY.md`](../SECURITY.md) | Vulnerability reporting and repository-wide security posture. |
-
-## Branding and presentation
-
-| Document | Purpose |
-| --- | --- |
-| [`BRAND.md`](BRAND.md) | PARA11AX visual/interaction identity and presentation constraints. |
 
 ## Core authority rules
 
@@ -93,7 +88,7 @@ Disposition = explicit analyst judgment
 MCP = transport/control plane, not an authority class
 ```
 
-Absence is not benignness. Infrastructure proximity is not attribution. A matching username/email/profile is not same-person proof. A tool/provider failure is not negative evidence. MCP does not bypass those rules.
+Absence is not benignness. Infrastructure proximity is not attribution. A matching username/email/profile is not same-person proof. A tool/provider failure is not negative evidence. MCP does not bypass those rules. Provider configuration is not proof of provider health.
 
 ## Current remote entry point
 
@@ -102,7 +97,13 @@ POST https://para11ax.vercel.app/mcp
 MCP-Protocol-Version: 2026-07-28
 ```
 
-See [`MCP.md`](MCP.md) before configuring an external MCP client. A live MCP route proves transport availability only; client authentication and each credentialed provider/worker/entitlement remain separate proof states.
+The MCP catalog contains 13 grouped tools. Bounded Swarm and User Scanner tools advertise strict argument schemas in addition to their runtime validators. OAuth uses authorization-code + PKCE with refresh-token support via `offline_access`; canonical external authentication failures surface an HTTP `401` challenge while the core MCP result model remains usable internally.
+
+A live MCP route proves transport availability only. Client authentication, every credentialed provider/worker, account entitlement and exact deployed source SHA remain separate proof states.
+
+## Documentation maintenance
+
+Current operational documents are expected to track executable contracts. Tests in `test/documentation-contracts.test.mjs` bind provider counts, public routes, workflow names and selected critical semantics to code. Historical dated plans/specifications are preserved as historical records rather than silently edited when implementation evolves.
 
 ---
 
