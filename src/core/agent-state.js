@@ -1,10 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { sha256Hex } from './sha256.js';
 
 const SCHEMA_VERSION = 'para11ax-agent-state-v1.0';
 const TASK_CLASSES = new Set(['simple_transform', 'research', 'coding', 'security_analysis', 'deep_reasoning', 'long_context', 'review', 'analysis']);
 const RISKS = new Set(['low', 'medium', 'high']);
 const ACTIONS = new Set(['DECISION_ADD', 'ARTIFACT_ADD', 'NEXT_ACTIONS_SET', 'OBJECTIVE_REVISE', 'CONSTRAINTS_SET', 'HANDOFF']);
-const CONTROL = /[\u0000-\u001F\u007F]/;
+const UNSAFE_CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 const MAX_TEXT = 8192;
 const MAX_LIST = 128;
 const MAX_TIMELINE = 256;
@@ -15,8 +16,8 @@ function fail(message, ErrorType = TypeError) {
 
 function text(value, field, maximum = MAX_TEXT) {
   if (typeof value !== 'string') fail(field);
-  const normalized = value.trim();
-  if (!normalized || normalized.length > maximum || CONTROL.test(normalized)) fail(field);
+  const normalized = value.replace(/\r\n?/g, '\n').trim();
+  if (!normalized || normalized.length > maximum || UNSAFE_CONTROL.test(normalized)) fail(field);
   return normalized;
 }
 
@@ -63,8 +64,17 @@ function invariantPayload(state) {
   };
 }
 
+function fullStatePayload(state) {
+  const { checkpoint: _checkpoint, ...payload } = state;
+  return payload;
+}
+
 export function agentInvariantHash(state) {
   return sha256Hex(canonicalJson(invariantPayload(state)));
+}
+
+export function agentStateHash(state) {
+  return sha256Hex(canonicalJson(fullStatePayload(state)));
 }
 
 function validateArtifact(value) {
@@ -107,6 +117,7 @@ export function importAgentState(input) {
     try { value = JSON.parse(input); } catch { fail('malformed JSON'); }
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail('object');
+
   const expectedKeys = [
     'schemaVersion', 'id', 'objective', 'taskClass', 'risk', 'constraints', 'decisions', 'artifacts', 'nextActions',
     'revision', 'epoch', 'createdAt', 'updatedAt', 'checkpoint', 'handoffs', 'timeline',
@@ -114,6 +125,7 @@ export function importAgentState(input) {
   const actualKeys = Object.keys(value).sort();
   if (canonicalJson(actualKeys) !== canonicalJson(expectedKeys)) fail('top-level keys');
   if (value.schemaVersion !== SCHEMA_VERSION) fail('schema version');
+
   const normalized = {
     schemaVersion: SCHEMA_VERSION,
     id: text(value.id, 'id', 160),
@@ -132,22 +144,28 @@ export function importAgentState(input) {
     handoffs: Array.isArray(value.handoffs) && value.handoffs.length <= MAX_LIST ? value.handoffs.map(validateHandoff) : fail('handoffs'),
     timeline: Array.isArray(value.timeline) && value.timeline.length <= MAX_TIMELINE ? value.timeline.map(validateTimeline) : fail('timeline'),
   };
+
   if (!TASK_CLASSES.has(normalized.taskClass)) fail('task class');
   if (!RISKS.has(normalized.risk)) fail('risk');
   if (!Number.isSafeInteger(normalized.revision) || normalized.revision < 0) fail('revision');
   if (!Number.isSafeInteger(normalized.epoch) || normalized.epoch < 0) fail('epoch');
   if (!value.checkpoint || typeof value.checkpoint !== 'object' || Array.isArray(value.checkpoint)) fail('checkpoint');
+
   const checkpointKeys = Object.keys(value.checkpoint).sort();
-  if (canonicalJson(checkpointKeys) !== canonicalJson(['at', 'invariantHash', 'revision'].sort())) fail('checkpoint keys');
+  if (canonicalJson(checkpointKeys) !== canonicalJson(['at', 'invariantHash', 'revision', 'stateHash'].sort())) fail('checkpoint keys');
   const checkpoint = {
     at: timestamp(value.checkpoint.at, 'checkpoint at'),
     revision: value.checkpoint.revision,
     invariantHash: text(value.checkpoint.invariantHash, 'checkpoint invariant hash', 64),
+    stateHash: text(value.checkpoint.stateHash, 'checkpoint state hash', 64),
   };
   if (!Number.isSafeInteger(checkpoint.revision) || checkpoint.revision !== normalized.revision) fail('checkpoint revision');
   if (!/^[a-f0-9]{64}$/.test(checkpoint.invariantHash)) fail('checkpoint invariant hash');
+  if (!/^[a-f0-9]{64}$/.test(checkpoint.stateHash)) fail('checkpoint state hash');
   normalized.checkpoint = checkpoint;
-  if (checkpoint.invariantHash !== agentInvariantHash(normalized)) fail('checkpoint mismatch');
+
+  if (checkpoint.invariantHash !== agentInvariantHash(normalized)) fail('checkpoint invariant mismatch');
+  if (checkpoint.stateHash !== agentStateHash(normalized)) fail('checkpoint state mismatch');
   return deepFreeze(normalized);
 }
 
@@ -157,7 +175,7 @@ export function createAgentState({
   taskClass = 'analysis',
   risk = 'medium',
   now = () => new Date().toISOString(),
-  uuid = () => crypto.randomUUID(),
+  uuid = () => randomUUID(),
 } = {}) {
   const at = timestamp(now(), 'createdAt');
   const base = {
@@ -180,7 +198,12 @@ export function createAgentState({
   };
   if (!TASK_CLASSES.has(base.taskClass)) fail('task class');
   if (!RISKS.has(base.risk)) fail('risk');
-  base.checkpoint = { at, revision: 0, invariantHash: agentInvariantHash(base) };
+  base.checkpoint = {
+    at,
+    revision: 0,
+    invariantHash: agentInvariantHash(base),
+    stateHash: agentStateHash(base),
+  };
   return importAgentState(base);
 }
 
@@ -194,7 +217,7 @@ export function reduceAgentState(current, action, dependencies = {}) {
   if (!action || typeof action !== 'object' || Array.isArray(action) || !ACTIONS.has(action.type)) fail('unsupported action');
   if (valid.revision === Number.MAX_SAFE_INTEGER) fail('revision limit', RangeError);
   const now = dependencies.now ?? (() => new Date().toISOString());
-  const uuid = dependencies.uuid ?? (() => crypto.randomUUID());
+  const uuid = dependencies.uuid ?? (() => randomUUID());
   const at = timestamp(now(), 'updatedAt');
   const next = clone(valid);
   let timelineType = action.type;
@@ -238,13 +261,12 @@ export function reduceAgentState(current, action, dependencies = {}) {
       break;
     case 'HANDOFF': {
       if (next.handoffs.length >= MAX_LIST) fail('handoff limit', RangeError);
-      const invariantHash = agentInvariantHash(next);
       next.handoffs.push({
         id: text(uuid(), 'handoff id', 160),
         at,
         to: text(action.to, 'handoff to', 160),
         reason: text(action.reason, 'handoff reason', 2048),
-        invariantHash,
+        invariantHash: agentInvariantHash(next),
       });
       break;
     }
@@ -255,7 +277,12 @@ export function reduceAgentState(current, action, dependencies = {}) {
   next.revision += 1;
   next.updatedAt = at;
   addTimeline(next, { id: text(uuid(), 'timeline id', 160), at, type: timelineType, reason: timelineReason });
-  next.checkpoint = { at, revision: next.revision, invariantHash: agentInvariantHash(next) };
+  next.checkpoint = {
+    at,
+    revision: next.revision,
+    invariantHash: agentInvariantHash(next),
+    stateHash: agentStateHash(next),
+  };
   if (action.type === 'HANDOFF') next.handoffs[next.handoffs.length - 1].invariantHash = next.checkpoint.invariantHash;
   return importAgentState(next);
 }
@@ -268,15 +295,19 @@ export function detectAgentDrift(baselineInput, candidateInput) {
   const baseline = clone(baselineInput);
   const candidate = clone(candidateInput);
   const fields = [];
-  for (const field of ['objective', 'taskClass', 'risk', 'constraints', 'decisions']) {
+
+  for (const field of ['objective', 'taskClass', 'risk', 'constraints']) {
     if (!same(baseline[field], candidate[field])) fields.push(field);
   }
+
   const decisionLoss = Array.isArray(baseline.decisions) && Array.isArray(candidate.decisions)
     && baseline.decisions.some(value => !candidate.decisions.includes(value));
+  if (decisionLoss) fields.push('decisions');
+
   let severity = 'none';
   if (fields.some(field => ['objective', 'taskClass', 'risk', 'constraints'].includes(field))) severity = 'critical';
   else if (decisionLoss) severity = 'high';
-  else if (fields.includes('decisions')) severity = 'medium';
+
   return {
     drifted: fields.length > 0,
     severity,
@@ -304,5 +335,6 @@ export function createHandoffEnvelope(current, { to, reason, contextRefs = [] } 
     nextActions: [...state.nextActions],
     contextRefs: uniqueText(contextRefs, 'context refs'),
     invariantHash: state.checkpoint.invariantHash,
+    stateHash: state.checkpoint.stateHash,
   });
 }
