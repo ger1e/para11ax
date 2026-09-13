@@ -17,7 +17,7 @@ const DOMAIN_ACTIONS = Object.freeze([
   'build', 'surface_import', 'vulnerability_import', 'show', 'report', 'stix', 'handoff',
 ]);
 
-const DOMAIN_TOOL = Object.freeze({
+const DOMAIN_TOOL = {
   name: 'para11ax_domain_investigation',
   title: 'PARA11AX Domain Investigation',
   description: 'Build and advance a passive suspicious-domain investigation with explicit client-carried state, bounded operator-context imports, report, STIX, and handoff projections.',
@@ -32,16 +32,10 @@ const DOMAIN_TOOL = Object.freeze({
     required: Object.freeze(['action']),
     additionalProperties: false,
   }),
-  annotations: Object.freeze({ readOnlyHint: false }),
-});
+  annotations: { readOnlyHint: false },
+};
 
 export const MCP_TOOLS = Object.freeze([...RUNTIME_MCP_TOOLS, DOMAIN_TOOL]);
-
-function headerValue(headers, name) {
-  if (!headers) return undefined;
-  if (typeof headers.get === 'function') return headers.get(name) ?? undefined;
-  return headers[name] ?? headers[name.toLowerCase()] ?? headers[name.toUpperCase()];
-}
 
 function parsedBody(request) {
   const value = request?.body;
