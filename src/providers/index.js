@@ -42,6 +42,9 @@ import { sslblProvider as rawSslblProvider } from './sslbl.js';
 import { yaraifyProvider as rawYaraifyProvider } from './yaraify.js';
 import { mwdbProvider as rawMwdbProvider } from './mwdb.js';
 import { waybackCdxProvider as rawWaybackCdxProvider } from './wayback-cdx.js';
+import { d3fendProvider as rawD3fendProvider } from './d3fend.js';
+import { chainabuseProvider as rawChainabuseProvider } from './chainabuse.js';
+import { gitguardianHmslProvider as rawGitguardianHmslProvider } from './gitguardian-hmsl.js';
 import { withProviderMetadata } from './metadata.js';
 
 export const ipinfoProvider = withProviderMetadata(rawIpinfoProvider);
@@ -93,6 +96,9 @@ export const sslblProvider = withProviderMetadata(rawSslblProvider);
 export const yaraifyProvider = withProviderMetadata(rawYaraifyProvider);
 export const mwdbProvider = withProviderMetadata(rawMwdbProvider);
 export const waybackCdxProvider = withProviderMetadata(rawWaybackCdxProvider);
+export const d3fendProvider = withProviderMetadata(rawD3fendProvider);
+export const chainabuseProvider = withProviderMetadata(rawChainabuseProvider);
+export const gitguardianHmslProvider = withProviderMetadata(rawGitguardianHmslProvider);
 
 export const ALL_PROVIDERS = Object.freeze([
   ipinfoProvider, rdapProvider, ripestatProvider, dshieldProvider, spamhausDropProvider, torExitProvider,
@@ -104,4 +110,5 @@ export const ALL_PROVIDERS = Object.freeze([
   circlVulnerabilityProvider, nvdProvider, osvProvider, attackTaxiiProvider,
   tweetfeedProvider, ransomlookProvider, ransomwareLiveProvider, vulncheckProvider, depsDevProvider,
   sslblProvider, yaraifyProvider, mwdbProvider, waybackCdxProvider,
+  d3fendProvider, chainabuseProvider, gitguardianHmslProvider,
 ]);
