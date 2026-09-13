@@ -1,5 +1,6 @@
 import rawManifest from '../../config/providers.json' with { type: 'json' };
 import rawIntelligenceManifest from '../../config/intelligence-providers.json' with { type: 'json' };
+import rawOwnedAssetManifest from '../../config/owned-asset-providers.json' with { type: 'json' };
 import { EXECUTION_POLICY_VERSION } from '../core/execution-policy.js';
 
 const MAX_PROVIDERS = 64;
@@ -7,7 +8,7 @@ const MAX_TEXT = 512;
 const REQUIRED_ARRAYS = ['types','observationTypes','fixedHosts','methods','protocols'];
 const REQUIRED_NUMBERS = ['tier','timeoutMs','cacheTtlMs','negativeCacheTtlMs','maxResponseBytes'];
 const COST_CLASSES = new Set(['free','quota','scarce']);
-const AUTH_TYPES = new Set(['none','api_key','bearer','basic','token']);
+const AUTH_TYPES = new Set(['none','api_key','bearer','basic','token','hmac']);
 const DISTRIBUTIONS = new Set(['internal','shareable','internal_only']);
 const SOURCE_ROLES = new Set(['authoritative','first_party','aggregator','community','contextual']);
 const FRESHNESS_CLASSES = new Set(['live','near_real_time','periodic','reference']);
@@ -157,12 +158,17 @@ export function validateProviderPolicy(name, input) {
   return validatePolicy(name, input);
 }
 
-for (const [label, manifest] of [['legacy', rawManifest], ['intelligence', rawIntelligenceManifest]]) {
+for (const [label, manifest] of [
+  ['legacy', rawManifest],
+  ['intelligence', rawIntelligenceManifest],
+  ['owned_asset', rawOwnedAssetManifest],
+]) {
   if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) fail(`${label} root`);
 }
 const legacyEntries = Object.entries(rawManifest);
 const intelligenceEntries = Object.entries(rawIntelligenceManifest);
-const entries = [...legacyEntries, ...intelligenceEntries];
+const ownedAssetEntries = Object.entries(rawOwnedAssetManifest);
+const entries = [...legacyEntries, ...intelligenceEntries, ...ownedAssetEntries];
 if (entries.length < 1 || entries.length > MAX_PROVIDERS) fail('provider count');
 if (new Set(entries.map(([name]) => name)).size !== entries.length) fail('duplicate provider name across manifests');
 
