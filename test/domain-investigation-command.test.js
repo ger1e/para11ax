@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import { COMMAND_REGISTRY } from '../app/shell-core/catalog.js';
 import { WORKFLOW_HANDLERS, executeMissionCommand } from '../src/core/mission/command-adapter.js';
+import { createMissionContentLoader } from '../src/control/mission-content-loader.js';
+import { createNodeShellExecutor } from '../src/control/shell-node-executor.js';
 
 const EXPECTED = Object.freeze([
   ['domain-investigation', 'build'], ['domain-investigation', 'surface-import'],
@@ -81,4 +83,33 @@ test('shared command adapter keeps volatile Domain Investigation state and prese
 
   const cleared = await executeMissionCommand({ handler: 'domain-investigation-clear', workspace, loadContent: loader });
   assert.equal(cleared.workspace, null);
+});
+
+test('bounded local content loader accepts only explicit Domain Investigation payload kinds', async () => {
+  const content = JSON.stringify(enrichment());
+  const load = createMissionContentLoader({ stdinContent: content, readFile: async () => content });
+  assert.equal(await load({ kind: 'domain-enrichment', args: ['--stdin'] }), content);
+  assert.equal(await load({ kind: 'domain-surface', args: ['--file', '/tmp/surface.json'] }), content);
+  assert.equal(await load({ kind: 'domain-vulnerability', args: ['--stdin'] }), content);
+  await assert.rejects(() => load({ kind: 'arbitrary-file', args: ['--stdin'] }), error => error?.code === 'POLICY_DENIED');
+});
+
+test('Node shell executor dispatches Domain Investigation through volatile workflow state', async () => {
+  const content = JSON.stringify(enrichment());
+  const executor = createNodeShellExecutor({
+    registry: COMMAND_REGISTRY,
+    missionStdin: content,
+    missionReadFile: async () => content,
+    fetchImpl: async () => { throw new Error('network must not be used'); },
+  });
+  const resolved = COMMAND_REGISTRY.resolve(['domain-investigation', 'build', '--stdin'], 'cli');
+  assert.ok(resolved?.surfaceAvailable);
+  const output = await executor.execute({ descriptor: resolved.descriptor, args: resolved.args, context: { surface: 'cli' } });
+  assert.equal(output.type, 'record');
+  assert.equal(output.value.schemaVersion, 'domain-investigation-v1.0');
+  assert.equal(output.value._authoritative, undefined);
+
+  const shown = COMMAND_REGISTRY.resolve(['domain-investigation', 'show'], 'cli');
+  const showOutput = await executor.execute({ descriptor: shown.descriptor, args: shown.args, context: { surface: 'cli' } });
+  assert.equal(showOutput.value.schemaVersion, 'domain-investigation-v1.0');
 });
