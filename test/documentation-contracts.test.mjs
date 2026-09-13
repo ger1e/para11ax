@@ -35,7 +35,7 @@ test('README, provider docs and terminal distinguish capabilities from upstream 
   const readme = read('README.md');
   const providers = read('docs/PROVIDERS.md');
   const terminal = read('app/terminal-polish.js');
-  assert.equal(capabilityCount, 40, 'registered provider capability count drifted');
+  assert.equal(capabilityCount, 43, 'registered provider capability count drifted');
   assert.equal(upstreamSourceCount, 39, 'upstream provider-family count drifted');
   assert.ok(readme.includes(`${upstreamSourceCount} upstream APIs and feeds`), 'README upstream-source count drifted');
   assert.ok(providers.includes(`**${capabilityCount} provider capabilities**`), 'PROVIDERS capability count drifted');
