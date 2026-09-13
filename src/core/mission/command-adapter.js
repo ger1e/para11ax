@@ -10,13 +10,13 @@ import {
   executeDomainInvestigationCommand,
 } from '../domain-investigation-command-adapter.js';
 
-const MISSION_ONLY_HANDLERS = Object.freeze([
+export const MISSION_HANDLERS = Object.freeze([
   'mission-new', 'mission-show', 'mission-profile-set', 'mission-context-set',
   'mission-relevance', 'mission-hunt-build', 'mission-kql-validate',
   'mission-result-analyze', 'mission-servicenow', 'mission-export', 'mission-import', 'mission-clear',
 ]);
 
-export const MISSION_HANDLERS = Object.freeze([...MISSION_ONLY_HANDLERS, ...DOMAIN_INVESTIGATION_HANDLERS]);
+export const WORKFLOW_HANDLERS = Object.freeze([...MISSION_HANDLERS, ...DOMAIN_INVESTIGATION_HANDLERS]);
 
 const ACTIONS = Object.freeze({
   'mission-profile-set': Object.freeze({ type: 'PROFILE_SET', kind: 'profile', format: 'json' }),
@@ -98,7 +98,7 @@ export async function executeMissionCommand({
   handler, args = [], input = { type: 'void', value: null }, workspace = null, loadContent = null,
 } = {}) {
   try {
-    if (!MISSION_HANDLERS.includes(handler)) throw new TypeError('invalid mission input: unsupported handler');
+    if (!WORKFLOW_HANDLERS.includes(handler)) throw new TypeError('invalid mission input: unsupported handler');
     if (!Array.isArray(args)) throw new TypeError('invalid mission input: arguments required');
 
     const state = splitWorkspace(workspace);
