@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { sha256Hex } from './sha256.js';
 
 const SCHEMA_VERSION = 'para11ax-agent-state-v1.0';
+const HANDOFF_SCHEMA_VERSION = 'para11ax-agent-handoff-v1.0';
 const TASK_CLASSES = new Set(['simple_transform', 'research', 'coding', 'security_analysis', 'deep_reasoning', 'long_context', 'review', 'analysis']);
 const RISKS = new Set(['low', 'medium', 'high']);
 const ACTIONS = new Set(['DECISION_ADD', 'ARTIFACT_ADD', 'NEXT_ACTIONS_SET', 'OBJECTIVE_REVISE', 'CONSTRAINTS_SET', 'HANDOFF']);
@@ -14,11 +15,19 @@ function fail(message, ErrorType = TypeError) {
   throw new ErrorType(`invalid agent state: ${message}`);
 }
 
+function handoffFail(message, ErrorType = TypeError) {
+  throw new ErrorType(`invalid agent handoff: ${message}`);
+}
+
 function text(value, field, maximum = MAX_TEXT) {
   if (typeof value !== 'string') fail(field);
   const normalized = value.replace(/\r\n?/g, '\n').trim();
   if (!normalized || normalized.length > maximum || UNSAFE_CONTROL.test(normalized)) fail(field);
   return normalized;
+}
+
+function handoffText(value, field, maximum = MAX_TEXT) {
+  try { return text(value, field, maximum); } catch { handoffFail(field); }
 }
 
 function timestamp(value, field) {
@@ -32,6 +41,10 @@ function uniqueText(values, field) {
   const normalized = values.map(value => text(value, field, 2048));
   if (new Set(normalized).size !== normalized.length) fail(`${field} duplicate`);
   return normalized;
+}
+
+function handoffUniqueText(values, field) {
+  try { return uniqueText(values, field); } catch { handoffFail(field); }
 }
 
 function canonicalize(value) {
@@ -69,12 +82,21 @@ function fullStatePayload(state) {
   return payload;
 }
 
+function handoffPayload(handoff) {
+  const { handoffHash: _handoffHash, ...payload } = handoff;
+  return payload;
+}
+
 export function agentInvariantHash(state) {
   return sha256Hex(canonicalJson(invariantPayload(state)));
 }
 
 export function agentStateHash(state) {
   return sha256Hex(canonicalJson(fullStatePayload(state)));
+}
+
+export function agentHandoffHash(handoff) {
+  return sha256Hex(canonicalJson(handoffPayload(handoff)));
 }
 
 function validateArtifact(value) {
@@ -88,7 +110,11 @@ function validateArtifact(value) {
   };
 }
 
-function validateHandoff(value) {
+function validateHandoffArtifact(value) {
+  try { return validateArtifact(value); } catch { handoffFail('artifact'); }
+}
+
+function validateHandoffRecord(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail('handoff');
   const invariantHash = text(value.invariantHash, 'handoff invariant hash', 64);
   if (!/^[a-f0-9]{64}$/.test(invariantHash)) fail('handoff invariant hash');
@@ -141,7 +167,7 @@ export function importAgentState(input) {
     createdAt: timestamp(value.createdAt, 'createdAt'),
     updatedAt: timestamp(value.updatedAt, 'updatedAt'),
     checkpoint: value.checkpoint,
-    handoffs: Array.isArray(value.handoffs) && value.handoffs.length <= MAX_LIST ? value.handoffs.map(validateHandoff) : fail('handoffs'),
+    handoffs: Array.isArray(value.handoffs) && value.handoffs.length <= MAX_LIST ? value.handoffs.map(validateHandoffRecord) : fail('handoffs'),
     timeline: Array.isArray(value.timeline) && value.timeline.length <= MAX_TIMELINE ? value.timeline.map(validateTimeline) : fail('timeline'),
   };
 
@@ -198,12 +224,7 @@ export function createAgentState({
   };
   if (!TASK_CLASSES.has(base.taskClass)) fail('task class');
   if (!RISKS.has(base.risk)) fail('risk');
-  base.checkpoint = {
-    at,
-    revision: 0,
-    invariantHash: agentInvariantHash(base),
-    stateHash: agentStateHash(base),
-  };
+  base.checkpoint = { at, revision: 0, invariantHash: agentInvariantHash(base), stateHash: agentStateHash(base) };
   return importAgentState(base);
 }
 
@@ -259,7 +280,7 @@ export function reduceAgentState(current, action, dependencies = {}) {
       timelineType = 'SCOPE_CHANGE';
       timelineReason = text(action.reason, 'scope change reason', 2048);
       break;
-    case 'HANDOFF': {
+    case 'HANDOFF':
       if (next.handoffs.length >= MAX_LIST) fail('handoff limit', RangeError);
       next.handoffs.push({
         id: text(uuid(), 'handoff id', 160),
@@ -269,7 +290,6 @@ export function reduceAgentState(current, action, dependencies = {}) {
         invariantHash: agentInvariantHash(next),
       });
       break;
-    }
     default:
       fail('unsupported action');
   }
@@ -277,12 +297,7 @@ export function reduceAgentState(current, action, dependencies = {}) {
   next.revision += 1;
   next.updatedAt = at;
   addTimeline(next, { id: text(uuid(), 'timeline id', 160), at, type: timelineType, reason: timelineReason });
-  next.checkpoint = {
-    at,
-    revision: next.revision,
-    invariantHash: agentInvariantHash(next),
-    stateHash: agentStateHash(next),
-  };
+  next.checkpoint = { at, revision: next.revision, invariantHash: agentInvariantHash(next), stateHash: agentStateHash(next) };
   if (action.type === 'HANDOFF') next.handoffs[next.handoffs.length - 1].invariantHash = next.checkpoint.invariantHash;
   return importAgentState(next);
 }
@@ -295,11 +310,9 @@ export function detectAgentDrift(baselineInput, candidateInput) {
   const baseline = clone(baselineInput);
   const candidate = clone(candidateInput);
   const fields = [];
-
   for (const field of ['objective', 'taskClass', 'risk', 'constraints']) {
     if (!same(baseline[field], candidate[field])) fields.push(field);
   }
-
   const decisionLoss = Array.isArray(baseline.decisions) && Array.isArray(candidate.decisions)
     && baseline.decisions.some(value => !candidate.decisions.includes(value));
   if (decisionLoss) fields.push('decisions');
@@ -319,8 +332,8 @@ export function detectAgentDrift(baselineInput, candidateInput) {
 
 export function createHandoffEnvelope(current, { to, reason, contextRefs = [] } = {}) {
   const state = importAgentState(current);
-  return deepFreeze({
-    schemaVersion: 'para11ax-agent-handoff-v1.0',
+  const envelope = {
+    schemaVersion: HANDOFF_SCHEMA_VERSION,
     stateId: state.id,
     revision: state.revision,
     epoch: state.epoch,
@@ -335,6 +348,54 @@ export function createHandoffEnvelope(current, { to, reason, contextRefs = [] } 
     nextActions: [...state.nextActions],
     contextRefs: uniqueText(contextRefs, 'context refs'),
     invariantHash: state.checkpoint.invariantHash,
-    stateHash: state.checkpoint.stateHash,
-  });
+    sourceStateHash: state.checkpoint.stateHash,
+    handoffHash: null,
+  };
+  envelope.handoffHash = agentHandoffHash(envelope);
+  return importHandoffEnvelope(envelope);
+}
+
+export function importHandoffEnvelope(input) {
+  let value = input;
+  if (typeof input === 'string') {
+    try { value = JSON.parse(input); } catch { handoffFail('malformed JSON'); }
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) handoffFail('object');
+
+  const expectedKeys = [
+    'schemaVersion', 'stateId', 'revision', 'epoch', 'to', 'reason', 'objective', 'taskClass', 'risk', 'constraints',
+    'decisions', 'artifacts', 'nextActions', 'contextRefs', 'invariantHash', 'sourceStateHash', 'handoffHash',
+  ].sort();
+  if (canonicalJson(Object.keys(value).sort()) !== canonicalJson(expectedKeys)) handoffFail('top-level keys');
+  if (value.schemaVersion !== HANDOFF_SCHEMA_VERSION) handoffFail('schema version');
+  if (!Number.isSafeInteger(value.revision) || value.revision < 0) handoffFail('revision');
+  if (!Number.isSafeInteger(value.epoch) || value.epoch < 0) handoffFail('epoch');
+  if (!TASK_CLASSES.has(value.taskClass)) handoffFail('task class');
+  if (!RISKS.has(value.risk)) handoffFail('risk');
+
+  const normalized = {
+    schemaVersion: HANDOFF_SCHEMA_VERSION,
+    stateId: handoffText(value.stateId, 'state id', 160),
+    revision: value.revision,
+    epoch: value.epoch,
+    to: handoffText(value.to, 'to', 160),
+    reason: handoffText(value.reason, 'reason', 2048),
+    objective: handoffText(value.objective, 'objective'),
+    taskClass: value.taskClass,
+    risk: value.risk,
+    constraints: handoffUniqueText(value.constraints, 'constraints'),
+    decisions: handoffUniqueText(value.decisions, 'decisions'),
+    artifacts: Array.isArray(value.artifacts) && value.artifacts.length <= MAX_LIST ? value.artifacts.map(validateHandoffArtifact) : handoffFail('artifacts'),
+    nextActions: handoffUniqueText(value.nextActions, 'next actions'),
+    contextRefs: handoffUniqueText(value.contextRefs, 'context refs'),
+    invariantHash: handoffText(value.invariantHash, 'invariant hash', 64),
+    sourceStateHash: handoffText(value.sourceStateHash, 'source state hash', 64),
+    handoffHash: handoffText(value.handoffHash, 'handoff hash', 64),
+  };
+  for (const field of ['invariantHash', 'sourceStateHash', 'handoffHash']) {
+    if (!/^[a-f0-9]{64}$/.test(normalized[field])) handoffFail(field);
+  }
+  if (normalized.invariantHash !== agentInvariantHash(normalized)) handoffFail('invariant mismatch');
+  if (normalized.handoffHash !== agentHandoffHash(normalized)) handoffFail('handoff hash mismatch');
+  return deepFreeze(normalized);
 }
