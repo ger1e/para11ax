@@ -12,7 +12,7 @@ const upstreamSourceCount = new Set(
 ).size;
 
 test('provider source truth distinguishes registered capabilities from upstream services', () => {
-  assert.equal(capabilityCount, 40);
+  assert.equal(capabilityCount, 43);
   assert.equal(upstreamSourceCount, 39);
 });
 
