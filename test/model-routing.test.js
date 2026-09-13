@@ -7,6 +7,7 @@ test('routes routine transforms to economy tier with low reasoning', () => {
   assert.equal(route.tier, 'economy');
   assert.equal(route.reasoningEffort, 'low');
   assert.equal(route.requireIndependentReview, false);
+  assert.equal(route.specialistHint, null);
 });
 
 test('routes coding and high-risk security work to frontier reasoning with review gates', () => {
@@ -17,8 +18,18 @@ test('routes coding and high-risk security work to frontier reasoning with revie
   const security = routeModelTask({ taskClass: 'security_analysis', complexity: 'high', risk: 'high' });
   assert.equal(security.tier, 'frontier');
   assert.equal(security.reasoningEffort, 'high');
+  assert.equal(security.specialistHint, null);
   assert.equal(security.requireIndependentReview, true);
   assert.equal(security.requireDifferentFamilyReviewer, true);
+});
+
+test('reserves cyber specialist routing for authorized vulnerability research and exploit validation', () => {
+  const route = routeModelTask({ taskClass: 'cyber_research', complexity: 'high', risk: 'high' });
+  assert.equal(route.tier, 'frontier_max');
+  assert.equal(route.reasoningEffort, 'max');
+  assert.equal(route.specialistHint, 'cyber');
+  assert.equal(route.requireIndependentReview, true);
+  assert.equal(route.requireDifferentFamilyReviewer, true);
 });
 
 test('escalates repeated failures instead of burning tokens at the same capability level', () => {
@@ -34,12 +45,13 @@ test('high risk cannot be cost-demoted below frontier', () => {
   assert.equal(route.requireIndependentReview, true);
 });
 
-test('candidate ranking is task-specific, context-aware, and can enforce model-family diversity', () => {
+test('candidate ranking is task-specific, context-aware, specialist-aware, and can enforce model-family diversity', () => {
   const models = [
-    { id: 'cheap', family: 'a', contextWindow: 1_000_000, coding: 60, reasoning: 60, knowledge: 60, longContext: 70, speed: 95, costEfficiency: 100 },
-    { id: 'coder', family: 'b', contextWindow: 1_000_000, coding: 95, reasoning: 80, knowledge: 75, longContext: 80, speed: 60, costEfficiency: 65 },
-    { id: 'reasoner', family: 'c', contextWindow: 1_000_000, coding: 75, reasoning: 98, knowledge: 90, longContext: 90, speed: 45, costEfficiency: 45 },
-    { id: 'small-context', family: 'd', contextWindow: 32_000, coding: 100, reasoning: 100, knowledge: 100, longContext: 100, speed: 100, costEfficiency: 100 },
+    { id: 'cheap', family: 'a', contextWindow: 1_000_000, coding: 60, reasoning: 60, knowledge: 60, longContext: 70, speed: 95, costEfficiency: 100, specialties: [] },
+    { id: 'coder', family: 'b', contextWindow: 1_000_000, coding: 95, reasoning: 80, knowledge: 75, longContext: 80, speed: 60, costEfficiency: 65, specialties: [] },
+    { id: 'reasoner', family: 'c', contextWindow: 1_000_000, coding: 75, reasoning: 98, knowledge: 90, longContext: 90, speed: 45, costEfficiency: 45, specialties: [] },
+    { id: 'cyber', family: 'e', contextWindow: 400_000, coding: 92, reasoning: 92, knowledge: 88, longContext: 70, speed: 35, costEfficiency: 25, specialties: ['cyber'] },
+    { id: 'small-context', family: 'd', contextWindow: 32_000, coding: 100, reasoning: 100, knowledge: 100, longContext: 100, speed: 100, costEfficiency: 100, specialties: [] },
   ];
 
   const coding = rankModelCandidates(models, { taskClass: 'coding', contextTokens: 100_000 });
@@ -49,4 +61,7 @@ test('candidate ranking is task-specific, context-aware, and can enforce model-f
   const reasoning = rankModelCandidates(models, { taskClass: 'deep_reasoning', contextTokens: 100_000, excludeFamilies: ['b'] });
   assert.equal(reasoning[0].id, 'reasoner');
   assert.equal(reasoning.some(item => item.family === 'b'), false);
+
+  const cyber = rankModelCandidates(models, { taskClass: 'cyber_research', contextTokens: 100_000, requiredSpecialty: 'cyber' });
+  assert.deepEqual(cyber.map(item => item.id), ['cyber']);
 });
