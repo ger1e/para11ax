@@ -1,5 +1,3 @@
-import { MCP_OFFLINE_SCOPE } from './oauth.js';
-
 const MAX_CHALLENGE_BYTES = 2048;
 
 function safeChallenge(value) {
@@ -22,22 +20,8 @@ function isAuthenticationRequired(result) {
 
 export function normalizeExternalMcpResponse(route, result) {
   if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
-
-  if (route === 'protected-resource' && result.status === 200 && result.body && typeof result.body === 'object') {
-    const scopes = Array.isArray(result.body.scopes_supported) ? result.body.scopes_supported : [];
-    if (!scopes.includes(MCP_OFFLINE_SCOPE)) {
-      return {
-        ...result,
-        body: {
-          ...result.body,
-          scopes_supported: [...scopes, MCP_OFFLINE_SCOPE],
-        },
-      };
-    }
-    return result;
-  }
-
   if (route !== '' || !isAuthenticationRequired(result)) return result;
+
   const challenge = authChallenge(result);
   if (!challenge) return result;
 
