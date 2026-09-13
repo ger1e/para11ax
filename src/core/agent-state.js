@@ -1,10 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { isAgentRiskLevel, isAgentTaskClass } from './agent-policy.js';
 import { sha256Hex } from './sha256.js';
 
 const SCHEMA_VERSION = 'para11ax-agent-state-v1.0';
 const HANDOFF_SCHEMA_VERSION = 'para11ax-agent-handoff-v1.0';
-const TASK_CLASSES = new Set(['simple_transform', 'research', 'coding', 'security_analysis', 'deep_reasoning', 'long_context', 'review', 'analysis']);
-const RISKS = new Set(['low', 'medium', 'high']);
 const ACTIONS = new Set(['DECISION_ADD', 'ARTIFACT_ADD', 'NEXT_ACTIONS_SET', 'OBJECTIVE_REVISE', 'CONSTRAINTS_SET', 'HANDOFF']);
 const UNSAFE_CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 const MAX_TEXT = 8192;
@@ -171,8 +170,8 @@ export function importAgentState(input) {
     timeline: Array.isArray(value.timeline) && value.timeline.length <= MAX_TIMELINE ? value.timeline.map(validateTimeline) : fail('timeline'),
   };
 
-  if (!TASK_CLASSES.has(normalized.taskClass)) fail('task class');
-  if (!RISKS.has(normalized.risk)) fail('risk');
+  if (!isAgentTaskClass(normalized.taskClass)) fail('task class');
+  if (!isAgentRiskLevel(normalized.risk)) fail('risk');
   if (!Number.isSafeInteger(normalized.revision) || normalized.revision < 0) fail('revision');
   if (!Number.isSafeInteger(normalized.epoch) || normalized.epoch < 0) fail('epoch');
   if (!value.checkpoint || typeof value.checkpoint !== 'object' || Array.isArray(value.checkpoint)) fail('checkpoint');
@@ -222,8 +221,8 @@ export function createAgentState({
     handoffs: [],
     timeline: [],
   };
-  if (!TASK_CLASSES.has(base.taskClass)) fail('task class');
-  if (!RISKS.has(base.risk)) fail('risk');
+  if (!isAgentTaskClass(base.taskClass)) fail('task class');
+  if (!isAgentRiskLevel(base.risk)) fail('risk');
   base.checkpoint = { at, revision: 0, invariantHash: agentInvariantHash(base), stateHash: agentStateHash(base) };
   return importAgentState(base);
 }
@@ -370,8 +369,8 @@ export function importHandoffEnvelope(input) {
   if (value.schemaVersion !== HANDOFF_SCHEMA_VERSION) handoffFail('schema version');
   if (!Number.isSafeInteger(value.revision) || value.revision < 0) handoffFail('revision');
   if (!Number.isSafeInteger(value.epoch) || value.epoch < 0) handoffFail('epoch');
-  if (!TASK_CLASSES.has(value.taskClass)) handoffFail('task class');
-  if (!RISKS.has(value.risk)) handoffFail('risk');
+  if (!isAgentTaskClass(value.taskClass)) handoffFail('task class');
+  if (!isAgentRiskLevel(value.risk)) handoffFail('risk');
 
   const normalized = {
     schemaVersion: HANDOFF_SCHEMA_VERSION,
