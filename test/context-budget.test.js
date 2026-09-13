@@ -44,6 +44,14 @@ test('context selection keeps invariants and decisions before disposable tool no
   assert.ok(selected.usedTokens <= 45);
 });
 
+test('context selection rejects duplicate IDs so token accounting cannot alias items', () => {
+  const items = [
+    { id: 'same', kind: 'invariant', text: 'Objective: fixed.' },
+    { id: 'same', kind: 'tool_output', text: 'x'.repeat(500) },
+  ];
+  assert.throws(() => selectContextItems(items, { maxTokens: 50 }), /duplicate context item id/i);
+});
+
 test('context selection fails closed when durable state alone exceeds the budget', () => {
   const items = [
     { id: 'objective', kind: 'invariant', text: 'x'.repeat(1000) },
