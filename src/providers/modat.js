@@ -6,7 +6,7 @@ const MAX_RELATIONSHIPS = 250;
 const MAX_VALUES = 100;
 
 function bounded(values, limit = MAX_VALUES) {
-  return uniq(values).slice(0, limit);
+  return uniq(values.filter(value => value !== null && value !== undefined && String(value).trim())).slice(0, limit);
 }
 
 function invalidResponse(message) {
@@ -71,7 +71,7 @@ function asnValue(raw) {
 
 function asnOrganization(raw) {
   const value = raw?.asn;
-  if (value && typeof value === 'object') return value.organization ?? value.name ?? null;
+  if (value && typeof value === 'object') return value.org ?? value.organization ?? value.name ?? null;
   return raw?.autonomous_system?.organization ?? raw?.autonomous_system?.name ?? null;
 }
 
@@ -83,25 +83,46 @@ function hostnames(raw) {
   ]);
 }
 
+function cveValue(cve) {
+  if (typeof cve === 'string') return cve;
+  return cve?.id ?? cve?.cve ?? null;
+}
+
 function serviceValues(raw) {
   const services = arr(raw?.services).slice(0, MAX_VALUES);
   const ports = [...new Set(
     services
-      .map(item => item?.port)
-      .filter(value => Number.isInteger(Number(value)))
+      .flatMap(item => [
+        ...arr(item?.ports),
+        item?.port,
+        item?.last_scanned_port,
+      ])
+      .filter(value => value !== null && value !== undefined && Number.isInteger(Number(value)))
       .map(Number),
   )].slice(0, MAX_VALUES);
-  const tags = bounded(services.flatMap(item => arr(item?.tags)));
-  const cves = bounded(services.flatMap(item => arr(item?.cves).map(cve => typeof cve === 'string' ? cve : cve?.id ?? cve?.cve)));
+  const tags = bounded([
+    ...arr(raw?.tags),
+    ...services.flatMap(item => arr(item?.tags)),
+  ]);
+  const cves = bounded([
+    ...arr(raw?.cves).map(cveValue),
+    ...services.flatMap(item => arr(item?.cves).map(cveValue)),
+  ]);
   return { services, ports, tags, cves };
 }
 
 function recordValues(records, names) {
   const groups = names.flatMap(name => arr(records?.[name] ?? records?.[name.toLowerCase()]));
   return groups.slice(0, MAX_VALUES).map(record => ({
-    value: typeof record === 'string' ? record : record?.value ?? record?.address ?? record?.target ?? record?.exchange ?? null,
-    firstSeen: typeof record === 'object' ? record?.first_seen ?? record?.firstSeen ?? null : null,
-    lastSeen: typeof record === 'object' ? record?.last_seen ?? record?.lastSeen ?? null : null,
+    value: typeof record === 'string'
+      ? record
+      : record?.value ?? record?.ip ?? record?.cname ?? record?.ns ?? record?.host ?? record?.address ?? record?.target ?? record?.exchange ?? null,
+    firstSeen: typeof record === 'object'
+      ? record?.first_seen ?? record?.firstSeen ?? record?.created_at ?? record?.createdAt ?? null
+      : null,
+    lastSeen: typeof record === 'object'
+      ? record?.last_seen ?? record?.lastSeen ?? record?.deleted_at ?? record?.deletedAt ?? record?.created_at ?? record?.createdAt ?? null
+      : null,
   })).filter(item => item.value !== null && item.value !== undefined && String(item.value).trim());
 }
 
@@ -112,6 +133,12 @@ function latestTimestamp(values) {
     .map(value => Date.parse(value))
     .filter(Number.isFinite);
   return timestamps.length ? new Date(Math.max(...timestamps)).toISOString() : null;
+}
+
+function latestServiceTimestamp(services) {
+  return latestTimestamp(services.map(service => ({
+    lastSeen: service?.scanned_at ?? service?.scannedAt ?? null,
+  })));
 }
 
 async function runIp(input, context, key) {
@@ -159,13 +186,13 @@ async function runIp(input, context, key) {
   return {
     observationType: 'internet_exposure',
     verdict: 'observed',
-    lastSeen: host?.last_seen ?? host?.lastSeen ?? null,
+    lastSeen: host?.last_seen ?? host?.lastSeen ?? latestServiceTimestamp(services),
     tags,
     attributes: {
       ip: host?.ip ?? input.value,
       asn,
       organization: asnOrganization(host),
-      country: host?.geo?.country_code ?? host?.geo?.country ?? host?.country_code ?? null,
+      country: host?.geo?.country_iso_code ?? host?.geo?.country_code ?? host?.geo?.country ?? host?.country_code ?? null,
       hostnames: names,
       ports,
       serviceCount: services.length,
@@ -210,7 +237,7 @@ async function runDomain(input, context, key) {
   return {
     observationType: 'passive_dns',
     verdict: 'observed',
-    lastSeen: raw?.last_seen ?? raw?.lastSeen ?? latestTimestamp(all),
+    lastSeen: raw?.modified_at ?? raw?.modifiedAt ?? raw?.last_seen ?? raw?.lastSeen ?? latestTimestamp(all),
     tags: [],
     attributes: {
       fqdn: raw?.fqdn ?? input.value,
@@ -233,7 +260,7 @@ export const modatProvider = Object.freeze({
   negativeCacheTtlMs: 3_600_000,
   costClass: 'quota',
   timeoutMs: 7_000,
-  parserVersion: '2026-08-23.1',
+  parserVersion: '2026-09-13.1',
   async run(input, context = {}) {
     const key = requireEnv(context, 'MODAT_API_KEY');
     if (input?.type === 'ip') return runIp(input, context, key);
