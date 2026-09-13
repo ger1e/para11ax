@@ -110,7 +110,7 @@ test('Modat DNS parser preserves current Magnify DNS record field names', async 
   assert.equal(output.attributes.nameserverCount, 1);
   assert.equal(output.attributes.mailExchangerCount, 1);
   assert.deepEqual(
-    output.relationships.map(item => [item.type, item.value, item.relationship]),
+    output.relationships.map(item => [item.targetType, item.target, item.relationship]),
     [
       ['ip', '93.184.216.34', 'resolves_to'],
       ['ip', '2606:2800:220:1:248:1893:25c8:1946', 'resolves_to'],
