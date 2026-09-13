@@ -68,5 +68,5 @@ test('intelligence operation and asserted type are finite and strict', async () 
   assert.equal((await app.handleIntelligence(req({ operation: 'search', indicator: 'example.com', type: 'email' }))).status, 400);
   const username = await app.handleIntelligence(req({ operation: 'search', indicator: 'user:fixture_name' }));
   assert.equal(username.status, 503);
-  assert.equal(username.body.error, 'user_scanner_unavailable');
+  assert.equal(username.body.error, 'user_scanner_unconfigured');
 });
