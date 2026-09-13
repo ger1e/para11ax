@@ -1,18 +1,74 @@
 {
-  "ip": {"displayName":"IP address","category":"infrastructure","canonicalization":"ip","maxLength":64,"stixExport":"indicator","active":true},
-  "domain": {"displayName":"Domain","category":"infrastructure","canonicalization":"idna-domain","maxLength":253,"stixExport":"indicator","active":true},
-  "url": {"displayName":"URL","category":"infrastructure","canonicalization":"http-url","maxLength":4096,"stixExport":"indicator","active":true},
-  "hash": {"displayName":"File hash","category":"artifact","canonicalization":"md5-sha1-sha256","maxLength":64,"stixExport":"indicator","active":true},
-  "certificate": {"displayName":"X.509 certificate SHA-256","category":"infrastructure","canonicalization":"cert-sha256","maxLength":76,"stixExport":"unsupported","active":true},
-  "cve": {"displayName":"CVE","category":"vulnerability","canonicalization":"cve","maxLength":32,"stixExport":"vulnerability","active":true},
-  "attack": {"displayName":"ATT&CK ID","category":"knowledge","canonicalization":"attack-id","maxLength":16,"stixExport":"evidence-object","active":true},
-  "asn": {"displayName":"ASN","category":"infrastructure","canonicalization":"asn","maxLength":16,"stixExport":"indicator","active":true},
-  "cidr": {"displayName":"CIDR","category":"infrastructure","canonicalization":"cidr","maxLength":64,"stixExport":"unsupported","active":true},
-  "email": {"displayName":"Email address","category":"identity","canonicalization":"email","maxLength":254,"stixExport":"unsupported","active":true},
-  "package": {"displayName":"Package URL","category":"supply_chain","canonicalization":"purl","maxLength":1024,"stixExport":"unsupported","active":true},
-  "tls-fingerprint": {"displayName":"TLS fingerprint","category":"infrastructure","canonicalization":"tls-fingerprint","maxLength":128,"stixExport":"unsupported","active":true},
-  "crypto-address": {"displayName":"Cryptocurrency address","category":"financial_context","canonicalization":"crypto-address","maxLength":128,"stixExport":"unsupported","active":true},
-  "secret-fingerprint": {"displayName":"Privacy-preserving fingerprint","category":"artifact","canonicalization":"privacy-fingerprint","maxLength":96,"stixExport":"unsupported","active":true},
-  "legal-entity": {"displayName":"Legal entity identifier","category":"identity","canonicalization":"legal-entity","maxLength":80,"stixExport":"unsupported","active":true},
-  "username": {"displayName":"Username","category":"identity","canonicalization":"username","maxLength":80,"stixExport":"unsupported","active":true}
+  "ip": {
+    "displayName": "IP address",
+    "category": "infrastructure",
+    "canonicalization": "ip",
+    "maxLength": 64,
+    "stixExport": "indicator",
+    "active": true
+  },
+  "domain": {
+    "displayName": "Domain",
+    "category": "infrastructure",
+    "canonicalization": "idna-domain",
+    "maxLength": 253,
+    "stixExport": "indicator",
+    "active": true
+  },
+  "url": {
+    "displayName": "URL",
+    "category": "infrastructure",
+    "canonicalization": "http-url",
+    "maxLength": 4096,
+    "stixExport": "indicator",
+    "active": true
+  },
+  "hash": {
+    "displayName": "File hash",
+    "category": "artifact",
+    "canonicalization": "md5-sha1-sha256",
+    "maxLength": 64,
+    "stixExport": "indicator",
+    "active": true
+  },
+  "certificate": {
+    "displayName": "X.509 certificate SHA-256",
+    "category": "infrastructure",
+    "canonicalization": "cert-sha256",
+    "maxLength": 76,
+    "stixExport": "unsupported",
+    "active": true
+  },
+  "cve": {
+    "displayName": "CVE",
+    "category": "vulnerability",
+    "canonicalization": "cve",
+    "maxLength": 32,
+    "stixExport": "vulnerability",
+    "active": true
+  },
+  "attack": {
+    "displayName": "ATT&CK ID",
+    "category": "knowledge",
+    "canonicalization": "attack-id",
+    "maxLength": 16,
+    "stixExport": "evidence-object",
+    "active": true
+  },
+  "asn": {
+    "displayName": "ASN",
+    "category": "infrastructure",
+    "canonicalization": "asn",
+    "maxLength": 16,
+    "stixExport": "indicator",
+    "active": true
+  },
+  "cidr": {
+    "displayName": "CIDR",
+    "category": "infrastructure",
+    "canonicalization": "cidr",
+    "maxLength": 64,
+    "stixExport": "unsupported",
+    "active": true
+  }
 }
