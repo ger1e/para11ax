@@ -9,6 +9,7 @@ export {
   loadCorpusDirectory,
   verifyCorpus,
 } from './corpus.js';
+export { compareScorecards } from './compare.js';
 export { assertAggregateOnlyScorecard } from './privacy.js';
 export { EVALUATOR_VERSION, scoreResultBundle } from './score.js';
 export {
