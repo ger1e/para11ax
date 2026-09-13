@@ -38,6 +38,10 @@ import { ransomlookProvider as rawRansomlookProvider } from './ransomlook.js';
 import { ransomwareLiveProvider as rawRansomwareLiveProvider } from './ransomware-live.js';
 import { vulncheckProvider as rawVulncheckProvider } from './vulncheck.js';
 import { depsDevProvider as rawDepsDevProvider } from './deps-dev.js';
+import { sslblProvider as rawSslblProvider } from './sslbl.js';
+import { yaraifyProvider as rawYaraifyProvider } from './yaraify.js';
+import { mwdbProvider as rawMwdbProvider } from './mwdb.js';
+import { waybackCdxProvider as rawWaybackCdxProvider } from './wayback-cdx.js';
 import { withProviderMetadata } from './metadata.js';
 
 export const ipinfoProvider = withProviderMetadata(rawIpinfoProvider);
@@ -85,6 +89,10 @@ export const ransomlookProvider = withProviderMetadata(rawRansomlookProvider);
 export const ransomwareLiveProvider = withProviderMetadata(rawRansomwareLiveProvider);
 export const vulncheckProvider = withProviderMetadata(rawVulncheckProvider);
 export const depsDevProvider = withProviderMetadata(rawDepsDevProvider);
+export const sslblProvider = withProviderMetadata(rawSslblProvider);
+export const yaraifyProvider = withProviderMetadata(rawYaraifyProvider);
+export const mwdbProvider = withProviderMetadata(rawMwdbProvider);
+export const waybackCdxProvider = withProviderMetadata(rawWaybackCdxProvider);
 
 export const ALL_PROVIDERS = Object.freeze([
   ipinfoProvider, rdapProvider, ripestatProvider, dshieldProvider, spamhausDropProvider, torExitProvider,
@@ -95,4 +103,5 @@ export const ALL_PROVIDERS = Object.freeze([
   malwarebazaarProvider, malpediaProvider, hybridAnalysisProvider, cisaKevProvider, cisaAdpProvider, epssProvider,
   circlVulnerabilityProvider, nvdProvider, osvProvider, attackTaxiiProvider,
   tweetfeedProvider, ransomlookProvider, ransomwareLiveProvider, vulncheckProvider, depsDevProvider,
+  sslblProvider, yaraifyProvider, mwdbProvider, waybackCdxProvider,
 ]);
