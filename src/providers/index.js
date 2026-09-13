@@ -10,14 +10,14 @@ import { mispCirclOsintProvider as rawMispCirclOsintProvider, mispBotvrijOsintPr
 import { greynoiseProvider as rawGreynoiseProvider } from './greynoise.js';
 import { abuseipdbProvider as rawAbuseipdbProvider } from './abuseipdb.js';
 import { shodanProvider as rawShodanProvider } from './shodan.js';
-import { censysProvider as rawCensysProvider } from './censys.js';
+import { censysProvider as rawCensysProvider, censysSearchProvider as rawCensysSearchProvider, censysHistoryProvider as rawCensysHistoryProvider } from './censys.js';
 import { modatProvider as rawModatProvider } from './modat.js';
 import { cloudflareRadarProvider as rawCloudflareRadarProvider } from './cloudflare-radar.js';
 import { cloudflareDnsProvider as rawCloudflareDnsProvider } from './cloudflare-dns.js';
-import { virustotalProvider as rawVirustotalProvider } from './virustotal.js';
+import { virustotalProvider as rawVirustotalProvider, virustotalGraphProvider as rawVirustotalGraphProvider } from './virustotal.js';
 import { otxProvider as rawOtxProvider } from './otx.js';
 import { threatfoxProvider as rawThreatfoxProvider } from './threatfox.js';
-import { urlscanProvider as rawUrlscanProvider } from './urlscan.js';
+import { urlscanProvider as rawUrlscanProvider, urlscanGraphProvider as rawUrlscanGraphProvider } from './urlscan.js';
 import { webamonProvider as rawWebamonProvider } from './webamon.js';
 import { pulsediveProvider as rawPulsediveProvider } from './pulsedive.js';
 import { openphishProvider as rawOpenphishProvider } from './openphish.js';
@@ -32,6 +32,8 @@ import { epssProvider as rawEpssProvider } from './epss.js';
 import { circlVulnerabilityProvider as rawCirclVulnerabilityProvider } from './circl-vulnerability.js';
 import { nvdProvider as rawNvdProvider } from './nvd.js';
 import { osvProvider as rawOsvProvider } from './osv.js';
+import { vulncheckProvider as rawVulncheckProvider } from './vulncheck.js';
+import { depsDevProvider as rawDepsDevProvider } from './deps-dev.js';
 import { attackTaxiiProvider as rawAttackTaxiiProvider } from './attack-taxii.js';
 import { tweetfeedProvider as rawTweetfeedProvider } from './tweetfeed.js';
 import { ransomlookProvider as rawRansomlookProvider } from './ransomlook.js';
@@ -52,13 +54,17 @@ export const greynoiseProvider = withProviderMetadata(rawGreynoiseProvider);
 export const abuseipdbProvider = withProviderMetadata(rawAbuseipdbProvider);
 export const shodanProvider = withProviderMetadata(rawShodanProvider);
 export const censysProvider = withProviderMetadata(rawCensysProvider);
+export const censysSearchProvider = withProviderMetadata(rawCensysSearchProvider);
+export const censysHistoryProvider = withProviderMetadata(rawCensysHistoryProvider);
 export const modatProvider = withProviderMetadata(rawModatProvider);
 export const cloudflareRadarProvider = withProviderMetadata(rawCloudflareRadarProvider);
 export const cloudflareDnsProvider = withProviderMetadata(rawCloudflareDnsProvider);
 export const virustotalProvider = withProviderMetadata(rawVirustotalProvider);
+export const virustotalGraphProvider = withProviderMetadata(rawVirustotalGraphProvider);
 export const otxProvider = withProviderMetadata(rawOtxProvider);
 export const threatfoxProvider = withProviderMetadata(rawThreatfoxProvider);
 export const urlscanProvider = withProviderMetadata(rawUrlscanProvider);
+export const urlscanGraphProvider = withProviderMetadata(rawUrlscanGraphProvider);
 export const webamonProvider = withProviderMetadata(rawWebamonProvider);
 export const pulsediveProvider = withProviderMetadata(rawPulsediveProvider);
 export const openphishProvider = withProviderMetadata(rawOpenphishProvider);
@@ -73,6 +79,8 @@ export const epssProvider = withProviderMetadata(rawEpssProvider);
 export const circlVulnerabilityProvider = withProviderMetadata(rawCirclVulnerabilityProvider);
 export const nvdProvider = withProviderMetadata(rawNvdProvider);
 export const osvProvider = withProviderMetadata(rawOsvProvider);
+export const vulncheckProvider = withProviderMetadata(rawVulncheckProvider);
+export const depsDevProvider = withProviderMetadata(rawDepsDevProvider);
 export const attackTaxiiProvider = withProviderMetadata(rawAttackTaxiiProvider);
 export const tweetfeedProvider = withProviderMetadata(rawTweetfeedProvider);
 export const ransomlookProvider = withProviderMetadata(rawRansomlookProvider);
@@ -81,10 +89,10 @@ export const ransomwareLiveProvider = withProviderMetadata(rawRansomwareLiveProv
 export const ALL_PROVIDERS = Object.freeze([
   ipinfoProvider, rdapProvider, ripestatProvider, dshieldProvider, spamhausDropProvider, torExitProvider,
   feodoTrackerProvider, threatminerProvider, mispCirclOsintProvider, mispBotvrijOsintProvider,
-  greynoiseProvider, abuseipdbProvider, shodanProvider, censysProvider, modatProvider, cloudflareRadarProvider,
-  cloudflareDnsProvider, virustotalProvider, otxProvider, threatfoxProvider, urlscanProvider, webamonProvider,
+  greynoiseProvider, abuseipdbProvider, shodanProvider, censysProvider, censysSearchProvider, censysHistoryProvider, modatProvider, cloudflareRadarProvider,
+  cloudflareDnsProvider, virustotalProvider, virustotalGraphProvider, otxProvider, threatfoxProvider, urlscanProvider, urlscanGraphProvider, webamonProvider,
   pulsediveProvider, openphishProvider, urlhausProvider, circlHashlookupProvider,
   malwarebazaarProvider, malpediaProvider, hybridAnalysisProvider, cisaKevProvider, cisaAdpProvider, epssProvider,
-  circlVulnerabilityProvider, nvdProvider, osvProvider, attackTaxiiProvider,
+  circlVulnerabilityProvider, nvdProvider, osvProvider, vulncheckProvider, depsDevProvider, attackTaxiiProvider,
   tweetfeedProvider, ransomlookProvider, ransomwareLiveProvider,
 ]);

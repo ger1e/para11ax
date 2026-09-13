@@ -110,15 +110,14 @@ test('canonical deep docs describe scheduler v1, Kernel v1, and evidence boundar
   assert.match(api, /Intelligence Kernel v1\.0/i);
 
   const operations = read('docs/OPERATIONS.md');
-  assert.match(operations, /3a0b456ecceecd826a8c15b596653149b685c95e/i);
-  assert.match(operations, /exact main SHA green in CI/i);
-  assert.match(operations, /A merge is not production acceptance/i);
+  assert.match(operations, /11d7b861d9f626c45f44c138c8d72cee9493efdf/i);
+  assert.match(operations, /build-rate limit|deployment rate limit/i);
 
   const qa = read('docs/QA-REPORT.md');
-  assert.match(qa, /3a0b456ecceecd826a8c15b596653149b685c95e/i);
-  assert.match(qa, /Required exact-head gates/i);
-  assert.match(qa, /CodeQL JavaScript\/TypeScript/i);
-  assert.match(qa, /Production acceptance is a later, separate gate after merge\/deploy/i);
+  assert.match(qa, /11d7b861d9f626c45f44c138c8d72cee9493efdf/i);
+  assert.match(qa, /Tooling smoke 1374/i);
+  assert.match(qa, /CodeQL 962/i);
+  assert.match(qa, /2acc19f0558b1c3bbbcd96b47b8da69a25192c55/i);
 });
 
 test('all current public docs are free of stale scheduler/provider-count language', () => {

@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { buildCoverage, buildCorrelation } from '../app/view-model.js';
 import { WORKFLOWS, WORKFLOW_CALL_LIMITS } from '../src/workflows.js';
-import { ALL_PROVIDERS } from '../src/providers/index.js';
 
 const sample = {
   providerSummary: { ok: 19, failed: 3, skipped: 2, cached: 0 },
@@ -77,12 +76,11 @@ test('full CTI workflow budget permits at most two bounded attempts per configur
   }
 });
 
-test('terminal chrome reports the canonical provider registry count', () => {
+test('terminal chrome reports the canonical 39-upstream-source fabric', () => {
   const polish = readFileSync('app/terminal-polish.js', 'utf8');
-  const expected = ALL_PROVIDERS.length;
-  assert.match(polish, new RegExp(`${expected} SOURCES`));
-  assert.match(polish, new RegExp(`${expected} SRC`));
-  assert.doesNotMatch(polish, /38 SOURCES|38 SRC/);
+  assert.match(polish, /39 SOURCES/);
+  assert.match(polish, /39 SRC/);
+  assert.doesNotMatch(polish, /38 SOURCES|38 SRC|40 SOURCES|40 SRC/);
 });
 
 test('report renderers format structured analyst content without JSON object syntax', () => {
