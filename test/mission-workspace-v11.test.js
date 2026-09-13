@@ -53,10 +53,22 @@ function completeWorkspace() {
   };
 }
 
+function domainProjection(workspace) {
+  return {
+    revision: workspace.revision,
+    profile: workspace.profile,
+    context: workspace.context,
+    relevance: workspace.relevance,
+    hunt: workspace.hunt,
+    kqlValidations: workspace.kqlValidations,
+    result: workspace.result,
+    serviceNow: workspace.serviceNow,
+  };
+}
+
 test('empty mission workspace has the exact portable frozen contract', () => {
   const workspace = createMissionWorkspace();
-  assert.deepEqual(workspace, {
-    schemaVersion: 'mission-workspace-v1.0',
+  assert.deepEqual(domainProjection(workspace), {
     revision: 0,
     profile: null,
     context: null,
@@ -66,8 +78,13 @@ test('empty mission workspace has the exact portable frozen contract', () => {
     result: null,
     serviceNow: null,
   });
+  assert.equal(workspace.schemaVersion, 'mission-workspace-v1.1');
+  assert.equal(workspace.agentState.taskClass, 'security_analysis');
+  assert.equal(workspace.handoff.stateId, workspace.agentState.id);
   assert.equal(Object.isFrozen(workspace), true);
   assert.equal(Object.isFrozen(workspace.kqlValidations), true);
+  assert.equal(Object.isFrozen(workspace.agentState), true);
+  assert.equal(Object.isFrozen(workspace.handoff), true);
 });
 
 test('mission bundle export and import are byte-stable', () => {
@@ -77,8 +94,13 @@ test('mission bundle export and import are byte-stable', () => {
 });
 
 test('mission import reconstructs and freezes every derived projection', () => {
-  const imported = importMissionWorkspace(completeWorkspace());
-  assert.deepEqual(imported, completeWorkspace());
+  const legacy = completeWorkspace();
+  const imported = importMissionWorkspace(legacy);
+  const { schemaVersion: _legacyVersion, ...legacyDomain } = legacy;
+  assert.equal(imported.schemaVersion, 'mission-workspace-v1.1');
+  assert.deepEqual(domainProjection(imported), legacyDomain);
+  assert.deepEqual(imported.agentState.nextActions, []);
+  assert.equal(imported.handoff.sourceStateHash, imported.agentState.checkpoint.stateHash);
   assert.equal(Object.isFrozen(imported.profile.technologies), true);
   assert.equal(Object.isFrozen(imported.hunt.kqlCandidates[0].validation), true);
   assert.equal(Object.isFrozen(imported.serviceNow.provenance), true);
@@ -136,6 +158,8 @@ test('workspace reducer executes the complete mission lifecycle', () => {
   assert.deepEqual(state.kqlValidations, state.hunt.kqlCandidates);
   assert.equal(state.result.state, 'RESULTS_PRESENT');
   assert.equal(state.serviceNow.provenance.autoSubmission, false);
+  assert.deepEqual(state.agentState.nextActions, []);
+  assert.equal(state.handoff.sourceStateHash, state.agentState.checkpoint.stateHash);
   assert.equal(Object.isFrozen(state), true);
 });
 
@@ -154,6 +178,7 @@ test('changing profile invalidates every downstream projection', () => {
     serviceNow: null,
   });
   assert.deepEqual(next.kqlValidations, []);
+  assert.deepEqual(next.agentState.nextActions, ['mission-relevance']);
 });
 
 test('failed transitions leave the frozen current workspace unchanged', () => {
@@ -169,6 +194,8 @@ test('clear removes all content and increments revision exactly once', () => {
   assert.equal(cleared.revision, 2);
   assert.equal(cleared.profile, null);
   assert.deepEqual(cleared.kqlValidations, []);
+  assert.deepEqual(cleared.agentState.nextActions, ['mission-profile-set']);
+  assert.ok(cleared.handoff.contextRefs.includes('mission:action:clear'));
 });
 
 test('independent KQL validation is sorted deduplicated bounded and non-destructive', () => {
@@ -197,4 +224,6 @@ test('workspace import preserves the imported revision', () => {
   const imported = reduceMissionWorkspace(createMissionWorkspace(), { type: 'IMPORT', value: completeWorkspace() });
   assert.equal(imported.revision, 6);
   assert.equal(imported.hunt.state, 'READY');
+  assert.deepEqual(imported.agentState.nextActions, []);
+  assert.ok(imported.handoff.contextRefs.includes('mission:revision:6'));
 });
