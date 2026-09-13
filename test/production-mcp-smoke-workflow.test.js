@@ -13,7 +13,8 @@ test('production MCP smoke uses GitHub OIDC and never duplicates the analyst bea
   assert.match(workflow, /EXPECTED_SHA:\s*\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /\.deploymentSha == \$sha/);
   assert.match(workflow, /\.authorization == "github_oidc"/);
-  assert.match(workflow, /\.mcp\.toolCount == 13/);
+  assert.match(workflow, /\.mcp\.toolCount == 14/);
+  assert.match(workflow, /\.conformance\.toolCount == 14/);
   assert.match(workflow, /\.enrichment\.target == "1\.1\.1\.1"/);
   assert.match(workflow, /\.userScanner\.target == "ger1e"/);
   assert.doesNotMatch(workflow, /secrets\.PARA11AX_TOKEN/);
