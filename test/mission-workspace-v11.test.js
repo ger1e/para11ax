@@ -178,7 +178,7 @@ test('changing profile invalidates every downstream projection', () => {
     serviceNow: null,
   });
   assert.deepEqual(next.kqlValidations, []);
-  assert.deepEqual(next.agentState.nextActions, ['mission-context-set']);
+  assert.deepEqual(next.agentState.nextActions, ['mission-relevance']);
 });
 
 test('failed transitions leave the frozen current workspace unchanged', () => {
