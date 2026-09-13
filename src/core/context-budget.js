@@ -21,6 +21,7 @@ function clamp(value, minimum, maximum) {
 export function estimateTokens(value) {
   const text = typeof value === 'string' ? value : JSON.stringify(value);
   if (!text) return 0;
+  // Fallback only. Callers should pass provider-tokenized item.tokens when available.
   // 3.5 chars/token intentionally overestimates typical English/JSON to avoid silent overflow.
   return Math.ceil(text.length / 3.5);
 }
@@ -28,18 +29,17 @@ export function estimateTokens(value) {
 export function planContextBudget({
   contextWindow,
   maxOutputTokens = 16_384,
-  reasoningReserveRatio = 0.18,
-  safetyReserveRatio = 0.08,
+  safetyReserveRatio = 0.05,
 } = {}) {
   const window = positiveInteger(contextWindow, 'contextWindow');
   const output = positiveInteger(maxOutputTokens, 'maxOutputTokens');
   if (output >= window) throw new RangeError('invalid context budget: output exceeds context window');
-  if (!Number.isFinite(reasoningReserveRatio) || reasoningReserveRatio < 0 || reasoningReserveRatio > 0.4) throw new TypeError('invalid context budget: reasoningReserveRatio');
   if (!Number.isFinite(safetyReserveRatio) || safetyReserveRatio < 0 || safetyReserveRatio > 0.2) throw new TypeError('invalid context budget: safetyReserveRatio');
 
-  const reasoningReserveTokens = Math.floor(window * reasoningReserveRatio);
+  // Reasoning tokens are part of max output on current reasoning APIs. Reserving them
+  // a second time wastes usable input context, so output is subtracted exactly once.
   const safetyReserveTokens = Math.floor(window * safetyReserveRatio);
-  const inputBudgetTokens = window - output - reasoningReserveTokens - safetyReserveTokens;
+  const inputBudgetTokens = window - output - safetyReserveTokens;
   if (inputBudgetTokens <= 0) throw new RangeError('invalid context budget: reserves exhaust context window');
 
   const allocations = {
@@ -54,7 +54,7 @@ export function planContextBudget({
   return Object.freeze({
     contextWindow: window,
     maxOutputTokens: output,
-    reasoningReserveTokens,
+    reasoningBudgetPolicy: 'inside-max-output',
     safetyReserveTokens,
     inputBudgetTokens,
     allocations: Object.freeze(allocations),
