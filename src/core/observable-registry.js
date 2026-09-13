@@ -1,7 +1,10 @@
 import rawManifest from '../../config/observables.json' with { type: 'json' };
 
-const CATEGORIES = new Set(['infrastructure', 'artifact', 'vulnerability', 'knowledge']);
-const CANONICALIZATION = new Set(['ip', 'idna-domain', 'http-url', 'md5-sha1-sha256', 'cert-sha256', 'cve', 'attack-id', 'asn', 'cidr']);
+const CATEGORIES = new Set(['infrastructure', 'artifact', 'vulnerability', 'knowledge', 'identity', 'supply_chain', 'financial_context']);
+const CANONICALIZATION = new Set([
+  'ip', 'idna-domain', 'http-url', 'md5-sha1-sha256', 'cert-sha256', 'cve', 'attack-id', 'asn', 'cidr',
+  'email', 'purl', 'tls-fingerprint', 'crypto-address', 'privacy-fingerprint', 'legal-entity', 'username',
+]);
 const STIX_EXPORT = new Set(['indicator', 'vulnerability', 'evidence-object', 'unsupported']);
 
 function fail(message) {
