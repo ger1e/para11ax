@@ -84,7 +84,29 @@ export const mwdbProvider = Object.freeze({
     if (!token) throw new Error('MWDB is not configured');
     const hash = input.value.toLowerCase();
     const fileUrl = `${API_BASE}/file/${encodeURIComponent(hash)}`;
-    const file = await getJson(fileUrl, token, { fetchImpl, signal });
+    let file;
+    try {
+      file = await getJson(fileUrl, token, { fetchImpl, signal });
+    } catch (error) {
+      if (error?.status === 404) {
+        return {
+          observationType: 'malware_configuration',
+          verdict: 'not_found',
+          confidence: 0,
+          attributes: {
+            hash,
+            sha256: null,
+            tags: [],
+            family: null,
+            configId: null,
+            c2Count: 0,
+          },
+          relationships: [],
+          references: [fileUrl],
+        };
+      }
+      throw error;
+    }
     if (!isObject(file) || file.type !== 'file' || typeof file.id !== 'string') throw schemaError();
     if (file.tags !== undefined && !Array.isArray(file.tags)) throw schemaError();
     const tagNames = Array.isArray(file.tags)
