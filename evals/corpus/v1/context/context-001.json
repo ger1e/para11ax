@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "para11ax-eval-case-v1.0",
+  "caseId": "context-001",
+  "domain": "context",
+  "weight": 1,
+  "input": {
+    "items": [
+      {"id": "objective", "tokens": 4, "durable": true, "priority": 100},
+      {"id": "constraints", "tokens": 5, "durable": true, "priority": 100},
+      {"id": "decision-1", "tokens": 4, "durable": true, "priority": 90},
+      {"id": "tool-noise", "tokens": 9, "durable": false, "priority": 10}
+    ],
+    "maxTokens": 15
+  },
+  "expected": {
+    "requiredIds": ["objective", "constraints", "decision-1"]
+  }
+}
