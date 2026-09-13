@@ -3,7 +3,10 @@ import { readFile as nodeReadFile } from 'node:fs/promises';
 import { ShellCommandError, shellError } from '../../app/shell-core/errors.js';
 
 const MAX_BYTES = 2 * 1024 * 1024;
-const KINDS = new Set(['profile', 'context', 'hunt', 'result', 'workspace']);
+const KINDS = new Set([
+  'profile', 'context', 'hunt', 'result', 'workspace',
+  'domain-enrichment', 'domain-surface', 'domain-vulnerability',
+]);
 
 function deny(message) {
   throw shellError('POLICY_DENIED', message);

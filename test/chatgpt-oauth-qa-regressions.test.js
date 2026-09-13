@@ -260,10 +260,10 @@ test('MCP tool catalog remains stable across repeated metadata application', () 
   const first = JSON.stringify(tools);
   applyChatGptToolMetadata(tools);
   assert.equal(JSON.stringify(tools), first);
-  assert.equal(tools.length, 13);
+  assert.equal(tools.length, 14);
 });
 
-test('MCP transport returns the same 13-tool catalog across repeated modern tools/list calls', async () => {
+test('MCP transport returns the same 14-tool catalog across repeated modern tools/list calls', async () => {
   const handler = createMcpTransportHandler({ env: { PARA11AX_TOKEN: 'gateway-token' } });
   let baseline = null;
   for (let i = 0; i < 10; i += 1) {
@@ -278,8 +278,8 @@ test('MCP transport returns the same 13-tool catalog across repeated modern tool
     });
     assert.equal(result.status, 200);
     const names = result.body.result.tools.map(tool => tool.name);
-    assert.equal(names.length, 13);
-    assert.equal(new Set(names).size, 13);
+    assert.equal(names.length, 14);
+    assert.equal(new Set(names).size, 14);
     baseline ??= names;
     assert.deepEqual(names, baseline);
   }
