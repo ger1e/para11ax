@@ -26,7 +26,7 @@ test('MCP intelligence schema exposes no authorization or raw-provider routing f
 
 test('MCP catalog grows by exactly one dedicated intelligence surface', () => {
   const names = MCP_TOOLS.map(tool => tool.name);
-  assert.equal(names.length, 14);
-  assert.equal(new Set(names).size, 14);
+  assert.equal(names.length, 15);
+  assert.equal(new Set(names).size, 15);
   assert.equal(names.filter(name => name === 'para11ax_intelligence').length, 1);
 });
