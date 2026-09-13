@@ -156,7 +156,7 @@ function createFooter(version) {
 
   const center = document.createElement('span');
   center.className = 'shell-footer-center';
-  center.textContent = '38 SOURCES · EVIDENCE v2 · READ ONLY';
+  center.textContent = '40 SOURCES · EVIDENCE v2 · READ ONLY';
 
   const leds = document.createElement('span');
   leds.className = 'shell-footer-leds';
@@ -173,7 +173,7 @@ function createFooter(version) {
 
   const mobile = document.createElement('span');
   mobile.className = 'shell-footer-mobile';
-  mobile.textContent = `CTI ENRICHMENT · 38 SRC · v${version}`;
+  mobile.textContent = `CTI ENRICHMENT · 40 SRC · v${version}`;
 
   footer.append(desktop, center, leds, build, mobile);
   return footer;
