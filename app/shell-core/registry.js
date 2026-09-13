@@ -1,10 +1,11 @@
 import { VALUE_TYPES } from './types.js';
+import { DOMAIN_INVESTIGATION_COMMAND_DESCRIPTORS } from './domain-investigation-catalog.js';
 
 const SURFACES = new Set(['web', 'cli']);
 const AUTH_MODES = new Set(['none', 'optional', 'required']);
 const EGRESS_CLASSES = new Set(['none', 'gateway', 'provider']);
 const SIDE_EFFECTS = new Set(['none', 'session', 'browser-download', 'filesystem', 'local-admin']);
-const NAMESPACES = new Set(['discovery', 'session', 'system', 'intel', 'provider', 'osint', 'result', 'mission', 'case', 'investigation', 'report', 'export', 'terminal', 'transform']);
+const NAMESPACES = new Set(['discovery', 'session', 'system', 'intel', 'provider', 'osint', 'result', 'mission', 'domain-investigation', 'case', 'investigation', 'report', 'export', 'terminal', 'transform']);
 const FORBIDDEN_HOST_ROOTS = new Set(['sudo', 'ssh', 'curl', 'wget', 'eval', 'exec', 'source']);
 
 function nonEmptyString(value, label) {
@@ -89,10 +90,17 @@ function sequenceKey(tokens) {
   return tokens.join('\u0000');
 }
 
+function canonicalBuiltins(descriptors) {
+  const ids = new Set(descriptors.map(item => item?.id));
+  const canonicalCatalog = ids.has('discovery.help') && ids.has('mission.new') && ids.has('investigation.show');
+  if (!canonicalCatalog || ids.has('domain-investigation.build')) return descriptors;
+  return [...descriptors, ...DOMAIN_INVESTIGATION_COMMAND_DESCRIPTORS];
+}
+
 export function createCommandRegistry(descriptors = []) {
   if (!Array.isArray(descriptors)) throw new TypeError('command descriptors must be an array');
 
-  const items = Object.freeze(descriptors.map(normalizeDescriptor));
+  const items = Object.freeze(canonicalBuiltins(descriptors).map(normalizeDescriptor));
   const byId = new Map();
   const sequences = new Map();
 
