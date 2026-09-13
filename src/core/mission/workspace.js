@@ -4,12 +4,18 @@ import { validateMissionKql } from './kql-validator.js';
 import { buildHuntPackage } from './hunt-package.js';
 import { analyzeMissionResults } from './result-analysis.js';
 import { buildServiceNowProjection } from '../../report/render-servicenow.js';
+import {
+  createAgentState,
+  createHandoffEnvelope,
+  importAgentState,
+  importHandoffEnvelope,
+  reduceAgentState,
+} from '../agent-state.js';
 
-export const MISSION_WORKSPACE_SCHEMA_VERSION = 'mission-workspace-v1.0';
-
+export const MISSION_WORKSPACE_SCHEMA_VERSION = 'mission-workspace-v1.1';
+const LEGACY_MISSION_WORKSPACE_SCHEMA_VERSION = 'mission-workspace-v1.0';
 const MAX_BUNDLE_BYTES = 2 * 1024 * 1024;
-const WORKSPACE_KEYS = Object.freeze([
-  'schemaVersion',
+const DOMAIN_KEYS = Object.freeze([
   'revision',
   'profile',
   'context',
@@ -19,6 +25,8 @@ const WORKSPACE_KEYS = Object.freeze([
   'result',
   'serviceNow',
 ]);
+const LEGACY_WORKSPACE_KEYS = Object.freeze(['schemaVersion', ...DOMAIN_KEYS]);
+const WORKSPACE_KEYS = Object.freeze(['schemaVersion', ...DOMAIN_KEYS, 'agentState', 'handoff']);
 const CONTEXT_KEYS = Object.freeze([
   'technologies',
   'industries',
@@ -49,6 +57,13 @@ const RESULT_KEYS = Object.freeze([
   'limitations',
 ]);
 const CONTROL = /[\u0000-\u001F\u007F]/;
+const MISSION_AGENT_TIME = '1970-01-01T00:00:00.000Z';
+const MISSION_AGENT_OBJECTIVE = 'Complete the PARA11AX mission workflow while preserving canonical state, provenance, and fail-closed evidence semantics.';
+const MISSION_AGENT_CONSTRAINTS = Object.freeze([
+  'Preserve canonical mission workspace state and provenance.',
+  'Do not treat missing or empty results as benign evidence.',
+  'Only continue from validated mission and handoff state.',
+]);
 
 function fail(message) {
   throw new TypeError(`invalid mission workspace: ${message}`);
@@ -234,10 +249,107 @@ function validateServiceNow(value, hunt, result) {
   return expected;
 }
 
-export function createMissionWorkspace() {
+function normalizeDomain(value) {
+  if (!Number.isSafeInteger(value.revision) || value.revision < 0) fail('revision');
+  const profile = validateProfile(value.profile);
+  const context = normalizeContext(value.context, profile);
+  const relevance = validateRelevance(value.relevance, profile, context);
+  const hunt = validateHunt(value.hunt, profile, context);
+  const kqlValidations = validateKqlValidations(value.kqlValidations);
+  const result = validateResult(value.result);
+  const serviceNow = validateServiceNow(value.serviceNow, hunt, result);
+  return { revision: value.revision, profile, context, relevance, hunt, kqlValidations, result, serviceNow };
+}
+
+function nextMissionActions(domain) {
+  if (!domain.profile) return ['mission-profile-set'];
+  if (domain.context === null) return ['mission-context-set'];
+  if (domain.relevance === null) return ['mission-relevance'];
+  if (domain.hunt === null) return ['mission-hunt-build'];
+  if (domain.result === null) return ['mission-result-analyze'];
+  if (domain.serviceNow === null) return ['mission-servicenow'];
+  return [];
+}
+
+function actionSlug(actionType) {
+  return String(actionType).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function missionAgentDeps(missionRevision, actionType) {
+  let sequence = 0;
+  const slug = actionSlug(actionType);
+  return Object.freeze({
+    now: () => MISSION_AGENT_TIME,
+    uuid: () => `mission-${missionRevision}-${slug}-${++sequence}`,
+  });
+}
+
+function missionReason(actionType, revision) {
+  return `Mission ${actionSlug(actionType)} completed; continue from canonical workspace revision ${revision}.`;
+}
+
+function buildMissionContinuation(domain, previousAgentState, actionType) {
+  const deps = missionAgentDeps(domain.revision, actionType);
+  let agentState = previousAgentState
+    ? importAgentState(previousAgentState)
+    : createAgentState({
+      objective: MISSION_AGENT_OBJECTIVE,
+      constraints: MISSION_AGENT_CONSTRAINTS,
+      taskClass: 'security_analysis',
+      risk: 'medium',
+      ...deps,
+    });
+
+  agentState = reduceAgentState(agentState, { type: 'NEXT_ACTIONS_SET', values: nextMissionActions(domain) }, deps);
+  const reason = missionReason(actionType, domain.revision);
+  agentState = reduceAgentState(agentState, { type: 'HANDOFF', to: 'next-agent', reason }, deps);
+  const handoff = createHandoffEnvelope(agentState, {
+    to: 'next-agent',
+    reason,
+    contextRefs: [
+      `mission:revision:${domain.revision}`,
+      `mission:action:${actionSlug(actionType)}`,
+    ],
+  });
+  return { agentState, handoff };
+}
+
+function validateMissionContinuation(domain, agentStateInput, handoffInput) {
+  let agentState;
+  let handoff;
+  try {
+    agentState = importAgentState(agentStateInput);
+    handoff = importHandoffEnvelope(handoffInput);
+  } catch {
+    fail('handoff validation failed');
+  }
+  if (agentState.objective !== MISSION_AGENT_OBJECTIVE) fail('agent objective');
+  if (agentState.taskClass !== 'security_analysis' || agentState.risk !== 'medium') fail('agent routing contract');
+  if (!sameJson(agentState.constraints, MISSION_AGENT_CONSTRAINTS)) fail('agent constraints');
+  const expectedNextActions = nextMissionActions(domain);
+  if (!sameJson(agentState.nextActions, expectedNextActions)) fail('agent next actions');
+  if (handoff.stateId !== agentState.id || handoff.revision !== agentState.revision || handoff.epoch !== agentState.epoch) fail('handoff state mismatch');
+  if (handoff.invariantHash !== agentState.checkpoint.invariantHash || handoff.sourceStateHash !== agentState.checkpoint.stateHash) fail('handoff checkpoint mismatch');
+  if (!sameJson(handoff.nextActions, expectedNextActions)) fail('handoff next actions');
+  if (handoff.to !== 'next-agent') fail('handoff recipient');
+  if (!handoff.contextRefs.includes(`mission:revision:${domain.revision}`)) fail('handoff mission revision');
+  const actionRefs = handoff.contextRefs.filter(item => item.startsWith('mission:action:'));
+  if (actionRefs.length !== 1) fail('handoff mission action');
+  return { agentState, handoff };
+}
+
+function assembleWorkspace(domain, continuation) {
   return deepFreeze({
     schemaVersion: MISSION_WORKSPACE_SCHEMA_VERSION,
-    revision: 0,
+    ...domain,
+    agentState: continuation.agentState,
+    handoff: continuation.handoff,
+  });
+}
+
+function blankDomain(revision = 0) {
+  return {
+    revision,
     profile: null,
     context: null,
     relevance: null,
@@ -245,7 +357,12 @@ export function createMissionWorkspace() {
     kqlValidations: [],
     result: null,
     serviceNow: null,
-  });
+  };
+}
+
+export function createMissionWorkspace() {
+  const domain = blankDomain(0);
+  return assembleWorkspace(domain, buildMissionContinuation(domain, null, 'new'));
 }
 
 export function importMissionWorkspace(input) {
@@ -257,27 +374,17 @@ export function importMissionWorkspace(input) {
   }
   assertJsonTree(value);
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) fail('plain object required');
-  if (!exactKeys(value, WORKSPACE_KEYS)) fail('top-level keys');
+
+  if (value.schemaVersion === LEGACY_MISSION_WORKSPACE_SCHEMA_VERSION) {
+    if (!exactKeys(value, LEGACY_WORKSPACE_KEYS)) fail('top-level keys');
+    const domain = normalizeDomain(value);
+    return assembleWorkspace(domain, buildMissionContinuation(domain, null, 'legacy-import'));
+  }
+
   if (value.schemaVersion !== MISSION_WORKSPACE_SCHEMA_VERSION) fail('unsupported version');
-  if (!Number.isSafeInteger(value.revision) || value.revision < 0) fail('revision');
-  const profile = validateProfile(value.profile);
-  const context = normalizeContext(value.context, profile);
-  const relevance = validateRelevance(value.relevance, profile, context);
-  const hunt = validateHunt(value.hunt, profile, context);
-  const kqlValidations = validateKqlValidations(value.kqlValidations);
-  const result = validateResult(value.result);
-  const serviceNow = validateServiceNow(value.serviceNow, hunt, result);
-  return deepFreeze({
-    schemaVersion: MISSION_WORKSPACE_SCHEMA_VERSION,
-    revision: value.revision,
-    profile,
-    context,
-    relevance,
-    hunt,
-    kqlValidations,
-    result,
-    serviceNow,
-  });
+  if (!exactKeys(value, WORKSPACE_KEYS)) fail('top-level keys');
+  const domain = normalizeDomain(value);
+  return assembleWorkspace(domain, validateMissionContinuation(domain, value.agentState, value.handoff));
 }
 
 export function exportMissionWorkspace(workspace) {
@@ -293,9 +400,15 @@ function requireContext(current) {
   if (current.context === null) fail('context required');
 }
 
-function advance(current, patch) {
+function domainFromWorkspace(workspace) {
+  return Object.fromEntries(DOMAIN_KEYS.map(key => [key, workspace[key]]));
+}
+
+function advance(current, patch, actionType, { resetAgent = false } = {}) {
   if (current.revision === Number.MAX_SAFE_INTEGER) throw new RangeError('invalid mission workspace: revision limit');
-  return importMissionWorkspace({ ...current, ...patch, revision: current.revision + 1 });
+  const domain = { ...domainFromWorkspace(current), ...patch, revision: current.revision + 1 };
+  const continuation = buildMissionContinuation(domain, resetAgent ? null : current.agentState, actionType);
+  return assembleWorkspace(domain, continuation);
 }
 
 const TRANSITIONS = Object.freeze({
@@ -308,7 +421,7 @@ const TRANSITIONS = Object.freeze({
       kqlValidations: [],
       result: null,
       serviceNow: null,
-    });
+    }, 'PROFILE_SET');
   },
   CONTEXT_SET(current, action) {
     const context = normalizeContext(action.value, current.profile);
@@ -320,7 +433,7 @@ const TRANSITIONS = Object.freeze({
       kqlValidations: [],
       result: null,
       serviceNow: null,
-    });
+    }, 'CONTEXT_SET');
   },
   RELEVANCE_ASSESS(current) {
     requireProfile(current);
@@ -331,7 +444,7 @@ const TRANSITIONS = Object.freeze({
       kqlValidations: [],
       result: null,
       serviceNow: null,
-    });
+    }, 'RELEVANCE_ASSESS');
   },
   HUNT_BUILD(current, action) {
     requireProfile(current);
@@ -344,7 +457,7 @@ const TRANSITIONS = Object.freeze({
       kqlValidations: hunt.kqlCandidates,
       result: null,
       serviceNow: null,
-    });
+    }, 'HUNT_BUILD');
   },
   KQL_VALIDATE(current, action) {
     if (typeof action.value !== 'string') fail('KQL query required');
@@ -354,21 +467,20 @@ const TRANSITIONS = Object.freeze({
     if (byQuery.size > 8) throw new RangeError('invalid mission workspace: KQL validation limit is 8');
     return advance(current, {
       kqlValidations: [...byQuery.values()].sort((left, right) => left.query.localeCompare(right.query)),
-    });
+    }, 'KQL_VALIDATE');
   },
   RESULT_ANALYZE(current, action) {
     return advance(current, {
       result: analyzeMissionResults(action.value),
       serviceNow: null,
-    });
+    }, 'RESULT_ANALYZE');
   },
   SERVICENOW_BUILD(current) {
     if (!current.hunt) fail('hunt required for ServiceNow projection');
-    return advance(current, { serviceNow: buildServiceNowProjection(current.hunt, current.result) });
+    return advance(current, { serviceNow: buildServiceNowProjection(current.hunt, current.result) }, 'SERVICENOW_BUILD');
   },
   CLEAR(current) {
-    if (current.revision === Number.MAX_SAFE_INTEGER) throw new RangeError('invalid mission workspace: revision limit');
-    return importMissionWorkspace({ ...createMissionWorkspace(), revision: current.revision + 1 });
+    return advance(current, blankDomain(current.revision + 1), 'CLEAR', { resetAgent: true });
   },
 });
 
