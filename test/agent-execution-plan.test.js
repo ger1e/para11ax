@@ -124,7 +124,8 @@ test('Mission MCP request returns portable workspace plus ephemeral execution pl
 
   const payload = response.body.result.structuredContent;
   assert.ok(payload.workspace);
-  assert.equal(typeof payload.output, 'string');
+  assert.equal(payload.output.type, 'record');
+  assert.deepEqual(payload.output.value, payload.workspace);
   assert.equal(payload.executionPlan.schemaVersion, 'para11ax-agent-execution-plan-v1.0');
   assert.equal(payload.executionPlan.route.taskClass, 'security_analysis');
   assert.equal(payload.executionPlan.route.tier, 'frontier');
