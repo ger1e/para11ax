@@ -1,3 +1,6 @@
+<!-- PARA11AX-DOC-STANDARD: GER1E/PARA11AX v1 -->
+> **Document status:** Historical design record. Preserved for implementation history; current behavior is defined by [docs/ARCHITECTURE.md](https://github.com/ger1e/para11ax/blob/main/docs/ARCHITECTURE.md) and the current README.
+
 # PARA11AX Intelligence Fabric Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -861,3 +864,7 @@ Every PR independently runs Task 18 release gates appropriate to its changed sur
 - Type consistency: observable names, mode enums, authorization enums, distribution source, planner signature, and evidence policy fields are consistent across tasks.
 - Backward compatibility: existing `enrich` remains phase-1 only by default; secondary pivots are opt-in through the intelligence surface until intentionally promoted by provider-admission metrics.
 - Security boundary: sensitive/monitor/analysis capabilities cannot become fanout-eligible under the provider-policy validator.
+
+---
+
+<p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
