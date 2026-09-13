@@ -203,6 +203,28 @@ function validateGraph(raw, expected) {
   return nodes;
 }
 
+function noResult(parsed, versionUrl) {
+  return {
+    observationType: 'supply_chain',
+    verdict: 'no_result',
+    confidence: 100,
+    attributes: {
+      purl: parsed.purl,
+      system: parsed.system,
+      name: parsed.name,
+      version: parsed.version,
+      publishedAt: null,
+      licenses: [],
+      advisories: [],
+      directDependencyCount: 0,
+      transitiveDependencyCount: 0,
+      dependencyCount: 0,
+    },
+    relationships: [],
+    references: [versionUrl],
+  };
+}
+
 export const depsDevProvider = Object.freeze({
   name: 'deps-dev',
   types: ['package'],
@@ -221,7 +243,13 @@ export const depsDevProvider = Object.freeze({
     const versionUrl = `${API_BASE}/systems/${systemPath}/packages/${packagePath}/versions/${versionPath}`;
     const dependenciesUrl = `${versionUrl}:dependencies`;
 
-    const versionRaw = await fetchJson(versionUrl, { fetchImpl, signal, maxBytes: MAX_RESPONSE_BYTES });
+    let versionRaw;
+    try {
+      versionRaw = await fetchJson(versionUrl, { fetchImpl, signal, maxBytes: MAX_RESPONSE_BYTES });
+    } catch (error) {
+      if (error?.status === 404) return noResult(parsed, versionUrl);
+      throw error;
+    }
     const versionInfo = validateVersion(versionRaw, parsed);
     const graphRaw = await fetchJson(dependenciesUrl, { fetchImpl, signal, maxBytes: MAX_RESPONSE_BYTES });
     const nodes = validateGraph(graphRaw, parsed);
