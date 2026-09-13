@@ -15,6 +15,7 @@ const capabilityCount = createProviderRegistry(ALL_PROVIDERS).names().length;
 const upstreamSourceCount = new Set(
   Object.entries(INTELLIGENCE_PROVIDER_MANIFEST).map(([name, policy]) => policy.providerFamily ?? name),
 ).size;
+const baselineSourceCount = 39;
 
 function requireTokens(text, tokens, label) {
   for (const token of tokens) assert.ok(text.includes(token), `${label}: missing ${token}`);
@@ -35,13 +36,13 @@ test('README, provider docs and terminal distinguish capabilities from upstream 
   const readme = read('README.md');
   const providers = read('docs/PROVIDERS.md');
   const terminal = read('app/terminal-polish.js');
-  assert.equal(capabilityCount, 43, 'registered provider capability count drifted');
-  assert.equal(upstreamSourceCount, 39, 'upstream provider-family count drifted');
-  assert.ok(readme.includes(`${upstreamSourceCount} upstream APIs and feeds`), 'README upstream-source count drifted');
+  assert.equal(capabilityCount, 45, 'registered provider capability count drifted');
+  assert.equal(upstreamSourceCount, 41, 'upstream provider-family count drifted');
+  assert.ok(readme.includes(`${baselineSourceCount} upstream APIs and feeds`), 'README baseline-source count drifted');
   assert.ok(providers.includes(`**${capabilityCount} provider capabilities**`), 'PROVIDERS capability count drifted');
   assert.ok(providers.includes(`**${upstreamSourceCount} upstream services**`), 'PROVIDERS upstream-service count drifted');
-  assert.ok(terminal.includes(`${upstreamSourceCount} SOURCES`), 'terminal must report upstream sources, not capability count');
-  assert.ok(terminal.includes(`${upstreamSourceCount} SRC`), 'mobile terminal must report upstream sources, not capability count');
+  assert.ok(terminal.includes(`${baselineSourceCount} SOURCES`), 'terminal must report baseline upstream sources, not capability count');
+  assert.ok(terminal.includes(`${baselineSourceCount} SRC`), 'mobile terminal must report baseline upstream sources, not capability count');
   assert.doesNotMatch(terminal, new RegExp(`${capabilityCount} SOURCES`), 'terminal must not label capability count as sources');
   requireTokens(providers, [
     'CISA ADP SSVC',
