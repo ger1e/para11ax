@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { ALL_PROVIDERS } from '../src/providers/index.js';
 
 const read = path => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -25,10 +26,11 @@ test('Gateway Terminal retains semantic footer telemetry as a compatibility hook
   const polish = await read('app/terminal-polish.js');
   const css = await read('app/shell-polish.css');
   const finalCss = await read('app/analyst-deck.css');
+  const providerCount = ALL_PROVIDERS.length;
   assert.match(polish, /shell-footer/);
   assert.match(polish, /PARA11AX \/\/ CTI ENRICHMENT/);
-  assert.match(polish, /CTI ENRICHMENT · 38 SRC/);
-  assert.match(polish, /38 SOURCES/);
+  assert.match(polish, new RegExp(`CTI ENRICHMENT · ${providerCount} SRC`));
+  assert.match(polish, new RegExp(`${providerCount} SOURCES`));
   assert.match(polish, /EVIDENCE v2/);
   assert.match(polish, /READ ONLY/);
   assert.match(polish, /shell-footer-led/);
