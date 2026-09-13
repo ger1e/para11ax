@@ -28,7 +28,7 @@ function classify(rec, independence) {
   if (knownGroups >= 2 && contradictions.length === 0) {
     return {
       disposition: 'BLOCK',
-      ruleId: 'DI-BLOCK-2-INDEPENDENT-GROUPS',
+      ruleId: 'DI-BLOCK-2-DIRECT',
       reasons: ['At least two known independent provider families directly support the exact IOC with no material contradiction.'],
     };
   }
