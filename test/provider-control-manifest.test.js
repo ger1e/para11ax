@@ -71,8 +71,11 @@ test('provider secret inventory remains exact while non-secret integration confi
   assert.deepEqual(bootstrapNames, providerAndGateway);
 });
 
-test('checked-in JSON is identical to the runtime manifest projection and contains no credential values', () => {
-  const raw = json('config/providers.json');
+test('checked-in JSON manifests are identical to the runtime manifest projection and contain no credential values', () => {
+  const raw = {
+    ...json('config/providers.json'),
+    ...json('config/intelligence-providers.json'),
+  };
   assert.deepEqual(raw, PROVIDER_MANIFEST);
   const serialized = JSON.stringify(raw);
   assert.doesNotMatch(serialized, /eyJ[a-zA-Z0-9_-]{20,}\./);
