@@ -7,13 +7,13 @@ PARA11AX exposes its functional analyst surface through one authenticated remote
 https://para11ax.vercel.app/mcp
 ```
 
-MCP is a control plane over existing PARA11AX domain logic, not a second implementation. Enrichment, User Scanner, Shodan, GreyNoise Swarm, Mission Workspace, Investigation Workspace, cases, reports and registered commands delegate into the same bounded handlers used elsewhere.
+MCP is a control plane over existing PARA11AX domain logic, not a second implementation. Enrichment, User Scanner, Shodan, GreyNoise Swarm, Mission Workspace, Domain Investigation, Investigation Workspace, cases, reports and registered commands delegate into the same bounded handlers used elsewhere.
 
 The transport implements the stateless `2026-07-28` profile and retains bounded `2025-06-18` initialize compatibility. Repository, CI, deployment, OAuth transport, live credential capability and ChatGPT-connection proof are separate states.
 
 ## Authentication and transport
 
-Protocol discovery is public so a client can initialize and inspect the 13 tool descriptors before linking. Public methods are limited to `server/discover`, `initialize`, `notifications/initialized`, `ping`, and `tools/list`; they execute no analyst capability.
+Protocol discovery is public so a client can initialize and inspect the 14 tool descriptors before linking. Public methods are limited to `server/discover`, `initialize`, `notifications/initialized`, `ping`, and `tools/list`; they execute no analyst capability.
 
 Protected execution accepts either a PARA11AX OAuth access token or the existing gateway bearer for trusted non-OAuth clients.
 
@@ -44,7 +44,7 @@ Core MCP tool-auth failures preserve the result-level `_meta["mcp/www_authentica
 
 Modern routing also validates `Mcp-Method`; `Mcp-Name` is required for `tools/call` and must match `params.name`. Mismatches fail closed.
 
-The endpoint is stateless. Mission, investigation and analyst-case state is returned to the client and supplied on subsequent related calls. `/mcp` has no hidden cross-user workflow session.
+The endpoint is stateless. Mission, Domain Investigation, investigation and analyst-case state is returned to the client and supplied on subsequent related calls. `/mcp` has no hidden cross-user workflow session.
 
 ## Discovery and schemas
 
@@ -56,7 +56,7 @@ server/discover
   -> tools/call
 ```
 
-`tools/list` returns all 13 tools with schemas and annotations. The catalog is the authoritative remote capability inventory. Bounded operator tools advertise bounded schemas as well as enforcing runtime validation. In particular, `para11ax_swarm` and `para11ax_user_scan` use `additionalProperties: false`; supported enums, fields and numeric/string limits are explicit. This prevents the tool model from advertising a looser contract than the server actually accepts.
+`tools/list` returns all 14 tools with schemas and annotations. The catalog is the authoritative remote capability inventory. Bounded operator tools advertise bounded schemas as well as enforcing runtime validation. In particular, `para11ax_swarm` and `para11ax_user_scan` use `additionalProperties: false`; supported enums, fields and numeric/string limits are explicit. This prevents the tool model from advertising a looser contract than the server actually accepts.
 
 Schema metadata is not the security boundary by itself. Runtime validators remain authoritative and reject unsupported command/field combinations, oversize input and invalid ranges even if a client ignores JSON Schema.
 
@@ -73,6 +73,7 @@ Schema metadata is not the security boundary by itself. Runtime validators remai
 | `para11ax_user_scan` | isolated email/username OSINT scanner | active open-world OSINT |
 | `para11ax_stix` | deterministic STIX object projection from enrichment | read-only projection |
 | `para11ax_mission` | mission profile/context/relevance/hunt/KQL/result/ServiceNow workflow | explicit client-carried state |
+| `para11ax_domain_investigation` | build/import/show/report/STIX/handoff for suspicious-domain investigation | explicit client-carried state; no scanner/provider execution |
 | `para11ax_investigation` | Investigation Workspace create/status/mutate/report/import/export | explicit client-carried state |
 | `para11ax_case` | portable analyst case operations | explicit client-carried state |
 | `para11ax_report` | deterministic report render/quality/manifest | read-only projection |
@@ -108,6 +109,18 @@ The schema advertises the bounded command fields for session ID, scope, time ran
 
 Swarm is operator context, not another Evidence v2 provider. Workspace/demo capability depends on upstream entitlement. Individual JSON/binary responses remain bounded by the underlying Swarm handler.
 
+### Domain Investigation
+
+`para11ax_domain_investigation` exposes these exact actions:
+
+`build` · `surface_import` · `vulnerability_import` · `show` · `report` · `stix` · `handoff`
+
+`build` accepts a canonical domain Evidence v2 enrichment. Import actions accept a previously returned Domain Investigation artifact plus bounded scalar-only records. The server stores no hidden Domain Investigation state: build/import transitions return the full client-carried artifact, while `show`, report, STIX and handoff return bounded public projections.
+
+The Domain Investigation body allowance is raised only on this exact authenticated grouped-tool path so a valid client-carried artifact or import can cross the ordinary 128 KiB MCP ceiling. Unauthenticated requests remain behind the public ceiling, and unrelated tools do not inherit the larger allowance.
+
+Imported discovery/vulnerability records are `operator_context`, not Evidence v2. The tool never performs active scanning, provider execution or arbitrary egress. Full authority and recommendation semantics are documented in [`DOMAIN-INVESTIGATION.md`](DOMAIN-INVESTIGATION.md).
+
 ## State round trips
 
 Mission example:
@@ -118,6 +131,17 @@ Mission example:
 3. para11ax_mission { operation: "profile_set", workspace: <returned>, payload: {...} }
 4. retain the new returned workspace
 5. continue relevance -> hunt_build -> kql_validate -> result_analyze -> servicenow/export
+```
+
+Domain Investigation example:
+
+```text
+1. para11ax_domain_investigation { action: "build", enrichment: <canonical-domain-evidence-v2> }
+2. retain returned artifact
+3. para11ax_domain_investigation { action: "surface_import", artifact: <returned>, records: [...] }
+4. retain returned artifact
+5. optionally vulnerability_import
+6. call show / report / stix / handoff with the current artifact
 ```
 
 Investigations and cases follow the same state-in/state-out pattern. KQL is validated/projected, not executed. ServiceNow-ready output is projected, not submitted automatically.
@@ -140,7 +164,8 @@ MCP does not expose:
 - provider host/method/credential overrides;
 - automatic KQL execution;
 - automatic ServiceNow submission;
-- automatic Evidence v2 promotion of User Scanner/Shodan/Swarm context.
+- automatic Evidence v2 promotion of User Scanner/Shodan/Swarm context;
+- hosted active surface discovery or vulnerability scanning through Domain Investigation.
 
 Provider and OSINT work continues through existing fixed-host policies, timeouts, response limits, provenance, parser semantics and gateway authentication.
 
@@ -169,6 +194,7 @@ A successful token exchange with no subsequent `/mcp` request is a client/sessio
 - [`README.md`](../README.md)
 - [`API.md`](API.md)
 - [`ARCHITECTURE.md`](ARCHITECTURE.md)
+- [`DOMAIN-INVESTIGATION.md`](DOMAIN-INVESTIGATION.md)
 - [`PROVIDERS.md`](PROVIDERS.md)
 - [`IDENTITY-OSINT.md`](IDENTITY-OSINT.md)
 - [`GREYNOISE-SWARM.md`](GREYNOISE-SWARM.md)
