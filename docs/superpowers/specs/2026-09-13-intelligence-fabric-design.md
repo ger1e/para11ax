@@ -1,10 +1,10 @@
 <!-- PARA11AX-DOC-STANDARD: GER1E/PARA11AX v1 -->
-> **Document status:** Approved architectural design for implementation. Current production behavior remains authoritative until this design is implemented, reviewed, merged, deployed, and verified.
+> **Document status:** Architecture approved in chat; written specification pending final user review. Current production behavior remains authoritative until this design is implemented, reviewed, merged, deployed, and verified.
 
 # PARA11AX Intelligence Fabric Design
 
 Date: 2026-09-13
-Status: approved design
+Status: architecture approved; written spec pending review
 Base commit: `dc1445b0596bda6833ae1c2fe6cf78b16ce4bcc5`
 Branch: `intelligence-fabric-20260913`
 
@@ -49,10 +49,10 @@ Extend the provider manifest with validated fields:
 - `sensitivity`: `public`, `owned_asset`, `pii`, `credential`, `secret`, or `sample`
 - `authorization`: `none`, `tenant`, `verified_domain`, `owned_network`, `explicit_case`, or `explicit_action`
 - `retentionClass`: `normal`, `restricted`, `ephemeral`, or `no_store`
-- `licenseClass`: `shareable`, `summary_only`, or `internal_only`
+- reuse the existing `distribution` field as the single export/redistribution policy source of truth; extend its validated values only if `summary_only` is needed
 - optional `async`, `maxPages`, `maxRelationships`, `supportsHistorical`, `supportsSearch`, `supportsBulk`, `providerFamily`, and quota metadata.
 
-Unknown values or incomplete policy metadata fail provider registration.
+Do not introduce a second licensing/export field that can contradict `distribution`. Unknown values or incomplete policy metadata fail provider registration.
 
 ## Observable expansion
 
@@ -172,13 +172,13 @@ Untrusted request fields cannot grant ownership or tenant privileges by themselv
 
 Sensitive values use restricted logging and retention. Raw secret material is never a generic observable.
 
-Each evidence item inherits effective distribution policy:
+Every evidence item inherits the provider's existing `distribution` policy. If `summary_only` is added, manifest validation, evidence normalization, report generation, and exporters must all recognize it consistently.
 
 - `shareable`: normalized evidence may be exported.
 - `summary_only`: only permitted derived summaries/references may leave internal output.
-- `internal_only`: evidence is excluded or redacted from shareable exports.
+- `internal` / `internal_only`: preserve existing semantics and exclude or redact material wherever current policy requires.
 
-Export and reporting enforce this centrally.
+Export and reporting enforce distribution centrally.
 
 No absent result from an exposure-oriented source may be summarized as `safe`, `clean`, or equivalent.
 
@@ -186,7 +186,7 @@ No absent result from an exposure-oriented source may be summarized as `safe`, `
 
 All external results continue through canonical normalization and retain provider, observable, semantic kind, verdict, timestamps, attributes, relationships, references, cache/retrieval metadata, parser version, integrity fingerprint, and evidence role.
 
-New fields may add execution mode, sensitivity, and distribution metadata.
+New fields may add execution mode, sensitivity, retention, and effective distribution metadata.
 
 Relationship insertion must canonicalize targets, reject invalid values, remove external markup, deduplicate edges, cap expansion, and preserve provider provenance.
 
@@ -292,7 +292,7 @@ Duplicative generic-reputation sources remain explicit-only or are rejected.
 9. No knowledge result converted to threat evidence.
 10. All loops, pages, calls, graph expansion, bodies, and outputs remain bounded.
 11. Raw external markup never becomes a canonical observable.
-12. Distribution restrictions are enforced at export boundaries.
+12. Existing distribution policy remains the single export-policy source of truth.
 13. Production changes flow through protected PR and verified deployment.
 
 ## Acceptance criteria
