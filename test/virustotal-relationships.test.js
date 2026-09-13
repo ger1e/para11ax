@@ -15,13 +15,17 @@ function context(fetchImpl) {
   };
 }
 
-test('VirusTotal manifest carries validated graph bounds without replacing point-enrichment policy', () => {
-  const policy = intelligenceProviderPolicy('virustotal');
-  assert.equal(policy.mode, 'enrich');
-  assert.equal(policy.fanoutEligible, true);
-  assert.equal(policy.providerFamily, 'virustotal');
-  assert.equal(policy.maxPages, 1);
-  assert.equal(policy.maxRelationships, 60);
+test('VirusTotal graph is a separately selectable bounded policy while point enrichment remains unchanged', () => {
+  const point = intelligenceProviderPolicy('virustotal');
+  assert.equal(point.mode, 'enrich');
+  assert.equal(point.fanoutEligible, true);
+
+  const graph = intelligenceProviderPolicy('virustotal-graph');
+  assert.equal(graph.mode, 'graph');
+  assert.equal(graph.fanoutEligible, false);
+  assert.equal(graph.providerFamily, 'virustotal');
+  assert.equal(graph.maxPages, 1);
+  assert.equal(graph.maxRelationships, 60);
 });
 
 test('VirusTotal graph rejects relationship rows whose declared VT object type contradicts the relationship', async () => {
