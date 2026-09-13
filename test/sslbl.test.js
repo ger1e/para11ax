@@ -27,6 +27,26 @@ test('SSLBL performs one bounded passive JA3 blacklist lookup', async () => {
   assert.deepEqual(out.relationships, []);
 });
 
+test('SSLBL absence remains contextual not-listed evidence', async () => {
+  const out = await sslblProvider.run({ type: 'tls-fingerprint', value: `ja3:${JA3}` }, {
+    fetchImpl: async () => response('# abuse.ch SSLBL JA3\n'),
+    feedCache: new Map(),
+  });
+  assert.equal(out.verdict, 'not_listed');
+  assert.equal(out.attributes.listed, false);
+  assert.deepEqual(out.relationships, []);
+});
+
+test('SSLBL malformed successful feed fails closed', async () => {
+  await assert.rejects(
+    () => sslblProvider.run({ type: 'tls-fingerprint', value: `ja3:${JA3}` }, {
+      fetchImpl: async () => response('not,a,valid,row\n'),
+      feedCache: new Map(),
+    }),
+    /invalid SSLBL JA3 feed/,
+  );
+});
+
 test('SSLBL rejects unsupported TLS fingerprint families before egress', async () => {
   let called = false;
   await assert.rejects(
