@@ -44,9 +44,10 @@ Version 1 SHALL NOT:
 - alter `src/core/model-routing.js` automatically;
 - update routing based only on public benchmark rankings;
 - execute arbitrary generated KQL against live customer tenants;
-- contain real customer data, private incidents, internal credentials, or production IOCs;
+- contain real customer data, private incidents, internal credentials, production IOCs, or corpus material derived from private customer data;
 - persist production routing telemetry;
-- run expensive live model matrices in pull-request CI.
+- run expensive live model matrices in pull-request CI;
+- support partial eval profiles. Version 1 evaluates the complete corpus listed by its manifest.
 
 These are separate trust, cost, and governance decisions and require their own design review.
 
@@ -58,9 +59,9 @@ The subsystem has four isolated layers.
 
 Path: `evals/corpus/`
 
-The corpus contains synthetic or sanitized cases only. Each case is immutable once released in a corpus version. Corrections create a new corpus version rather than silently rewriting historical test meaning.
+The official corpus contains synthetic or public information only. Private customer material is prohibited even if anonymized or sanitized. Each case is immutable once released in a corpus version. Corrections create a new corpus version rather than silently rewriting historical test meaning.
 
-Recommended layout:
+Layout:
 
 ```text
 evals/
@@ -89,15 +90,17 @@ evals/
 - weights;
 - expected scorer versions;
 - SHA-256 of each case file;
-- corpus-level hash over the canonical manifest and case hashes.
+- corpus-level hash over the canonical manifest fields and case hashes.
 
-Each case uses a stable unique `caseId` and contains only the minimum material required to score that task. Human-readable prompts or evidence may exist in cases, but all content must be synthetic, public, or irreversibly sanitized.
+Each case uses a stable unique `caseId` and contains only the minimum material required to score that task. Human-readable prompts or evidence may exist in cases, but all content must be synthetic or public.
+
+Version 1 requires a result for every case listed in the manifest. Missing cases fail validation.
 
 ### 4.2 Provider-neutral result bundle
 
 A candidate run is imported as a result bundle rather than executed by PARA11AX.
 
-Proposed top-level schema:
+Top-level schema:
 
 ```json
 {
@@ -110,7 +113,7 @@ Proposed top-level schema:
     "family": "example-family",
     "effort": "high",
     "harness": "chatgpt-host-v1",
-    "harnessVersion": "..."
+    "harnessVersion": "2026-09-13.1"
   },
   "measurements": {
     "inputTokens": 0,
@@ -128,7 +131,7 @@ Proposed top-level schema:
 }
 ```
 
-Unknown or unavailable measurements remain `null`; they are never converted to zero. Duplicate case IDs, unknown case IDs, malformed metadata, incompatible corpus IDs, or non-finite numeric values fail closed.
+Unknown or unavailable measurements remain `null`; they are never converted to zero. Duplicate case IDs, unknown case IDs, missing manifest cases, malformed metadata, incompatible corpus IDs, or non-finite numeric values fail closed.
 
 Raw candidate outputs are accepted only as evaluator input. They are never copied into aggregate telemetry or comparison summaries.
 
@@ -136,7 +139,7 @@ Raw candidate outputs are accepted only as evaluator input. They are never copie
 
 Path: `src/eval/`
 
-Suggested modules:
+Modules:
 
 ```text
 src/eval/
@@ -178,23 +181,23 @@ The evaluator produces a canonical scorecard:
 ```json
 {
   "schemaVersion": "para11ax-eval-scorecard-v1.0",
-  "corpus": {...},
-  "candidate": {...},
+  "corpus": {},
+  "candidate": {},
   "aggregate": {
     "weightedScore": 0.0,
     "hardFailures": 0,
     "scoredCases": 0,
     "humanReviewCases": 0
   },
-  "domains": {...},
-  "measurements": {...},
+  "domains": {},
+  "measurements": {},
   "scorecardHash": "sha256:..."
 }
 ```
 
 Comparison accepts a baseline scorecard and one or more candidate scorecards generated from the exact same corpus and scorer versions.
 
-Comparison MUST reject mismatched corpus versions or scorer versions unless an explicit migration/comparison policy exists.
+Comparison MUST reject mismatched corpus versions or scorer versions. Version 1 has no migration or cross-version comparison mode.
 
 A candidate is never declared globally superior from weighted score alone. The comparison reports:
 
@@ -205,7 +208,7 @@ A candidate is never declared globally superior from weighted score alone. The c
 - KQL contract regressions;
 - cost/token/latency deltas where known;
 - review requirements;
-- whether the candidate satisfies a configurable promotion gate.
+- whether the candidate satisfies the promotion gate.
 
 ## 5. Initial corpus domains
 
@@ -227,11 +230,11 @@ Metrics include:
 - unsupported-claim count;
 - contradiction count where the case encodes explicit contradictions.
 
-Unsupported critical claims can trigger a hard failure.
+Unsupported critical claims trigger a hard failure when the case marks the claim class as critical.
 
 ### 5.3 IOC vs IOA/TTP classification
 
-Uses explicit expected labels and allows only documented accepted equivalents. This catches common analytical category drift.
+Uses explicit expected labels and documented accepted equivalents. This catches analytical category drift without fuzzy semantic grading.
 
 ### 5.4 ATT&CK mapping
 
@@ -241,18 +244,18 @@ Cases use a bounded allowed technique/sub-technique set. Scoring measures precis
 
 Version 1 validates structural requirements, not execution against a live tenant.
 
-Checks can include:
+Checks include case-configured requirements for:
 
 - permitted table set;
-- forbidden dependencies such as Sysmon/watchlists when the case disallows them;
+- forbidden dependencies such as Sysmon/watchlists when disallowed;
 - required time bound;
 - expected indicator fields;
-- bounded joins/unions according to the case;
+- bounded joins/unions;
 - required projection/aggregation properties;
 - required metadata/header fields when the case asks for the PARA11AX hunting format;
-- obvious syntax/contract patterns that the repository can deterministically validate.
+- deterministic syntax/contract checks already supportable by repository logic.
 
-If later execution validation is added, it must use a controlled synthetic schema/lab rather than production telemetry.
+If later execution validation is added, it must use a controlled synthetic schema/lab rather than production telemetry and requires a separate design change.
 
 ### 5.6 Handoff and constraint retention
 
@@ -274,13 +277,13 @@ This domain evaluates harness compliance with policy, not model intelligence.
 
 ### 5.9 Coding/review
 
-Initial coding cases should be repository-shaped but compact: schema validation, reducer behavior, deterministic transformations, and review tasks with known defects.
+Initial coding cases are repository-shaped but compact: schema validation, reducer behavior, deterministic transformations, and review tasks with known defects.
 
-The v1 scorer should emphasize observable contract results and fixture outputs, not subjective style.
+The v1 scorer emphasizes observable contract results and fixture outputs, not subjective style.
 
 ## 6. Scoring and weights
 
-Initial domain weights should reflect PARA11AX operational risk rather than case count. Proposed v1 weights:
+Initial domain weights reflect PARA11AX operational risk rather than case count:
 
 - provenance / unsupported claims: 20%
 - KQL contract: 15%
@@ -296,19 +299,20 @@ Weights live in the corpus manifest and therefore change only with a corpus-vers
 
 Hard failures are tracked separately from weighted score. A model with a higher aggregate score but a critical provenance or constraint-retention hard failure must not pass promotion by arithmetic averaging.
 
-Recommended default promotion gate:
+Default promotion gate:
 
 1. no new critical hard failures;
 2. no regression greater than 2 percentage points in provenance or handoff retention;
 3. no regression greater than 3 percentage points in KQL contract score;
-4. weighted score improves by at least 2 percentage points OR materially reduces cost/token use with weighted score within 1 percentage point of baseline;
-5. required human-review cases are completed before a routing recommendation is accepted.
+4. weighted score improves by at least 2 percentage points; OR
+5. when cost or total-token measurements are available for both baseline and candidate, candidate reduces either cost or total tokens by at least 20% while weighted score is no more than 1 percentage point below baseline;
+6. every case marked `humanReview.required=true` has an explicit completed review result before promotion can pass.
 
-These thresholds are configuration in the corpus/policy, not embedded throughout scorer code.
+Thresholds are stored once in the corpus manifest/policy section and consumed by comparison logic. They are not duplicated across scorer implementations.
 
 ## 7. Privacy and data minimization
 
-The eval harness must assume candidate output may contain sensitive-looking strings even though the official corpus is synthetic.
+The eval harness must assume candidate output may contain sensitive-looking strings even though the official corpus is synthetic/public.
 
 Aggregate scorecards SHALL NOT include:
 
@@ -327,7 +331,7 @@ A privacy assertion test seeds marker strings into fixtures and proves those mar
 
 ## 8. CLI and package contract
 
-Add a deterministic CLI entry point, preferably `scripts/run-evals.mjs`, with no network access required.
+The exact CLI entry point is `scripts/run-evals.mjs`. It requires no network access.
 
 Package scripts:
 
@@ -338,23 +342,24 @@ Package scripts:
 }
 ```
 
-Expected usage:
+Usage:
 
 ```text
 npm run eval -- --results path/to/results.json
 npm run eval -- --results candidate.json --baseline baseline.json
+npm run eval -- --results candidate.json --baseline baseline.json --require-promotion
 npm run eval:verify
 ```
 
-Output defaults to concise human-readable text and supports canonical JSON output for automation.
+Output defaults to concise human-readable text and supports `--json` for canonical machine-readable output.
 
-Exit non-zero for malformed corpus, invalid result bundle, deterministic scoring failure, or failed explicit promotion gate. A merely lower candidate score should not fail unless comparison was invoked with a promotion requirement.
+Exit non-zero for malformed corpus, invalid result bundle, deterministic scoring failure, failed privacy guard, or failed `--require-promotion` gate. A valid candidate that merely scores lower does not fail unless `--require-promotion` was requested.
 
 ## 9. CI integration
 
-Initial PR CI runs only deterministic self-tests and corpus verification. It does not call external model APIs.
+The implementation PR CI runs deterministic self-tests and corpus verification only. It never calls external model APIs.
 
-Tooling smoke should eventually include:
+Tooling smoke SHALL cover:
 
 - eval unit tests;
 - corpus hash verification;
@@ -375,7 +380,7 @@ Version independently:
 
 Every scorecard records all relevant versions and hashes. A result is reproducible only if the corpus, scorer versions, evaluator code revision, and candidate result bundle are known.
 
-Canonical JSON serialization must use stable key ordering before hashing. Floating-point outputs should be normalized to a documented precision to avoid cross-runtime noise.
+Canonical JSON serialization uses recursive lexicographic object-key ordering and preserves array order only where the schema declares order significant. Case results are sorted by `caseId` before scoring and hashing. Numeric scores are rounded to six decimal places before canonical serialization and hashing.
 
 ## 11. Error handling
 
@@ -383,15 +388,15 @@ Fail closed on:
 
 - unknown schema versions;
 - duplicate IDs;
-- missing corpus cases required by the selected evaluation profile;
+- missing corpus cases;
 - corpus/hash mismatch;
 - result/corpus mismatch;
-- NaN/Infinity/negative token or latency values;
+- NaN/Infinity/negative token, cost, or latency values;
 - invalid score ranges;
 - scorer exceptions;
 - privacy-policy violations in generated scorecards.
 
-Human-review-required is not an error. It is an explicit incomplete state that blocks automatic promotion when the promotion policy requires that review.
+`humanReview.required=true` is not an evaluator error. It is an explicit incomplete-review state that blocks promotion until the review is completed.
 
 ## 12. Testing strategy
 
@@ -399,7 +404,7 @@ Implementation follows TDD. Required regression coverage includes:
 
 1. corpus manifest validates and hashes reproduce exactly;
 2. corpus mutation breaks verification;
-3. duplicate/unknown case IDs are rejected;
+3. duplicate, unknown, or missing case IDs are rejected;
 4. result metadata validation rejects malformed measurements;
 5. each domain scorer has positive, partial, and hard-failure fixtures;
 6. unsupported claims and invalid provenance references are penalized deterministically;
@@ -409,32 +414,32 @@ Implementation follows TDD. Required regression coverage includes:
 10. context budget violation and durable-item loss are detected;
 11. routing cases match the normative policy contract;
 12. same input produces byte-identical canonical scorecard JSON and hash;
-13. result ordering does not change the scorecard;
-14. scorecard contains none of the seeded privacy markers;
+13. candidate case ordering does not change the scorecard;
+14. scorecard and comparison serialization contain none of the seeded privacy markers;
 15. comparison rejects incompatible corpus/scorer versions;
 16. promotion gate cannot be passed by weighted score when a critical hard failure regresses;
 17. missing cost/latency stays `null` and never becomes zero;
-18. CLI exit codes distinguish invalid input from valid-but-not-promoted candidates.
+18. CLI exit codes distinguish invalid input, valid evaluation, and failed required promotion.
 
 ## 13. Integration with current orchestration
 
 `src/core/model-routing.js` remains the normative deterministic routing policy.
 
-The eval harness does not import production customer state or write to Mission workspaces. It may import routing helpers to test policy compliance, but it must not create a circular dependency where production routing depends on eval scorecards at runtime.
+The eval harness does not import production customer state or write to Mission workspaces. It may import routing helpers to test policy compliance, but production routing must never depend on eval scorecards at runtime.
 
-Routing updates remain reviewed source changes. A future operator may use a scorecard comparison as evidence for such a change, but the act of changing the mapping remains explicit and auditable.
+Routing updates remain reviewed source changes. An operator may use a scorecard comparison as evidence for such a change, but the act of changing the mapping remains explicit and auditable.
 
 The existing MCP `executionPlan.telemetry` remains ephemeral aggregate metadata. The eval subsystem uses its own offline run/result/scorecard contracts; production telemetry persistence is deliberately outside this design.
 
 ## 14. Deliverables
 
-The implementation phase should produce, at minimum:
+The implementation phase produces:
 
-- `evals/corpus/v1/manifest.json` and an initial compact synthetic corpus;
+- `evals/corpus/v1/manifest.json` and an initial compact synthetic/public corpus;
 - `src/eval/` schemas, canonicalization, validation, scorers, comparison, and privacy guard;
 - `scripts/run-evals.mjs`;
 - `test/eval-*.test.js` coverage;
-- synthetic golden candidate/result fixtures;
+- synthetic/public golden candidate/result fixtures;
 - package scripts;
 - `docs/PARA11AX-EVALS.md` operator documentation;
 - updates to `docs/AGENT-ORCHESTRATION.md` linking routing review to internal eval evidence.
