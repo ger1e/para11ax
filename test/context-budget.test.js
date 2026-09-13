@@ -8,15 +8,23 @@ test('token estimator is deterministic and conservative for structured text', ()
   assert.equal(estimateTokens({ a: '1234567' }), estimateTokens(JSON.stringify({ a: '1234567' })));
 });
 
-test('context planner preserves explicit output, reasoning, and safety reserves', () => {
+test('context planner reserves output once because reasoning is part of the output budget', () => {
   const plan = planContextBudget({ contextWindow: 1_000_000, maxOutputTokens: 64_000 });
   assert.equal(plan.contextWindow, 1_000_000);
   assert.equal(plan.maxOutputTokens, 64_000);
-  assert.ok(plan.reasoningReserveTokens >= 100_000);
+  assert.equal(plan.reasoningBudgetPolicy, 'inside-max-output');
   assert.ok(plan.safetyReserveTokens >= 50_000);
-  assert.equal(plan.inputBudgetTokens + plan.maxOutputTokens + plan.reasoningReserveTokens + plan.safetyReserveTokens, 1_000_000);
+  assert.equal(plan.inputBudgetTokens + plan.maxOutputTokens + plan.safetyReserveTokens, 1_000_000);
+  assert.ok(plan.inputBudgetTokens > 850_000);
   assert.ok(plan.allocations.evidence > plan.allocations.toolOutput);
   assert.ok(plan.allocations.activeWork > plan.allocations.scratch);
+});
+
+test('context planner allows explicit headroom tuning without a hidden reasoning tax', () => {
+  const plan = planContextBudget({ contextWindow: 100_000, maxOutputTokens: 10_000, safetyReserveRatio: 0.02 });
+  assert.equal(plan.safetyReserveTokens, 2_000);
+  assert.equal(plan.inputBudgetTokens, 88_000);
+  assert.equal(plan.inputBudgetTokens + plan.maxOutputTokens + plan.safetyReserveTokens, 100_000);
 });
 
 test('context selection keeps invariants and decisions before disposable tool noise', () => {
