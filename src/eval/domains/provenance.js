@@ -4,8 +4,8 @@ export const PROVENANCE_SCORER_VERSION = '1.0.0';
 
 const NO_REVIEW = Object.freeze({ required: false, fields: Object.freeze([]) });
 
-function ratio(numerator, denominator) {
-  return denominator === 0 ? 1 : numerator / denominator;
+function ratio(numerator, denominator, emptyValue = 1) {
+  return denominator === 0 ? emptyValue : numerator / denominator;
 }
 
 function finish({ score, hardFail, violations, metrics }) {
@@ -28,7 +28,17 @@ export function scoreProvenanceCase(evalCase, output) {
       score: 0,
       hardFail: true,
       violations: ['PROVENANCE_MALFORMED_OUTPUT'],
-      metrics: { supportedClaims: 0, requiredClaims: 0, unsupportedClaims: 0, invalidEvidenceRefs: 0 },
+      metrics: {
+        supportedClaims: 0,
+        requiredClaims: 0,
+        requiredClaimsPresent: 0,
+        unsupportedClaims: 0,
+        invalidEvidenceRefs: 0,
+        validCitations: 0,
+        totalCitations: 0,
+        requiredClaimRecall: 0,
+        citationPrecision: 0,
+      },
     });
   }
 
@@ -39,6 +49,8 @@ export function scoreProvenanceCase(evalCase, output) {
   let supportedClaims = 0;
   let invalidEvidenceRefs = 0;
   let unsupportedClaims = 0;
+  let validCitations = 0;
+  let totalCitations = 0;
   let hardFail = false;
 
   for (const claim of output.claims) {
@@ -48,7 +60,17 @@ export function scoreProvenanceCase(evalCase, output) {
         score: 0,
         hardFail: true,
         violations: ['PROVENANCE_MALFORMED_OUTPUT'],
-        metrics: { supportedClaims: 0, requiredClaims: expectedClaims.filter(item => item.required).length, unsupportedClaims: 0, invalidEvidenceRefs: 0 },
+        metrics: {
+          supportedClaims: 0,
+          requiredClaims: expectedClaims.filter(item => item.required).length,
+          requiredClaimsPresent: 0,
+          unsupportedClaims: 0,
+          invalidEvidenceRefs: 0,
+          validCitations: 0,
+          totalCitations: 0,
+          requiredClaimRecall: 0,
+          citationPrecision: 0,
+        },
       });
     }
     if (seen.has(claim.claimId)) {
@@ -57,6 +79,8 @@ export function scoreProvenanceCase(evalCase, output) {
     }
     seen.add(claim.claimId);
 
+    const uniqueEvidence = [...new Set(claim.evidenceIds)];
+    totalCitations += uniqueEvidence.length;
     const rule = expected.get(claim.claimId);
     if (!rule) {
       unsupportedClaims += 1;
@@ -70,11 +94,15 @@ export function scoreProvenanceCase(evalCase, output) {
     }
 
     const allowed = new Set(rule.allowedEvidenceIds);
-    const uniqueEvidence = [...new Set(claim.evidenceIds)];
+    const valid = uniqueEvidence.filter(id => allowed.has(id));
     const invalid = uniqueEvidence.filter(id => !allowed.has(id));
+    validCitations += valid.length;
     for (const evidenceId of invalid) {
       violations.push(`PROVENANCE_INVALID_EVIDENCE_REF:${claim.claimId}:${evidenceId}`);
       invalidEvidenceRefs += 1;
+    }
+    if (uniqueEvidence.length === 0 && rule.required) {
+      violations.push(`PROVENANCE_MISSING_CITATION:${claim.claimId}`);
     }
     const supported = uniqueEvidence.length > 0 && invalid.length === 0;
     if (supported) supportedClaims += 1;
@@ -85,17 +113,18 @@ export function scoreProvenanceCase(evalCase, output) {
   }
 
   const required = expectedClaims.filter(claim => claim.required);
+  let requiredClaimsPresent = 0;
   for (const claim of required) {
-    if (!seen.has(claim.claimId)) {
+    if (seen.has(claim.claimId)) requiredClaimsPresent += 1;
+    else {
       violations.push(`PROVENANCE_MISSING_REQUIRED_CLAIM:${claim.claimId}`);
       if (claim.critical) hardFail = true;
     }
   }
 
-  const candidateCount = new Set(output.claims.map(claim => claim?.claimId).filter(id => typeof id === 'string')).size;
-  const precision = ratio(supportedClaims, candidateCount);
-  const recall = ratio(supportedClaims, required.length);
-  const score = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
+  const requiredClaimRecall = ratio(requiredClaimsPresent, required.length);
+  const citationPrecision = ratio(validCitations, totalCitations, required.length === 0 ? 1 : 0);
+  const score = requiredClaimRecall * citationPrecision;
 
   return finish({
     score,
@@ -104,10 +133,13 @@ export function scoreProvenanceCase(evalCase, output) {
     metrics: {
       supportedClaims,
       requiredClaims: required.length,
+      requiredClaimsPresent,
       unsupportedClaims,
       invalidEvidenceRefs,
-      precision: roundScore(precision),
-      recall: roundScore(recall),
+      validCitations,
+      totalCitations,
+      requiredClaimRecall: roundScore(requiredClaimRecall),
+      citationPrecision: roundScore(citationPrecision),
     },
   });
 }
