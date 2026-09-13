@@ -50,16 +50,17 @@ test('canonical provider manifest has exactly one complete policy for every acti
   }
 });
 
-test('provider secret inventory remains exact while User Scanner integration config stays explicit', () => {
+test('provider secret inventory remains exact while non-secret integration config stays explicit', () => {
   const providerNames = [...providerSecretNames()].sort();
   assert.deepEqual(providerNames, [...new Set(providerNames)].sort());
   assert.equal(providerNames.includes('PARA11AX_TOKEN'), false);
   assert.equal(providerNames.includes('SENTRY_AUTH_TOKEN'), false);
+  assert.equal(providerNames.includes('CENSYS_ORG_ID'), false);
   assert.equal(providerNames.some(name => name.startsWith('PARA11AX_USER_SCANNER_')), false);
   for (const name of providerNames) assert.match(name, /^[A-Z0-9_]+$/);
 
   const providerAndGateway = ['PARA11AX_TOKEN', ...providerNames, 'SENTRY_AUTH_TOKEN'].sort();
-  const integrationConfig = ['PARA11AX_USER_SCANNER_URL', 'PARA11AX_USER_SCANNER_TOKEN'].sort();
+  const integrationConfig = ['CENSYS_ORG_ID', 'PARA11AX_USER_SCANNER_URL', 'PARA11AX_USER_SCANNER_TOKEN'].sort();
   const envNames = text('.env.example').split(/\r?\n/).filter(line => /^[A-Z0-9_]+=$/.test(line)).map(line => line.slice(0, -1)).sort();
   assert.deepEqual(envNames, [...providerAndGateway, ...integrationConfig].sort());
 
