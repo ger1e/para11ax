@@ -31,6 +31,8 @@ Rules:
 6. After context reset, reconstruct from canonical state plus just-in-time retrieval, never conversational memory.
 7. Do not declare completion from context alone. Re-check objective, next actions, artifacts, and external verification.
 
+The SHA-256 checkpoint/handoff hashes detect accidental or out-of-band mutation only when the expected checkpoint is trusted. They are not signatures and do not authenticate state against an actor able to rewrite the payload and recompute hashes. If adversarial state tampering is in scope, bind checkpoints to an external trust anchor with a signature or keyed MAC and keep the signing key outside agent-controlled state.
+
 Anthropic's context-engineering guidance independently recommends high-signal context, just-in-time retrieval, clearing stale tool results, and preserving important decisions. Its long-running-agent work found compaction alone insufficient and used persistent progress plus git history for recoverable fresh sessions.
 
 Sources:
