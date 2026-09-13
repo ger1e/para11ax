@@ -49,7 +49,7 @@ IDENTITY-OSINT.md
 | Document | Purpose |
 | --- | --- |
 | [`EVIDENCE-SCHEMA.md`](EVIDENCE-SCHEMA.md) | Evidence v2 authority, semantic classes, provenance, graph/guidance boundaries and absence/failure semantics. |
-| [`PROVIDERS.md`](PROVIDERS.md) | Canonical 38-source provider fabric, workflow admission and scheduler metadata. |
+| [`PROVIDERS.md`](PROVIDERS.md) | Canonical 43-capability / 39-upstream-service provider fabric, workflow admission and scheduler metadata. |
 | [`END-TO-END-EXAMPLE.md`](END-TO-END-EXAMPLE.md) | Worked enrichment/analysis example through the deterministic evidence path. |
 | [`ANALYST-MISSION-PACK.md`](ANALYST-MISSION-PACK.md) | Client relevance → hunt → KQL validation → result analysis → ServiceNow-ready projection. |
 
