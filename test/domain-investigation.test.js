@@ -50,7 +50,7 @@ function evidence({
 
 function enrichment(items = []) {
   return {
-    schemaVersion: 'evidence-v2.0',
+    schemaVersion: '2.0',
     gatewayVersion: 'test',
     requestId: 'req-domain-investigation',
     indicator: 'suspicious.example',
