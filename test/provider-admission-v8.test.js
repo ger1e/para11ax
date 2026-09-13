@@ -48,10 +48,12 @@ const EXPECTED = Object.freeze({
   tweetfeed: ['community', 'near_real_time'],
   ransomlook: ['contextual', 'near_real_time'],
   'ransomware-live': ['contextual', 'near_real_time'],
+  vulncheck: ['first_party', 'near_real_time'],
+  'deps-dev': ['first_party', 'near_real_time'],
 });
 
-test('all 43 canonical provider capabilities have the approved v8 source and execution admission semantics', () => {
-  assert.equal(Object.keys(PROVIDER_MANIFEST).length, 43);
+test('all 45 canonical provider capabilities have the approved v8 source and execution admission semantics', () => {
+  assert.equal(Object.keys(PROVIDER_MANIFEST).length, 45);
   assert.deepEqual(Object.keys(PROVIDER_MANIFEST).sort(), Object.keys(EXPECTED).sort());
   for (const [name, [sourceRole, freshnessClass]] of Object.entries(EXPECTED)) {
     const policy = PROVIDER_MANIFEST[name];
@@ -63,7 +65,7 @@ test('all 43 canonical provider capabilities have the approved v8 source and exe
 });
 
 test('runtime adapters project exactly the canonical v8 admission metadata', () => {
-  assert.equal(ALL_PROVIDERS.length, 43);
+  assert.equal(ALL_PROVIDERS.length, 45);
   for (const provider of ALL_PROVIDERS) {
     const policy = PROVIDER_MANIFEST[provider.name];
     assert.equal(provider.sourceRole, policy.sourceRole, `${provider.name}.sourceRole`);
