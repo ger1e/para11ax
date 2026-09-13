@@ -30,6 +30,7 @@ $SecretNames = @(
     'OTX_API_KEY',
     'SHODAN_API_KEY',
     'CENSYS_PAT',
+    'VULNCHECK_API_TOKEN',
     'PULSEDIVE_API_KEY',
     'IPINFO_TOKEN',
     'MALPEDIA_API_TOKEN',
