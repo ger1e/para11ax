@@ -1,3 +1,6 @@
+<!-- PARA11AX-DOC-STANDARD: GER1E/PARA11AX v1 -->
+> **Document status:** Historical design record. Preserved for implementation history; current behavior is defined by [docs/ARCHITECTURE.md](https://github.com/ger1e/para11ax/blob/main/docs/ARCHITECTURE.md) and the current README.
+
 # PARA11AX Intelligence Fabric Gap-Closure Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -206,3 +209,7 @@ git commit -m "test: bound expanded provider registry"
 - Rich Spamhaus and IBM X-Force are represented separately from existing public providers and remain optional/unconfigured without credentials.
 - Provider-count strategy now has an explicit red/green invariant and a reviewed finite ceiling.
 - No new task relaxes the fixed-host, read-only-by-default, authorization, distribution, or Evidence v2 requirements from the approved spec.
+
+---
+
+<p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
