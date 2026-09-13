@@ -224,7 +224,7 @@ test('MCP discovery is public while every tool declares OAuth and calls trigger 
   const handle = createMcpHttpHandler({ env: { PARA11AX_TOKEN: SECRET }, nowMs: () => NOW_MS });
   const listed = await handle(mcpRequest('tools/list'));
   assert.equal(listed.status, 200);
-  assert.equal(listed.body.result.tools.length, 13);
+  assert.equal(listed.body.result.tools.length, 14);
   for (const tool of listed.body.result.tools) {
     assert.deepEqual(tool.securitySchemes, [{ type: 'oauth2', scopes: [MCP_OAUTH_SCOPE] }]);
   }
@@ -245,7 +245,7 @@ test('MCP accepts both scoped OAuth access tokens and the existing gateway beare
     }, token));
     assert.equal(result.status, 200);
     assert.equal(result.body.result.isError, false);
-    assert.equal(result.body.result.structuredContent.tools.length, 13);
+    assert.equal(result.body.result.structuredContent.tools.length, 14);
   }
 });
 

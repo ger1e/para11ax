@@ -37,6 +37,10 @@ const TOOL_METADATA = Object.freeze({
     description: 'Use this when you need the stateless mission, hunt, KQL-validation, result-analysis, or ServiceNow-projection workflow with explicit workspace state passed in and returned on every call.',
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
   },
+  para11ax_domain_investigation: {
+    description: 'Use this when you need a passive suspicious-domain investigation with explicit client-carried state, bounded authorized operator-context imports, deterministic report/STIX/handoff output, and no hosted active scanning.',
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
+  },
   para11ax_investigation: {
     description: 'Use this when you need to create, inspect, mutate, report, import, or export an Investigation Workspace v2 using explicit state-in and state-out rather than hidden server persistence.',
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },

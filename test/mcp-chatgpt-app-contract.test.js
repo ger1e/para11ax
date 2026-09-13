@@ -42,7 +42,7 @@ async function listedTools() {
 
 test('ChatGPT-facing MCP tools expose explicit routing descriptions and behavior annotations', async () => {
   const tools = await listedTools();
-  assert.equal(tools.length, 13);
+  assert.equal(tools.length, 14);
 
   for (const tool of tools) {
     assert.match(tool.description, /^Use this when\b/, `${tool.name} description must start with a routing cue`);
