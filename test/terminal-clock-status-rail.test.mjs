@@ -27,8 +27,8 @@ test('Gateway Terminal retains semantic footer telemetry as a compatibility hook
   const finalCss = await read('app/analyst-deck.css');
   assert.match(polish, /shell-footer/);
   assert.match(polish, /PARA11AX \/\/ CTI ENRICHMENT/);
-  assert.match(polish, /CTI ENRICHMENT · 38 SRC/);
-  assert.match(polish, /38 SOURCES/);
+  assert.match(polish, /CTI ENRICHMENT · 39 SRC/);
+  assert.match(polish, /39 SOURCES/);
   assert.match(polish, /EVIDENCE v2/);
   assert.match(polish, /READ ONLY/);
   assert.match(polish, /shell-footer-led/);
