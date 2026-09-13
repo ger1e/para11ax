@@ -4,6 +4,7 @@ import { createShodanCommandHandler } from '../shodan-command.js';
 import { createUserScannerHandler } from '../user-scanner.js';
 import { createGreyNoiseSwarmCommandHandler } from '../greynoise-swarm-command.js';
 import { executeMissionCommand } from '../core/mission/command-adapter.js';
+import { buildAgentExecutionPlan } from '../core/agent-execution-plan.js';
 import {
   createInvestigation,
   deriveInvestigationStatus,
@@ -171,7 +172,7 @@ const TOOLS = Object.freeze([
   {
     name: 'para11ax_mission',
     title: 'PARA11AX mission workflow',
-    description: 'Operate the complete mission/hunt/KQL workflow using an explicit workspace handle returned on every call.',
+    description: 'Operate the mission/hunt/KQL workflow with explicit portable workspace state plus an ephemeral host execution plan on every successful call.',
     inputSchema: schema({
       operation: string('Mission operation.', { enum: ['new', 'show', 'profile_set', 'context_set', 'relevance', 'hunt_build', 'kql_validate', 'result_analyze', 'servicenow', 'export', 'import', 'clear'] }),
       workspace: object('Existing mission workspace for stateful operations.'),
@@ -389,7 +390,11 @@ async function runMission(args) {
     workspace: args.workspace ?? null,
     loadContent: async () => content,
   });
-  return { workspace: outcome.workspace, output: outcome.output };
+  return {
+    workspace: outcome.workspace,
+    output: outcome.output,
+    executionPlan: buildAgentExecutionPlan(outcome.workspace),
+  };
 }
 
 function runInvestigation(args, now) {
