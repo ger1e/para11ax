@@ -3,6 +3,7 @@ import { authorizeCapability } from './intelligence-policy.js';
 import { rankProvidersForExecution } from './provider-priority.js';
 import { runProvider } from './provider-runner.js';
 import { normalizeEvidence } from './normalize.js';
+import { cidrContains, parseCanonicalCidr, parseIp } from './network.js';
 
 const MAX_DIRECT_PROVIDERS = 4;
 const NEGATIVE_VERDICTS = new Set(['not_listed','not_found','no_result','no_association','clean','benign']);
@@ -29,11 +30,31 @@ function cacheAllowed(adapter) {
   return adapter?.retentionClass !== 'no_store';
 }
 
+function requiredCredentialEnvs(adapter) {
+  if (Array.isArray(adapter?.requiredEnvs) && adapter.requiredEnvs.length) return adapter.requiredEnvs;
+  return adapter?.requiredEnv ? [adapter.requiredEnv] : [];
+}
+
 function providerState(adapter, env) {
   if (!adapter) return 'missing';
   if (adapter.active === false) return 'inactive';
-  if (adapter.requiredEnv && !env?.[adapter.requiredEnv]) return 'unconfigured';
+  if (requiredCredentialEnvs(adapter).some(name => !env?.[name])) return 'unconfigured';
   return 'configured';
+}
+
+function ownedNetworkContainsSubject(subject, authz) {
+  if (!Array.isArray(authz?.ownedCidrs) || authz.ownedCidrs.length === 0) return false;
+  if (subject?.type === 'cidr') {
+    const requested = parseCanonicalCidr(subject.value);
+    return Boolean(requested) && authz.ownedCidrs.some(scope => cidrContains(scope, requested));
+  }
+  if (subject?.type === 'ip') {
+    const parsed = parseIp(subject.value);
+    if (!parsed) return false;
+    const host = { ...parsed, prefix: parsed.bits };
+    return authz.ownedCidrs.some(scope => cidrContains(scope, host));
+  }
+  return false;
 }
 
 async function runUsernameSearch({ operation, mode, subject, env, nowMs, context }) {
@@ -112,6 +133,10 @@ export async function runIntelligenceMode({
     const decision = authorizeCapability({ adapter, requestedMode: mode, authz });
     if (!decision.allowed) {
       denied.push(Object.freeze({ provider: adapter.name, reason: decision.reason }));
+      continue;
+    }
+    if (adapter.authorization === 'owned_network' && !ownedNetworkContainsSubject(subject, authz)) {
+      denied.push(Object.freeze({ provider: adapter.name, reason: 'owned_network_scope_mismatch' }));
       continue;
     }
     selected.push(adapter);
