@@ -189,6 +189,11 @@
       "active": true
     },
     {
+      "name": "shadowserver",
+      "parserVersion": "reports-query-2026-09-13.1",
+      "active": true
+    },
+    {
       "name": "spamhaus-drop",
       "parserVersion": "2026-08-21.2",
       "active": true
