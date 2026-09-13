@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { egressPolicyForAdapter, safeFetch } from './egress.js';
+import { hasProviderExecutionAuthorization } from './execution-authorization.js';
 
 function hashRaw(data) {
   return createHash('sha256').update(JSON.stringify(data)).digest('hex');
@@ -22,8 +23,15 @@ export async function runProvider(adapter, input, {
   telemetry = null,
   context = {},
 } = {}) {
-  const controller = new AbortController();
   const started = nowMs();
+  if (adapter?.authorization && adapter.authorization !== 'none'
+      && !hasProviderExecutionAuthorization(context.executionAuthorization, adapter, input)) {
+    const failure = { reason: 'authorization_required' };
+    telemetry?.emit?.({ event: 'provider_complete', requestId, type: input?.type, provider: adapter?.name, status: 'failed', reason: failure.reason, durationMs: 0 });
+    return { ok: false, provider: adapter?.name, failure, retrievedAt: now(), durationMs: 0 };
+  }
+
+  const controller = new AbortController();
   let timedOut = false;
   const timer = setTimeout(() => {
     timedOut = true;
