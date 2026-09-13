@@ -7,6 +7,7 @@ import {
   createMissionWorkspace,
   reduceMissionWorkspace,
 } from '../src/core/mission/workspace.js';
+import { createMcpHttpHandler } from '../src/mcp/server.js';
 
 const profileInput = {
   id: 'ultraviolet',
@@ -92,4 +93,45 @@ test('Mission MCP host path attaches the execution plan instead of leaving polic
   const source = readFileSync(new URL('../src/mcp/server.js', import.meta.url), 'utf8');
   assert.match(source, /import\s*\{\s*buildAgentExecutionPlan\s*\}\s*from\s*['"]\.\.\/core\/agent-execution-plan\.js['"]/);
   assert.match(source, /executionPlan\s*:\s*buildAgentExecutionPlan\(/);
+});
+
+test('Mission MCP request returns portable workspace plus ephemeral execution plan', async () => {
+  const token = 'agent-execution-plan-test-token';
+  const handleMcp = createMcpHttpHandler({
+    env: { PARA11AX_TOKEN: token },
+  });
+  const response = await handleMcp({
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    },
+    body: {
+      jsonrpc: '2.0',
+      id: 'mission-plan-contract',
+      method: 'tools/call',
+      params: {
+        name: 'para11ax_mission',
+        arguments: { operation: 'new' },
+      },
+    },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.jsonrpc, '2.0');
+  assert.equal(response.body.id, 'mission-plan-contract');
+  assert.equal(response.body.result.isError, false);
+
+  const payload = response.body.result.structuredContent;
+  assert.ok(payload.workspace);
+  assert.equal(typeof payload.output, 'string');
+  assert.equal(payload.executionPlan.schemaVersion, 'para11ax-agent-execution-plan-v1.0');
+  assert.equal(payload.executionPlan.route.taskClass, 'security_analysis');
+  assert.equal(payload.executionPlan.route.tier, 'frontier');
+  assert.equal(payload.executionPlan.route.reasoningEffort, 'high');
+  assert.ok(payload.executionPlan.context.selectedIds.includes('mission-handoff'));
+  assert.ok(payload.executionPlan.budget.selectedTokens <= payload.executionPlan.budget.inputBudgetTokens);
+
+  const textPayload = JSON.parse(response.body.result.content[0].text);
+  assert.deepEqual(textPayload, payload);
 });
