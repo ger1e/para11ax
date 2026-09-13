@@ -36,6 +36,11 @@ const base = {
   retentionClass: 'normal',
 };
 
+const MODES = new Set(['enrich', 'graph', 'search', 'monitor', 'analysis', 'knowledge', 'sensitive']);
+const SENSITIVITY = new Set(['public', 'owned_asset', 'pii', 'credential', 'secret', 'sample']);
+const AUTHORIZATION = new Set(['none', 'tenant', 'verified_domain', 'owned_network', 'explicit_case', 'explicit_action']);
+const RETENTION = new Set(['normal', 'restricted', 'ephemeral', 'no_store']);
+
 test('accepts validated intelligence capability policy', () => {
   const policy = validateIntelligenceProviderPolicy('fixture', base);
   assert.equal(policy.mode, 'enrich');
@@ -75,10 +80,26 @@ test('validates optional graph bounds', () => {
 
 test('every registered provider has a deterministic capability policy', () => {
   for (const [name, policy] of Object.entries(INTELLIGENCE_PROVIDER_MANIFEST)) {
-    assert.equal(typeof policy.mode, 'string', `${name}.mode`);
+    assert.ok(MODES.has(policy.mode), `${name}.mode`);
     assert.equal(typeof policy.fanoutEligible, 'boolean', `${name}.fanoutEligible`);
-    assert.equal(policy.sensitivity, 'public', `${name}.sensitivity`);
-    assert.equal(policy.authorization, 'none', `${name}.authorization`);
-    assert.equal(typeof policy.retentionClass, 'string', `${name}.retentionClass`);
+    assert.ok(SENSITIVITY.has(policy.sensitivity), `${name}.sensitivity`);
+    assert.ok(AUTHORIZATION.has(policy.authorization), `${name}.authorization`);
+    assert.ok(RETENTION.has(policy.retentionClass), `${name}.retentionClass`);
+    if (policy.fanoutEligible) {
+      assert.equal(policy.mode, 'enrich', `${name}.fanoutEligible mode`);
+      assert.equal(policy.sensitivity, 'public', `${name}.fanoutEligible sensitivity`);
+      assert.equal(policy.authorization, 'none', `${name}.fanoutEligible authorization`);
+    }
   }
+});
+
+test('GitGuardian HMSL remains explicit no-store secret-sensitive capability', () => {
+  const policy = INTELLIGENCE_PROVIDER_MANIFEST['gitguardian-hmsl'];
+  assert.ok(policy);
+  assert.equal(policy.mode, 'graph');
+  assert.equal(policy.fanoutEligible, false);
+  assert.equal(policy.sensitivity, 'secret');
+  assert.equal(policy.authorization, 'explicit_case');
+  assert.equal(policy.retentionClass, 'no_store');
+  assert.equal(policy.distribution, 'internal_only');
 });
