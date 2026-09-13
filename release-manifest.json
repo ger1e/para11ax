@@ -59,6 +59,11 @@
       "active": true
     },
     {
+      "name": "deps-dev",
+      "parserVersion": "v3-supply-chain-2026-09-13.1",
+      "active": true
+    },
+    {
       "name": "dshield",
       "parserVersion": "2026-08-20",
       "active": true
@@ -211,6 +216,11 @@
     {
       "name": "virustotal-graph",
       "parserVersion": "v3-2026-09-13.1",
+      "active": true
+    },
+    {
+      "name": "vulncheck",
+      "parserVersion": "v3-exploits-2026-09-13.1",
       "active": true
     },
     {
