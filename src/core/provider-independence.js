@@ -103,7 +103,16 @@ export function createProviderIndependenceRegistry(entries = []) {
   });
 }
 
-export function resolveProviderIndependence(provider, registry = createProviderIndependenceRegistry()) {
+export const DEFAULT_PROVIDER_INDEPENDENCE_ENTRIES = Object.freeze([
+  Object.freeze({ provider: 'virustotal', independenceGroup: 'google-virustotal', lineageConfidence: 'confirmed', basis: 'maintained_mapping', references: [], updatedAt: '2026-09-13T00:00:00.000Z' }),
+  Object.freeze({ provider: 'urlhaus', independenceGroup: 'abuse-ch', lineageConfidence: 'confirmed', basis: 'maintained_mapping', references: [], updatedAt: '2026-09-13T00:00:00.000Z' }),
+  Object.freeze({ provider: 'otx', independenceGroup: 'levelblue-otx', lineageConfidence: 'confirmed', basis: 'maintained_mapping', references: [], updatedAt: '2026-09-13T00:00:00.000Z' }),
+  Object.freeze({ provider: 'openphish', independenceGroup: 'openphish', lineageConfidence: 'confirmed', basis: 'maintained_mapping', references: [], updatedAt: '2026-09-13T00:00:00.000Z' }),
+]);
+
+export const DEFAULT_PROVIDER_INDEPENDENCE_REGISTRY = createProviderIndependenceRegistry(DEFAULT_PROVIDER_INDEPENDENCE_ENTRIES);
+
+export function resolveProviderIndependence(provider, registry = DEFAULT_PROVIDER_INDEPENDENCE_REGISTRY) {
   const normalizedProvider = boundedText(provider, 'provider');
   if (!registry || registry.version !== 'provider-independence-v1.0' || !Array.isArray(registry.entries)) {
     throw new TypeError('registry must be a provider-independence-v1.0 registry');
@@ -121,7 +130,7 @@ export function resolveProviderIndependence(provider, registry = createProviderI
   });
 }
 
-export function summarizeProviderIndependence(providers = [], registry = createProviderIndependenceRegistry()) {
+export function summarizeProviderIndependence(providers = [], registry = DEFAULT_PROVIDER_INDEPENDENCE_REGISTRY) {
   if (!Array.isArray(providers) || providers.length > MAX_ENTRIES) {
     throw new TypeError(`providers must be an array of at most ${MAX_ENTRIES} values`);
   }
