@@ -152,7 +152,7 @@ test('pending or failed required human review blocks promotion; completed pass p
 });
 
 test('quality path passes only at the manifest minimum improvement threshold', () => {
-  const baseline = score('baseline-v1.json');
+  const baseline = compatibleCandidate();
   baseline.aggregate.weightedScore = 0.9;
   const candidate = clone(baseline);
   candidate.aggregate.weightedScore = 0.92;
