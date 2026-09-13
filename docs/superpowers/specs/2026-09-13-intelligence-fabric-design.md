@@ -1,10 +1,10 @@
 <!-- PARA11AX-DOC-STANDARD: GER1E/PARA11AX v1 -->
-> **Document status:** Architecture approved in chat; written specification pending final user review. Current production behavior remains authoritative until this design is implemented, reviewed, merged, deployed, and verified.
+> **Document status:** Historical design record. Preserved for implementation history; current behavior is defined by [docs/ARCHITECTURE.md](https://github.com/ger1e/para11ax/blob/main/docs/ARCHITECTURE.md) and the current README.
 
 # PARA11AX Intelligence Fabric Design
 
 Date: 2026-09-13
-Status: architecture approved; written spec pending review
+Status: historical design record
 Base commit: `dc1445b0596bda6833ae1c2fe6cf78b16ce4bcc5`
 Branch: `intelligence-fabric-20260913`
 
@@ -314,3 +314,7 @@ The design is implemented when:
 ## Final principle
 
 PARA11AX maximizes information gain per provider call, not provider count. All useful API candidates may be represented as capabilities, but only the semantically appropriate subset executes for a given observable, intent, authorization context, quota budget, and evidence gap.
+
+---
+
+<p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
