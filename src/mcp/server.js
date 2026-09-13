@@ -434,7 +434,7 @@ export function createMcpHttpHandler({
       throw new Error('unsupported capabilities view');
     }
     if (name === 'para11ax_enrich') return { enrichment: await unwrap(app.handleEnrich(innerRequest(env, { indicator: args.indicator, ...(args.type ? { type: args.type } : {}), ...(args.profile ? { profile: args.profile } : {}) }))) };
-    if (name === 'para11ax_intelligence') return { intelligence: await unwrap(app.handleIntelligence(innerRequest(env, { operation: args.operation, indicator: args.indicator, ...(args.type ? { type: args.type } : {}), ...(args.profile ? { profile: args.profile } : {}) }))) };
+    if (name === 'para11ax_intelligence') return { intelligence: await unwrap(app.handleIntelligence(innerRequest(env, { operation: args.operation, indicator: args.indicator, ...(args.type ? { type: args.type } : {}), ...(args.profile ? { profile: args.profile } : {}) }, 'POST', sourceRequest))) };
     if (name === 'para11ax_batch') return { batch: await unwrap(app.handleBatch(innerRequest(env, { indicators: args.indicators, ...(args.profile ? { profile: args.profile } : {}) }))) };
     if (name === 'para11ax_provider') return { enrichment: await unwrap(app.handleProvider(innerRequest(env, { provider: args.provider, indicator: args.indicator, ...(args.type ? { type: args.type } : {}) }))) };
     if (name === 'para11ax_stix') return { bundle: await unwrap(app.handleStix(innerRequest(env, { indicator: args.indicator, ...(args.type ? { type: args.type } : {}), ...(args.profile ? { profile: args.profile } : {}) }))) };
