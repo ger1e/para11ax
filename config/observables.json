@@ -70,5 +70,61 @@
     "maxLength": 64,
     "stixExport": "unsupported",
     "active": true
+  },
+  "email": {
+    "displayName": "Email address",
+    "category": "identity",
+    "canonicalization": "email",
+    "maxLength": 254,
+    "stixExport": "unsupported",
+    "active": true
+  },
+  "package": {
+    "displayName": "Package URL",
+    "category": "supply_chain",
+    "canonicalization": "purl",
+    "maxLength": 1024,
+    "stixExport": "unsupported",
+    "active": true
+  },
+  "tls-fingerprint": {
+    "displayName": "TLS fingerprint",
+    "category": "infrastructure",
+    "canonicalization": "tls-fingerprint",
+    "maxLength": 128,
+    "stixExport": "unsupported",
+    "active": true
+  },
+  "crypto-address": {
+    "displayName": "Cryptocurrency address",
+    "category": "financial_context",
+    "canonicalization": "crypto-address",
+    "maxLength": 128,
+    "stixExport": "unsupported",
+    "active": true
+  },
+  "secret-fingerprint": {
+    "displayName": "Privacy-preserving secret fingerprint",
+    "category": "artifact",
+    "canonicalization": "secret-fingerprint",
+    "maxLength": 96,
+    "stixExport": "unsupported",
+    "active": true
+  },
+  "legal-entity": {
+    "displayName": "Legal entity identifier",
+    "category": "identity",
+    "canonicalization": "legal-entity",
+    "maxLength": 80,
+    "stixExport": "unsupported",
+    "active": true
+  },
+  "username": {
+    "displayName": "Username",
+    "category": "identity",
+    "canonicalization": "username",
+    "maxLength": 80,
+    "stixExport": "unsupported",
+    "active": true
   }
 }
