@@ -13,19 +13,19 @@ const COVERAGE_OBSERVATION_TYPES = Object.freeze({
 const GRAPH_PAGE_LIMIT = 20;
 const GRAPH_SPECS = Object.freeze({
   domain: Object.freeze([
-    Object.freeze({ name: 'resolutions', targetType: 'ip', relationship: 'resolves_to', value: item => item?.attributes?.ip_address }),
-    Object.freeze({ name: 'communicating_files', targetType: 'hash', relationship: 'communicating_file', value: item => item?.id }),
-    Object.freeze({ name: 'historical_ssl_certificates', targetType: 'certificate', relationship: 'historical_ssl_certificate', value: item => item?.id ? `cert-sha256:${item.id}` : null }),
+    Object.freeze({ name: 'resolutions', itemType: 'resolution', targetType: 'ip', relationship: 'resolves_to', value: item => item?.attributes?.ip_address }),
+    Object.freeze({ name: 'communicating_files', itemType: 'file', targetType: 'hash', relationship: 'communicating_file', value: item => item?.id }),
+    Object.freeze({ name: 'historical_ssl_certificates', itemType: 'ssl_cert', targetType: 'certificate', relationship: 'historical_ssl_certificate', value: item => item?.id ? `cert-sha256:${item.id}` : null }),
   ]),
   ip: Object.freeze([
-    Object.freeze({ name: 'resolutions', targetType: 'domain', relationship: 'resolved_domain', value: item => item?.attributes?.host_name }),
-    Object.freeze({ name: 'communicating_files', targetType: 'hash', relationship: 'communicating_file', value: item => item?.id }),
-    Object.freeze({ name: 'historical_ssl_certificates', targetType: 'certificate', relationship: 'historical_ssl_certificate', value: item => item?.id ? `cert-sha256:${item.id}` : null }),
+    Object.freeze({ name: 'resolutions', itemType: 'resolution', targetType: 'domain', relationship: 'resolved_domain', value: item => item?.attributes?.host_name }),
+    Object.freeze({ name: 'communicating_files', itemType: 'file', targetType: 'hash', relationship: 'communicating_file', value: item => item?.id }),
+    Object.freeze({ name: 'historical_ssl_certificates', itemType: 'ssl_cert', targetType: 'certificate', relationship: 'historical_ssl_certificate', value: item => item?.id ? `cert-sha256:${item.id}` : null }),
   ]),
   hash: Object.freeze([
-    Object.freeze({ name: 'contacted_domains', targetType: 'domain', relationship: 'contacted_domain', value: item => item?.id }),
-    Object.freeze({ name: 'contacted_ips', targetType: 'ip', relationship: 'contacted_ip', value: item => item?.id }),
-    Object.freeze({ name: 'contacted_urls', targetType: 'url', relationship: 'contacted_url', value: item => item?.attributes?.url }),
+    Object.freeze({ name: 'contacted_domains', itemType: 'domain', targetType: 'domain', relationship: 'contacted_domain', value: item => item?.id }),
+    Object.freeze({ name: 'contacted_ips', itemType: 'ip_address', targetType: 'ip', relationship: 'contacted_ip', value: item => item?.id }),
+    Object.freeze({ name: 'contacted_urls', itemType: 'url', targetType: 'url', relationship: 'contacted_url', value: item => item?.attributes?.url }),
   ]),
 });
 
@@ -105,6 +105,7 @@ function schemaInvalid() {
 }
 
 function canonicalRelationship(spec, item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item) || item.type !== spec.itemType) return null;
   const raw = spec.value(item);
   if (typeof raw !== 'string' || !raw.trim() || /[<>]/.test(raw)) return null;
   try {
