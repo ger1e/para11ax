@@ -71,17 +71,20 @@ OpenAI token-accounting reference:
 
 ## 3. Vendor-neutral routing
 
-`src/core/model-routing.js` routes by task properties, not model brand.
+`src/core/model-routing.js` routes by task properties, not model brand. Task/risk enums are shared with canonical agent state through `src/core/agent-policy.js` so routing and persisted state cannot silently diverge.
 
-| Task class | Tier | Effort | Review |
-| --- | --- | --- | --- |
-| simple transform / formatting | economy | low | no |
-| routine research / analysis | balanced | medium | risk-dependent |
-| coding / debugging | frontier | high | high-risk/repeated failure |
-| security analysis | frontier | high | different-family reviewer when high risk |
-| long-context synthesis | frontier | high | risk-dependent |
-| deep reasoning | frontier_max | max | independent |
-| explicit review | frontier | high | different family |
+| Task class | Tier | Effort | Specialist hint | Review |
+| --- | --- | --- | --- | --- |
+| simple transform / formatting | economy | low | none | no |
+| routine research / analysis | balanced | medium | none | risk-dependent |
+| coding / debugging | frontier | high | none | high-risk/repeated failure |
+| security analysis / CTI / IR | frontier | high | none | different-family reviewer when high risk |
+| authorized advanced vulnerability research / exploit validation | frontier_max | max | cyber | independent different-family |
+| long-context synthesis | frontier | high | none | risk-dependent |
+| deep reasoning | frontier_max | max | none | independent |
+| explicit review | frontier | high | none | different family |
+
+`specialistHint` is advisory. `rankModelCandidates()` can require a specialty explicitly when the operator has an approved specialist deployment, but routine security work does not automatically consume a cyber-specialist model.
 
 Escalation:
 - zero failures: base route;
@@ -102,14 +105,19 @@ Current official OpenAI API catalog mapping:
 | --- | --- | --- |
 | economy: extraction, normalization, formatting, high-volume low-risk transforms | GPT-5.6 Luna low | OpenAI positions Luna for cost-sensitive high-volume workloads. |
 | balanced: routine research/analysis where quality still matters | GPT-5.6 Terra medium | OpenAI positions Terra as the intelligence/cost balance. |
-| frontier: complex CTI synthesis, coding, security analysis | GPT-5.6 Sol high | OpenAI's documented flagship for complex reasoning/coding; 1.05M context. |
-| frontier_max: deep reasoning or repeated failure | GPT-5.6 Sol max | Highest documented effort on the currently listed flagship API model. |
+| frontier: complex CTI synthesis, coding, routine defensive security analysis | GPT-5.6 Sol high | OpenAI's documented flagship for complex reasoning/coding; 1.05M context. Daybreak Blue recommends the Sol family as the starting point for most defenders. |
+| frontier_max: deep reasoning or repeated failure | GPT-5.6 Sol max | Highest documented effort on the generally listed flagship API model. |
+| specialist cyber: approved exploit validation / advanced authorized vulnerability research | GPT-5.6 Cyber where provisioned | Purpose-trained cyber model with separate approval. It improves some exploit/zero-day workflows, but Sol still wins some vulnerability-reporting and constrained-turn exploit evaluations, so do not replace routine security analysis with Cyber wholesale. |
 
-Official source:
+Official sources:
 - https://platform.openai.com/docs/models
+- https://developers.openai.com/api/docs/models/gpt-5.6-cyber
+- https://openai.com/index/expanding-daybreak-as-the-cyber-defense-window-narrows/
+
+Cyber routing nuance matters. OpenAI reports GPT-5.6-Cyber completing 95% of its internal advanced-cyber request set versus very low completion for guarded Sol, and beating Sol on ExploitGym and an internal zero-day evaluation. The same OpenAI publication says Sol performs better on its Vulnerability Discovery and Report Writing evaluation and is more token-efficient/best on the standard 300-turn ExploitBench setting. That evidence supports a specialist route, not a blanket `security_analysis -> cyber` rule.
 
 Benchmark-advisory alternatives:
-- Artificial Analysis v4.3 currently reports GPT-6 Astra max tied with Claude Fable 5.1 max for the Intelligence Index lead and tied at 62 on its Coding Agent Index, ahead of GPT-5.6 Sol at 55 for coding. If Astra is actually exposed in the target runtime/API, validate availability and internal evals before mapping `frontier_max` to it.
+- Artificial Analysis v4.3 currently reports GPT-6 Astra max tied with Claude Fable 5.1 max for the Intelligence Index lead. Its separate Astra analysis also places Astra at the coding-agent frontier and materially ahead of GPT-5.6 Sol on that suite. If Astra is actually exposed in the target runtime/API, validate availability and internal evals before mapping `frontier_max` to it.
 - Claude Fable 5.1 high/max is a strong different-family reviewer candidate where available. Use a different-family reviewer for error diversity, not because public benchmarks prove statistical independence.
 
 Independent benchmark sources:
@@ -117,19 +125,20 @@ Independent benchmark sources:
 - https://artificialanalysis.ai/articles/artificial-analysis-intelligence-index-v4-3
 - https://artificialanalysis.ai/agents/coding-agents/comparisons/claude-code-vs-codex
 - https://artificialanalysis.ai/articles/claude-fable-5-1
+- https://arcprize.org/blog/astra
 
-Benchmark caution: model scores depend on harness, tool access, effort, and benchmark version. The harness is part of the evaluated system. Never hard-code a leaderboard ordering as permanent routing logic.
+Benchmark caution: model scores depend on harness, tool access, effort, and benchmark version. ARC Prize reports GPT-6 Astra at 62.7% with its provider-neutral Standard harness and up to 99.9% with a provider adapter that preserves reasoning state and compacts longer conversations. The harness is therefore part of the evaluated system. Never hard-code a leaderboard ordering as permanent routing logic.
 
 ## 5. Refresh procedure
 
 Refresh the advisory mapping when:
-- a new frontier model is released;
+- a new frontier or specialist model is released;
 - a benchmark index version changes;
 - provider availability/pricing changes materially;
 - a better task-specific benchmark appears;
 - internal PARA11AX evals disagree with public rankings.
 
-For every candidate record model+effort, family, availability, context, task-specific score, token use/task, cost/task, latency where relevant, harness/tool configuration, and snapshot date. Feed normalized scores to `rankModelCandidates()`. Change generic routing only when the policy itself changes.
+For every candidate record model+effort, family, availability, context, task-specific score, token use/task, cost/task, latency where relevant, harness/tool configuration, specialist capabilities where applicable, and snapshot date. Feed normalized scores to `rankModelCandidates()`. Change generic routing only when the policy itself changes.
 
 ## 6. Internal PARA11AX eval target
 
@@ -142,6 +151,7 @@ Public leaderboards are priors. Prefer a frozen internal eval corpus for:
 - evidence retention through handoff/context reset;
 - constraint retention after long tool traces;
 - representative repo coding tasks;
+- approved cyber-research tasks where a specialist model is under consideration;
 - token/cost per successful task.
 
 A generic coding benchmark does not prove a model is the best CTI analyst. Humanity continues to require domain-specific evaluation. Tragic, but manageable.
