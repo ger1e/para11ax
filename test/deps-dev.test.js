@@ -80,6 +80,32 @@ test('deps.dev resolves one fixed version and dependency graph and preserves dir
   assert.deepEqual(result.references, calls);
 });
 
+test('deps.dev treats an unknown package version as neutral absence without requesting its dependency graph', async () => {
+  const calls = [];
+  const result = await depsDevProvider.run({ type: 'package', value: 'pkg:npm/does-not-exist-para11ax@0.0.0' }, context(async url => {
+    calls.push(String(url));
+    return json({ code: 404, message: 'not found' }, 404);
+  }));
+
+  assert.equal(calls.length, 1);
+  assert.equal(result.observationType, 'supply_chain');
+  assert.equal(result.verdict, 'no_result');
+  assert.equal(result.confidence, 100);
+  assert.deepEqual(result.relationships, []);
+  assert.deepEqual(result.attributes, {
+    purl: 'pkg:npm/does-not-exist-para11ax@0.0.0',
+    system: 'NPM',
+    name: 'does-not-exist-para11ax',
+    version: '0.0.0',
+    publishedAt: null,
+    licenses: [],
+    advisories: [],
+    directDependencyCount: 0,
+    transitiveDependencyCount: 0,
+    dependencyCount: 0,
+  });
+});
+
 test('deps.dev rejects malformed or unsupported PURLs before network access', async () => {
   let calls = 0;
   const fetchImpl = async () => { calls += 1; return json({}); };
