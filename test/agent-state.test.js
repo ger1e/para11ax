@@ -66,6 +66,16 @@ test('reducer persists decisions, artifact references, next actions, and explici
   assert.equal(state.handoffs[0].invariantHash, state.checkpoint.invariantHash);
 });
 
+test('canonical state rejects duplicate IDs inside audit collections', () => {
+  const deps = { now: () => LATER, uuid: () => 'duplicate-id' };
+  let state = createAgentState({ objective: 'Keep audit references unambiguous', constraints: ['Unique artifact IDs'], ...fixed });
+  state = reduceAgentState(state, { type: 'ARTIFACT_ADD', value: { kind: 'commit', ref: 'sha:first', summary: 'First artifact' } }, deps);
+  assert.throws(
+    () => reduceAgentState(state, { type: 'ARTIFACT_ADD', value: { kind: 'commit', ref: 'sha:second', summary: 'Second artifact' } }, deps),
+    /artifacts duplicate id/i,
+  );
+});
+
 test('objective and constraint changes require explicit reducer actions and advance the epoch', () => {
   let state = createAgentState({ objective: 'Old objective', constraints: ['A'], ...fixed });
   state = reduceAgentState(state, { type: 'OBJECTIVE_REVISE', objective: 'New objective', reason: 'User changed scope' }, { now: () => LATER, uuid: () => 'evt-1' });
