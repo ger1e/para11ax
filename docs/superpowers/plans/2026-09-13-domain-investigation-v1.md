@@ -229,3 +229,7 @@ Once required checks are green and review has no blocking findings, mark the PR 
 **Step 6: Final verification**
 
 Fetch merged `main`, confirm the merge commit/status, and report exact implemented surfaces, verification evidence, any intentionally deferred non-goals, and the PR/commit reference.
+
+---
+
+<p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
