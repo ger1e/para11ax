@@ -25,7 +25,7 @@ import {
   renderBrowserReportText,
 } from './shell-report-browser.js';
 import { parseSwarmArgs } from './swarm-command.js';
-import { MISSION_HANDLERS, executeMissionCommand } from '../src/core/mission/command-adapter.js';
+import { WORKFLOW_HANDLERS, executeMissionCommand } from '../src/core/mission/command-adapter.js';
 import { importMissionWorkspace } from '../src/core/mission/workspace.js';
 
 const PROFILES = new Set(['fast', 'standard', 'full']);
@@ -339,7 +339,7 @@ export function createBrowserShellExecutor({
     if (!descriptor || typeof descriptor.handler !== 'string') throw new TypeError('command descriptor required');
     const handler = descriptor.handler;
     const surface = context.surface ?? 'web';
-    if (MISSION_HANDLERS.includes(handler)) {
+    if (WORKFLOW_HANDLERS.includes(handler)) {
       const outcome = await executeMissionCommand({
         handler,
         args,

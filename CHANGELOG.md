@@ -7,6 +7,8 @@ All notable repository changes should be recorded here. This project uses a ligh
 
 ##### Added
 
+- **Domain Investigation v1** for suspicious-domain investigations: canonical Evidence v2 input, existing Webamon evidence projection, bounded scalar-only surface/vulnerability imports as `operator_context`, deterministic IOC correlation and conservative `BLOCK|BLOCK_CANDIDATE|MONITOR|DO_NOT_BLOCK` guidance, bounded STIX 2.1/report/handoff output, shared Web/CLI shell commands, and stateless client-carried MCP parity through `para11ax_domain_investigation`. The workflow performs no hosted active scanning/provider execution and adds no new egress or credential surface.
+
 - ChatGPT-ready MCP OAuth 2.1 authorization-code + `S256` PKCE linking with protected-resource/authorization-server metadata, fixed ChatGPT CIMD identity and redirect, resource/scope-bound signed access tokens, per-tool `securitySchemes`, and runtime `mcp/www_authenticate` challenges. Existing trusted gateway-bearer MCP clients remain compatible.
 
 - **GreyNoise Project Swarm integration** delivered across PRs #207–#209:
@@ -41,6 +43,8 @@ All notable repository changes should be recorded here. This project uses a ligh
 
 ##### Changed
 
+- MCP discovery/catalog now exposes 14 grouped tools and includes `para11ax_domain_investigation` with explicit stateless client-carried transitions and scoped larger authenticated body handling for valid Domain Investigation artifacts/imports.
+- Unified Shell now exposes the `domain-investigation` namespace across Web and CLI with one shared volatile no-egress command adapter.
 - Production User Scanner routing now uses the canonical public `user-scanner-kappa.vercel.app` alias instead of a branch alias that could be intercepted by Vercel deployment protection before worker identity validation.
 
 - Static browser security headers now run as the first continuing rule in Vercel's active legacy route pipeline, covering landing, app, assets, API, and branded errors instead of relying on an ineffective mixed-config top-level header rule.
@@ -62,6 +66,7 @@ All notable repository changes should be recorded here. This project uses a ligh
 
 ##### Security
 
+- Domain Investigation adds no provider, host, credential, arbitrary fetch, filesystem write, shell execution, active scanner or server-side persistence path. Imported surface/vulnerability findings remain bounded `operator_context`, public projections omit internal authority state, references reject embedded credentials, handoff is capped, and all block guidance remains human-review advisory.
 - The ChatGPT consent bridge validates the existing gateway credential without echoing or persisting it; ChatGPT receives only a signed, expiring token restricted to the PARA11AX MCP resource and `para11ax:use` scope.
 
 - Deployment regression coverage now requires CSP, anti-framing, MIME-sniffing, referrer, cross-origin, and permissions controls on the effective continuing legacy route rule used by production.

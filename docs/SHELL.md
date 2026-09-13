@@ -28,6 +28,7 @@ osint
 result
 case
 mission
+domain-investigation
 investigation
 report
 export
@@ -255,6 +256,36 @@ para11ax mission import --stdin
 
 KQL is validated but never executed. ServiceNow output is a projection only: no ticket is submitted, no credential is read, and analyst approval remains mandatory. Mission commands add no provider call, model call, server-side persistence or Evidence v2 mutation. Full semantics are documented in [ANALYST-MISSION-PACK.md](ANALYST-MISSION-PACK.md).
 
+## Domain Investigation
+
+The `domain-investigation` family is shared by Web and CLI and keeps one volatile suspicious-domain workflow state. It consumes canonical domain Evidence v2 plus explicit bounded analyst imports; it does not execute providers or scanners itself.
+
+```text
+domain-investigation build <gateway-enrichment-json>
+domain-investigation build --file <path>
+domain-investigation build --stdin
+
+domain-investigation surface-import <surface-json>
+domain-investigation surface-import --file <path>
+domain-investigation surface-import --stdin
+
+domain-investigation vulnerability-import <vulnerability-json>
+domain-investigation vulnerability-import --file <path>
+domain-investigation vulnerability-import --stdin
+
+domain-investigation show
+domain-investigation report
+domain-investigation stix
+domain-investigation handoff
+domain-investigation clear
+```
+
+`build` requires canonical domain Evidence v2. Surface and vulnerability imports are scalar-only operator context, capped at 500 records and 2 MiB per imported set. They replace their corresponding imported set atomically and never become Evidence v2 by implication.
+
+Web and CLI route through the same pure command adapter. Browser state is memory-only and is cleared by disconnect/reboot. CLI state exists only inside the current process/pipeline. `show` returns a sanitized public projection without `_authoritative`; report/STIX/handoff are deterministic bounded projections; `clear` drops the volatile artifact.
+
+All Domain Investigation descriptors declare `egressClass: none`, no auth requirement at the local shell layer, and no provider/scanner capability. Authorized active discovery or vulnerability scanning must be performed separately outside this workflow and imported explicitly afterward. Full semantics are documented in [DOMAIN-INVESTIGATION.md](DOMAIN-INVESTIGATION.md).
+
 ## Result and evidence
 
 Result commands consume the current enrichment when invoked without pipeline input, or the typed upstream enrichment when composed in a pipeline.
@@ -415,6 +446,7 @@ The unified command fabric deliberately rejects host-shell semantics before comm
 - provider host/method/credential/policy overrides.
 - browser credential persistence or credential reflection in errors/history/output.
 - generic filesystem primitives or browser filesystem writes.
+- hosted active discovery/scanning through Domain Investigation.
 
 There is no arbitrary OS shell escape hatch. Export and download behavior is represented by explicit registered commands instead of redirects.
 
@@ -458,6 +490,16 @@ Bounded GreyNoise Swarm pivots:
 swarm unique --from 2026-09-05T00:00:00Z --to 2026-09-06T00:00:00Z --field source.ip --include-counts
 swarm diff --query "classification:malicious" --source personal --target greynoise --mode source-only
 investigation capture operator
+```
+
+Domain Investigation from previously produced Evidence v2:
+
+```text
+domain-investigation build --file domain-enrichment.json
+domain-investigation surface-import --file authorized-surface.json
+domain-investigation vulnerability-import --file authorized-vulnerabilities.json
+domain-investigation report
+domain-investigation handoff
 ```
 
 Current-result investigation:
