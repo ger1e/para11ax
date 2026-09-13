@@ -1,5 +1,6 @@
 import { createMcpHttpHandler } from '../src/mcp/transport.js';
 import { createMcpOAuthHandlers } from '../src/mcp/oauth.js';
+import { normalizeExternalMcpResponse } from '../src/mcp/external-auth-recovery.js';
 
 const handleMcp = createMcpHttpHandler();
 const oauth = createMcpOAuthHandlers();
@@ -12,7 +13,7 @@ function requestedRoute(req) {
 
 export default async function handler(req, res) {
   const route = requestedRoute(req);
-  const result = route === 'protected-resource'
+  const internalResult = route === 'protected-resource'
     ? oauth.handleProtectedResource(req)
     : route === 'authorization-metadata'
       ? oauth.handleAuthorizationMetadata(req)
@@ -21,6 +22,7 @@ export default async function handler(req, res) {
         : route === 'token'
           ? oauth.handleToken(req)
           : await handleMcp(req);
+  const result = normalizeExternalMcpResponse(route, internalResult);
   res.status(result.status);
   for (const [name, value] of Object.entries(result.headers ?? {})) res.setHeader(name, value);
   if (result.body === null || result.body === undefined) {
