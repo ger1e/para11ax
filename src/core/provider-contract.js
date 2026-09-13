@@ -1,4 +1,5 @@
 import { EXECUTION_POLICY_VERSION } from './execution-policy.js';
+import { INTELLIGENCE_ONLY_OBSERVABLE_MANIFEST } from './intelligence-observable-registry.js';
 
 const METHODS = new Set(['GET', 'POST']);
 const SOURCE_ROLES = new Set(['authoritative', 'first_party', 'aggregator', 'community', 'contextual']);
@@ -44,11 +45,15 @@ export function assertProviderContract({ adapter, policy, observableRegistry }) 
 export function validateProviderSet({ adapters, manifest, observableRegistry }) {
   if (!Array.isArray(adapters)) throw new TypeError('adapters are required');
   if (!manifest || typeof manifest !== 'object') throw new TypeError('provider manifest is required');
+  const providerObservableRegistry = Object.freeze({
+    ...observableRegistry,
+    ...INTELLIGENCE_ONLY_OBSERVABLE_MANIFEST,
+  });
   const names = [];
   const types = new Set();
   for (const adapter of adapters) {
     const policy = manifest[adapter.name];
-    assertProviderContract({ adapter, policy, observableRegistry });
+    assertProviderContract({ adapter, policy, observableRegistry: providerObservableRegistry });
     names.push(adapter.name);
     for (const type of adapter.types) types.add(type);
   }
