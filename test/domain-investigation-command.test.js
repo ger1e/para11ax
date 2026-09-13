@@ -16,7 +16,7 @@ const EXPECTED = Object.freeze([
 
 function enrichment() {
   return {
-    schemaVersion: 'evidence-v2.0', gatewayVersion: 'test', requestId: 'req-shell-domain',
+    schemaVersion: '2.0', gatewayVersion: 'test', requestId: 'req-shell-domain',
     indicator: 'suspicious.example', type: 'domain', queriedAt: '2026-09-13T12:00:00.000Z',
     profile: 'standard', status: 'ok', evidence: [], relationships: [], coverage: {}, limitations: [], failures: [],
     huntContext: { indicator: 'suspicious.example', type: 'domain', firstSeen: null, lastSeen: null, families: [], actors: [], sourceReferences: [] },
