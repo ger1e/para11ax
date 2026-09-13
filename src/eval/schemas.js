@@ -78,6 +78,9 @@ function validateReview(value) {
     return value;
   }
   if (value.status === 'completed') {
+    if (!Object.hasOwn(value, 'decision')) {
+      throw new TypeError('review decision is required when status is completed');
+    }
     exactKeys(value, ['status', 'decision'], 'review');
     if (value.decision !== 'pass' && value.decision !== 'fail') {
       throw new TypeError('review decision must be pass or fail');
