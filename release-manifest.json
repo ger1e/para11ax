@@ -29,6 +29,11 @@
       "active": true
     },
     {
+      "name": "chainabuse",
+      "parserVersion": "chainabuse-v0-2026-09-13.1",
+      "active": true
+    },
+    {
       "name": "circl-hashlookup",
       "parserVersion": "2026-08-22.1",
       "active": true
@@ -59,6 +64,11 @@
       "active": true
     },
     {
+      "name": "d3fend",
+      "parserVersion": "d3fend-2026-09-13.1",
+      "active": true
+    },
+    {
       "name": "deps-dev",
       "parserVersion": "v3-supply-chain-2026-09-13.1",
       "active": true
@@ -76,6 +86,11 @@
     {
       "name": "feodo-tracker",
       "parserVersion": "2026-08-20",
+      "active": true
+    },
+    {
+      "name": "gitguardian-hmsl",
+      "parserVersion": "gitguardian-hmsl-2026-09-13.1",
       "active": true
     },
     {
