@@ -55,6 +55,8 @@ const schema = (properties = {}, required = []) => ({
 const string = (description, extra = {}) => ({ type: 'string', description, ...extra });
 const object = description => ({ type: 'object', description, additionalProperties: true });
 const array = (description, items = {}) => ({ type: 'array', description, items });
+const integer = (description, minimum, maximum) => ({ type: 'integer', description, minimum, maximum });
+const boolean = description => ({ type: 'boolean', description });
 
 const TOOLS = Object.freeze([
   {
@@ -112,14 +114,39 @@ const TOOLS = Object.freeze([
     name: 'para11ax_swarm',
     title: 'PARA11AX GreyNoise Project Swarm',
     description: 'Run bounded Project Swarm session search, retrieval, pivot, timeseries, diff, or export operations.',
-    inputSchema: { type: 'object', additionalProperties: true, properties: { command: string('Swarm operation.', { enum: ['search', 'get', 'export', 'unique', 'timeseries', 'diff'] }) }, required: ['command'] },
+    inputSchema: schema({
+      command: string('Swarm operation.', { enum: ['search', 'get', 'export', 'unique', 'timeseries', 'diff'] }),
+      sessionId: string('Session identifier.', { maxLength: 256 }),
+      scope: string('Session/search scope.', { enum: ['workspace', 'demo'] }),
+      startTime: string('ISO-8601 range start.'),
+      endTime: string('ISO-8601 range end.'),
+      query: string('GreyNoise query or diff query.', { maxLength: 2048 }),
+      page: integer('Search page.', 1, 10000),
+      pageSize: integer('Search page size.', 1, 100),
+      exportType: string('Session export type.', { enum: ['pcap', 'rawSource', 'rawDestination'] }),
+      field: string('Unique/timeseries pivot field.'),
+      includeCounts: boolean('Include counts for unique pivots.'),
+      interval: string('Timeseries interval.', { enum: ['auto', '1s', '1m', '1h', '1d'] }),
+      size: integer('Timeseries/diff result size.', 1, 100),
+      sourceWorkspace: string('Diff source workspace.', { enum: ['personal', 'community', 'greynoise'] }),
+      targetWorkspace: string('Diff target workspace.', { enum: ['personal', 'community', 'greynoise'] }),
+      mode: string('Diff mode.', { enum: ['source-only', 'both', 'all'] }),
+      nextToken: string('Diff pagination token.', { maxLength: 4096 }),
+    }, ['command']),
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
   {
     name: 'para11ax_user_scan',
     title: 'PARA11AX User Scanner',
     description: 'Run the existing isolated identity OSINT scanner with its bounded policy controls.',
-    inputSchema: { type: 'object', additionalProperties: true, properties: { scanType: string('Identity target type.', { enum: ['email', 'username'] }), target: string('Identity target.') }, required: ['scanType', 'target'] },
+    inputSchema: schema({
+      scanType: string('Identity target type.', { enum: ['email', 'username'] }),
+      target: string('Identity target.', { minLength: 1, maxLength: 320 }),
+      category: string('Optional scanner category.', { pattern: '^[a-zA-Z0-9._-]{1,64}$', maxLength: 64 }),
+      module: string('Optional scanner module.', { pattern: '^[a-zA-Z0-9._-]{1,64}$', maxLength: 64 }),
+      crossScan: boolean('Enable bounded cross-scan behavior.'),
+      noNsfw: boolean('Exclude NSFW sites; defaults true.'),
+    }, ['scanType', 'target']),
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
   {
