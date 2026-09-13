@@ -10,17 +10,13 @@ import {
   executeDomainInvestigationCommand,
 } from '../domain-investigation-command-adapter.js';
 
-const CORE_MISSION_HANDLERS = Object.freeze([
+export const MISSION_HANDLERS = Object.freeze([
   'mission-new', 'mission-show', 'mission-profile-set', 'mission-context-set',
   'mission-relevance', 'mission-hunt-build', 'mission-kql-validate',
   'mission-result-analyze', 'mission-servicenow', 'mission-export', 'mission-import', 'mission-clear',
 ]);
 
-export const WORKFLOW_HANDLERS = Object.freeze([...CORE_MISSION_HANDLERS, ...DOMAIN_INVESTIGATION_HANDLERS]);
-// Compatibility export for the Node executor on the long-lived Intelligence Fabric branch.
-// Both handler families are safe here because executeMissionCommand preserves them in one
-// explicit volatile envelope rather than overwriting either workflow state.
-export const MISSION_HANDLERS = WORKFLOW_HANDLERS;
+export const WORKFLOW_HANDLERS = Object.freeze([...MISSION_HANDLERS, ...DOMAIN_INVESTIGATION_HANDLERS]);
 
 const ACTIONS = Object.freeze({
   'mission-profile-set': Object.freeze({ type: 'PROFILE_SET', kind: 'profile', format: 'json' }),

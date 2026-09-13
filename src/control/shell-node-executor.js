@@ -23,7 +23,7 @@ import {
   searchCommands,
   whichCommand,
 } from '../../app/shell-core/help.js';
-import { MISSION_HANDLERS, executeMissionCommand } from '../core/mission/command-adapter.js';
+import { WORKFLOW_HANDLERS, executeMissionCommand } from '../core/mission/command-adapter.js';
 import { createMissionContentLoader } from './mission-content-loader.js';
 import { createInvestigationContentLoader } from './investigation-content-loader.js';
 import { deriveInvestigationStatus, exportInvestigation, importInvestigation } from '../core/investigation/index.js';
@@ -250,7 +250,7 @@ export function createNodeShellExecutor({
   async function execute({ descriptor, args = [], input = { type: 'void', value: null }, context = {} } = {}) {
     if (!descriptor || typeof descriptor.handler !== 'string') throw new TypeError('command descriptor required');
     const handler = descriptor.handler;
-    if (MISSION_HANDLERS.includes(handler)) {
+    if (WORKFLOW_HANDLERS.includes(handler)) {
       const outcome = await executeMissionCommand({
         handler,
         args,
