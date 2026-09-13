@@ -1,5 +1,5 @@
 import { sha256Hex } from './sha256.js';
-import { classifyIndicator } from './validate.js';
+import { classifyIntelligenceIndicator } from './intelligence-observables.js';
 
 export const EVIDENCE_GRAPH_SCHEMA_VERSION = '1.0';
 
@@ -69,7 +69,7 @@ function observableNode(type, value) {
 function validatedObservableNode(type, value) {
   if (typeof value !== 'string' || /[\u0000-\u001f<>]/.test(value)) return null;
   try {
-    const classified = classifyIndicator(value.trim());
+    const classified = classifyIntelligenceIndicator(value.trim());
     return classified.type === type ? observableNode(classified.type, classified.value) : null;
   } catch {
     return null;
@@ -244,7 +244,7 @@ export function buildEvidenceGraph({
   }
 
   function resolveExistingSource(source, sourceType = type) {
-    if (source == null || canonicalObservableValue(type, source) === canonicalObservableValue(type, indicator)) return rootId;
+    if (source == null || (sourceType === type && canonicalObservableValue(type, source) === canonicalObservableValue(type, indicator))) return rootId;
     const key = `${sourceType}\u0000${canonicalObservableValue(sourceType, source)}`;
     const candidates = exactValueIndex.get(key) ?? [];
     return candidates.length === 1 ? candidates[0] : null;
@@ -258,7 +258,8 @@ export function buildEvidenceGraph({
     if (!targetType || target == null || target === '') continue;
     const targetNode = relationTargetNode(targetType, target);
     if (!targetNode) continue;
-    const sourceId = resolveExistingSource(relation?.source, type);
+    const sourceType = normalizedText(relation?.sourceType)?.toLowerCase() ?? type;
+    const sourceId = resolveExistingSource(relation?.source, sourceType);
     if (!sourceId) continue;
     const targetId = addNode(targetNode);
     addEdge('related_to', sourceId, targetId, {
