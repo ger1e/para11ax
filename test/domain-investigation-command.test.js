@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { COMMAND_REGISTRY } from '../app/shell-core/catalog.js';
+import { createBrowserShellExecutor } from '../app/shell-browser-executor.js';
 import { WORKFLOW_HANDLERS, executeMissionCommand } from '../src/core/mission/command-adapter.js';
 import { createMissionContentLoader } from '../src/control/mission-content-loader.js';
 import { createNodeShellExecutor } from '../src/control/shell-node-executor.js';
@@ -112,4 +113,19 @@ test('Node shell executor dispatches Domain Investigation through volatile workf
   const shown = COMMAND_REGISTRY.resolve(['domain-investigation', 'show'], 'cli');
   const showOutput = await executor.execute({ descriptor: shown.descriptor, args: shown.args, context: { surface: 'cli' } });
   assert.equal(showOutput.value.schemaVersion, 'domain-investigation-v1.0');
+});
+
+test('Web shell executor dispatches Domain Investigation through the shared workflow adapter', async () => {
+  const executor = createBrowserShellExecutor({ client: {}, session: {} });
+  const built = COMMAND_REGISTRY.resolve(['domain-investigation', 'build', JSON.stringify(enrichment())], 'web');
+  assert.ok(built?.surfaceAvailable);
+  const output = await executor.execute({ descriptor: built.descriptor, args: built.args, context: { surface: 'web' } });
+  assert.equal(output.type, 'record');
+  assert.equal(output.value.schemaVersion, 'domain-investigation-v1.0');
+  assert.equal(output.value._authoritative, undefined);
+
+  const shown = COMMAND_REGISTRY.resolve(['domain-investigation', 'show'], 'web');
+  const showOutput = await executor.execute({ descriptor: shown.descriptor, args: shown.args, context: { surface: 'web' } });
+  assert.equal(showOutput.value.schemaVersion, 'domain-investigation-v1.0');
+  assert.equal(showOutput.value._authoritative, undefined);
 });
