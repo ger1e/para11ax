@@ -1,4 +1,5 @@
 import { runUserScannerScan } from '../user-scanner.js';
+import { createTrustedAuthorizationContext } from './authorization-context.js';
 import { authorizeCapability } from './intelligence-policy.js';
 import { rankProvidersForExecution } from './provider-priority.js';
 import { runProvider } from './provider-runner.js';
@@ -34,6 +35,27 @@ function providerState(adapter, env) {
   if (adapter.active === false) return 'inactive';
   if (adapter.requiredEnv && !env?.[adapter.requiredEnv]) return 'unconfigured';
   return 'configured';
+}
+
+function scopeList(value) {
+  if (value === undefined || value === null || value === '') return [];
+  if (typeof value !== 'string') throw new TypeError('invalid server authorization scope');
+  return value.split(',').map(item => item.trim()).filter(Boolean);
+}
+
+function serverAuthorizationContext(authz, env, mode) {
+  if (authz?.trusted !== true) return authz;
+  const ownedCidrs = [...new Set([...(authz.ownedCidrs ?? []), ...scopeList(env?.PARA11AX_OWNED_CIDRS)])];
+  const verifiedDomains = [...new Set([...(authz.verifiedDomains ?? []), ...scopeList(env?.PARA11AX_VERIFIED_DOMAINS)])];
+  return createTrustedAuthorizationContext({
+    principal: authz.principal ?? undefined,
+    caseId: authz.caseId ?? undefined,
+    verifiedDomains,
+    ownedCidrs,
+    tenant: authz.tenant ?? undefined,
+    explicitAnalysis: authz.explicitAnalysis === true,
+    requestedMode: authz.requestedMode ?? mode,
+  });
 }
 
 async function runUsernameSearch({ operation, mode, subject, env, nowMs, context }) {
@@ -99,6 +121,7 @@ export async function runIntelligenceMode({
     return runUsernameSearch({ operation, mode, subject, env, nowMs, context });
   }
 
+  const effectiveAuthz = serverAuthorizationContext(authz, env, mode);
   const selected = [];
   const denied = [];
   const unavailable = [];
@@ -109,7 +132,7 @@ export async function runIntelligenceMode({
       unavailable.push(Object.freeze({ provider: adapter.name, state }));
       continue;
     }
-    const decision = authorizeCapability({ adapter, requestedMode: mode, authz });
+    const decision = authorizeCapability({ adapter, requestedMode: mode, authz: effectiveAuthz, subject });
     if (!decision.allowed) {
       denied.push(Object.freeze({ provider: adapter.name, reason: decision.reason }));
       continue;

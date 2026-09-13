@@ -35,6 +35,7 @@ test('owned-network monitoring requires trusted canonical CIDR scope', () => {
     adapter: monitor,
     requestedMode: 'monitor',
     authz: createTrustedAuthorizationContext({ ownedCidrs: ['192.0.2.0/24'] }),
+    subject: { type: 'ip', value: '192.0.2.7' },
   }), { allowed: true, reason: 'allowed' });
   assert.throws(() => createTrustedAuthorizationContext({ ownedCidrs: ['192.0.2.7/24'] }), /ownedCidrs/);
 });
