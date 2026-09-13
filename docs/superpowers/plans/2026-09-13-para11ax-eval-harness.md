@@ -4,7 +4,7 @@
 
 **Goal:** Build an offline, provider-neutral, deterministic PARA11AX evaluation harness that scores frozen synthetic workloads, produces privacy-bounded scorecards, compares candidates against a baseline, and supplies auditable evidence for routing decisions.
 
-**Architecture:** Keep evaluation completely outside the production MCP request path. A frozen corpus in `evals/corpus/v1/` is validated and hashed, candidate result bundles are imported from disk, pure domain scorers produce normalized case results, and a deterministic scorecard/comparison layer aggregates quality plus token/cost/latency evidence without copying raw candidate payloads into summaries. The CLI is a thin filesystem adapter over these pure modules and performs no network access or model calls.
+**Architecture:** Keep evaluation completely outside the production MCP request path. A frozen corpus in `evals/corpus/v1/` is validated and hashed, candidate result bundles are imported from disk, pure domain scorers produce normalized case results, and deterministic scorecard/comparison layers aggregate quality plus token/cost/latency evidence without copying raw candidate payloads into summaries. The CLI is a thin filesystem adapter over these pure modules and performs no network access or model calls.
 
 **Tech Stack:** Node.js 24.x ESM, built-in `node:test`, built-in `node:crypto`, built-in `node:fs`, JSON fixtures, existing PARA11AX routing helpers, existing shell/CI checks.
 
@@ -14,23 +14,21 @@
 
 - No model-provider API calls, credentials, or network access in eval v1.
 - No LLM-as-judge scoring.
-- No production customer data, private incidents, internal credentials, or production IOCs in the corpus or committed fixtures.
-- `src/core/model-routing.js` remains the normative production routing policy and must not depend on eval scorecards at runtime.
+- No production customer data, private incidents, internal credentials, or production IOCs in corpus or committed fixtures.
+- `src/core/model-routing.js` remains normative production routing policy and must not depend on eval scorecards at runtime.
 - Candidate outputs are evaluator input only and must never be copied into scorecards/comparison summaries.
-- Missing `costUsd` and `latencyMs` remain `null`; they are never coerced to zero.
+- Missing `costUsd` and `latencyMs` remain `null`; never coerce them to zero.
 - Full corpus is the only v1 evaluation profile; no partial-profile semantics in v1.
-- Canonical JSON uses recursively sorted object keys, array order normalized where the schema declares set semantics, and numeric scores rounded to six decimal places before hashing.
-- Scorecard hashes exclude the `scorecardHash` field itself and use SHA-256 prefixed with `sha256:`.
-- Promotion default: no new critical hard failures; provenance/handoff regression <= 0.02; KQL regression <= 0.03; and either weighted score improves by >= 0.02 or weighted score is within 0.01 of baseline while known cost drops by >= 10% or known total token use drops by >= 15%.
-- Human-review-required cases block automatic promotion until marked reviewed.
+- Canonical object keys are recursively lexicographically sorted. The canonical serializer preserves provided array order; every schema-defined set-semantic array must be normalized before canonical serialization/hashing. Numeric scores are rounded to six decimal places.
+- Scorecard hashes exclude `scorecardHash` itself and use SHA-256 prefixed with `sha256:`.
+- Promotion policy lives in the corpus manifest and is consumed by comparison logic. The approved v1 policy is: no new critical hard failures; provenance/handoff regression <= 0.02; KQL regression <= 0.03; and either weighted score improves by >= 0.02 or weighted score is within 0.01 of baseline while known cost or known total token use drops by >= 20%.
+- Any case with `humanReview.required=true` blocks promotion unless the result bundle contains an explicit completed review decision of `pass`.
 - TDD for every implementation task. Each code task starts with a failing test and ends with a focused commit.
 - Final repository completion requires exact-head Tooling smoke and CodeQL success before merge.
 
 ---
 
 ## File Structure
-
-Create or modify the following files. Keep these boundaries stable unless a test proves the decomposition is wrong.
 
 ```text
 evals/
@@ -52,13 +50,13 @@ evals/
       improved-v1.json
 
 src/eval/
-  canonical.js          # stable serialization, number normalization, SHA-256
-  schemas.js            # closed-schema validation for case/result/scorecard metadata
-  corpus.js             # corpus loading/manifest verification/hash verification
-  privacy.js            # aggregate-only scorecard/comparison structural guard
-  score.js              # dispatch domain scorer, aggregate cases/domains, hash scorecard
-  compare.js            # baseline/candidate compatibility and promotion gate
-  index.js              # public eval exports
+  canonical.js
+  schemas.js
+  corpus.js
+  privacy.js
+  score.js
+  compare.js
+  index.js
   domains/
     cti.js
     provenance.js
@@ -70,8 +68,7 @@ src/eval/
     routing.js
     coding.js
 
-scripts/
-  run-evals.mjs         # filesystem CLI adapter only
+scripts/run-evals.mjs
 
 test/
   eval-canonical.test.js
@@ -81,6 +78,7 @@ test/
   eval-scorecard.test.js
   eval-compare.test.js
   eval-cli.test.js
+  eval-docs.test.js
 
 package.json
 docs/PARA11AX-EVALS.md
@@ -99,53 +97,38 @@ The initial nine-case corpus is intentionally compact. Domain scorer unit tests 
 - Create: `test/eval-canonical.test.js`
 
 **Interfaces:**
-- Produces: `canonicalize(value) -> JSON-safe value`
-- Produces: `canonicalJson(value) -> string`
-- Produces: `sha256Canonical(value) -> "sha256:<hex>"`
-- Produces: `roundScore(value) -> number`
-- Produces: `validateEvalCase(value) -> frozen validated case`
-- Produces: `validateResultBundle(value) -> frozen validated result bundle`
-- Produces schema constants used by later tasks.
+- Produces `canonicalize(value) -> JSON-safe value`
+- Produces `canonicalJson(value) -> string`
+- Produces `sha256Canonical(value) -> "sha256:<hex>"`
+- Produces `roundScore(value) -> number`
+- Produces `validateEvalCase(value) -> frozen validated case`
+- Produces `validateResultBundle(value) -> frozen validated result bundle`
 
-- [ ] **Step 1: Write canonicalization tests first**
+- [ ] **Step 1: Write failing canonical/schema tests**
 
-Create `test/eval-canonical.test.js` with tests equivalent to:
+Create `test/eval-canonical.test.js` with at least:
 
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  canonicalJson,
-  roundScore,
-  sha256Canonical,
-} from '../src/eval/canonical.js';
-import {
-  validateEvalCase,
-  validateResultBundle,
-} from '../src/eval/schemas.js';
+import { canonicalJson, roundScore, sha256Canonical } from '../src/eval/canonical.js';
+import { validateEvalCase, validateResultBundle } from '../src/eval/schemas.js';
 
-test('canonical JSON sorts object keys recursively and preserves array order', () => {
+test('canonical JSON sorts object keys recursively and preserves supplied array order', () => {
   const value = { z: 1, a: { y: 2, b: 3 }, list: [{ q: 2, a: 1 }] };
-  assert.equal(
-    canonicalJson(value),
-    '{"a":{"b":3,"y":2},"list":[{"a":1,"q":2}],"z":1}'
-  );
+  assert.equal(canonicalJson(value), '{"a":{"b":3,"y":2},"list":[{"a":1,"q":2}],"z":1}');
 });
 
 test('score rounding is stable to six decimals', () => {
   assert.equal(roundScore(0.123456789), 0.123457);
-  assert.equal(roundScore(1), 1);
 });
 
-test('canonical hashes are independent of object key insertion order', () => {
-  assert.equal(
-    sha256Canonical({ a: 1, b: 2 }),
-    sha256Canonical({ b: 2, a: 1 })
-  );
+test('canonical hashes ignore object insertion order', () => {
+  assert.equal(sha256Canonical({ a: 1, b: 2 }), sha256Canonical({ b: 2, a: 1 }));
 });
 
-test('result validation preserves null measurements and rejects non-finite values', () => {
-  const valid = validateResultBundle({
+test('result validation preserves null measurements and review state', () => {
+  const result = validateResultBundle({
     schemaVersion: 'para11ax-eval-result-v1.0',
     corpusId: 'para11ax-internal-v1',
     runId: 'run-001',
@@ -154,31 +137,37 @@ test('result validation preserves null measurements and rejects non-finite value
       effort: 'high', harness: 'manual', harnessVersion: '1.0.0',
     },
     measurements: { inputTokens: 10, outputTokens: 5, costUsd: null, latencyMs: null },
-    cases: [{ caseId: 'cti-001', output: {}, measurements: {} }],
+    cases: [{ caseId: 'cti-001', output: {}, measurements: {}, review: null }],
   });
-  assert.equal(valid.measurements.costUsd, null);
-  assert.equal(valid.measurements.latencyMs, null);
+  assert.equal(result.measurements.costUsd, null);
+  assert.equal(result.measurements.latencyMs, null);
+  assert.equal(result.cases[0].review, null);
+});
 
-  assert.throws(() => validateResultBundle({
-    ...valid,
-    measurements: { ...valid.measurements, latencyMs: Infinity },
-  }), /latencyMs/);
+test('completed human review requires an explicit pass/fail decision', () => {
+  const baseCase = { caseId: 'cti-001', output: {}, measurements: {} };
+  const make = review => ({
+    schemaVersion: 'para11ax-eval-result-v1.0', corpusId: 'para11ax-internal-v1', runId: 'run-001',
+    candidate: { provider:'x', model:'x', family:'x', effort:'high', harness:'x', harnessVersion:'1' },
+    measurements: { inputTokens:0, outputTokens:0, costUsd:null, latencyMs:null },
+    cases: [{ ...baseCase, review }],
+  });
+  assert.throws(() => validateResultBundle(make({ status: 'completed' })), /decision/);
+  assert.doesNotThrow(() => validateResultBundle(make({ status: 'completed', decision: 'pass' })));
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify red**
-
-Run:
+- [ ] **Step 2: Run red**
 
 ```bash
 node --test test/eval-canonical.test.js
 ```
 
-Expected: FAIL because `src/eval/canonical.js` and `src/eval/schemas.js` do not exist.
+Expected: FAIL because the modules do not exist.
 
-- [ ] **Step 3: Implement stable canonical helpers**
+- [ ] **Step 3: Implement canonical helpers**
 
-Create `src/eval/canonical.js` with the actual behavior:
+`src/eval/canonical.js`:
 
 ```js
 import { createHash } from 'node:crypto';
@@ -191,9 +180,7 @@ export function roundScore(value) {
 export function canonicalize(value) {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.keys(value).sort().map(key => [key, canonicalize(value[key])])
-    );
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonicalize(value[key])]));
   }
   if (typeof value === 'number' && !Number.isFinite(value)) {
     throw new TypeError('canonical JSON cannot encode non-finite numbers');
@@ -211,11 +198,9 @@ export function sha256Canonical(value) {
 }
 ```
 
-- [ ] **Step 4: Implement closed-schema validators**
+- [ ] **Step 4: Implement explicit closed-schema validators**
 
-Create `src/eval/schemas.js`. Do not add a schema-library dependency. Use small explicit helpers and reject unknown top-level keys so accidental payload growth fails closed.
-
-Define constants:
+`src/eval/schemas.js` exports:
 
 ```js
 export const EVAL_CASE_SCHEMA = 'para11ax-eval-case-v1.0';
@@ -229,194 +214,120 @@ export const EVAL_DOMAINS = Object.freeze([
 ]);
 ```
 
-Use validation helpers with these exact rules:
-
-```js
-function object(value, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new TypeError(`${label} must be an object`);
-  }
-  return value;
-}
-
-function exactKeys(value, allowed, label) {
-  const extra = Object.keys(value).filter(key => !allowed.includes(key));
-  if (extra.length) throw new TypeError(`${label} contains unknown keys: ${extra.join(', ')}`);
-}
-
-function finiteNonNegative(value, label, { nullable = false } = {}) {
-  if (nullable && value === null) return null;
-  if (!Number.isFinite(value) || value < 0) throw new TypeError(`${label} must be a finite non-negative number`);
-  return value;
-}
-```
+Use local helpers `object()`, `exactKeys()`, `finiteNonNegative()`, and recursive freeze. Do not add a schema-library dependency.
 
 `validateEvalCase()` accepts exactly:
 
 ```js
-{
-  schemaVersion,
-  caseId,
-  domain,
-  weight,
-  input,
-  expected,
-}
+{ schemaVersion, caseId, domain, weight, input, expected }
 ```
 
-Rules: schema must be `para11ax-eval-case-v1.0`; `caseId` matches `^[a-z]+-[0-9]{3}$`; domain is in `EVAL_DOMAINS`; weight is finite and `> 0`; `input` and `expected` are objects.
+Rules: exact schema; `caseId` matches `^[a-z]+-[0-9]{3}$`; domain in `EVAL_DOMAINS`; weight finite and `>0`; input/expected plain objects.
 
 `validateResultBundle()` accepts exactly:
 
 ```js
-{
-  schemaVersion,
-  corpusId,
-  runId,
-  candidate,
-  measurements,
-  cases,
-}
+{ schemaVersion, corpusId, runId, candidate, measurements, cases }
 ```
 
-Candidate accepts exactly `provider`, `model`, `family`, `effort`, `harness`, `harnessVersion`, all non-empty strings. Measurements accepts exactly `inputTokens`, `outputTokens`, `costUsd`, `latencyMs`; tokens must be finite non-negative integers, cost and latency may be `null` or finite non-negative numbers. Case results accept exactly `caseId`, `output`, `measurements`; `output` and `measurements` must be objects. Duplicate result `caseId` values fail.
+Candidate accepts exactly `provider`, `model`, `family`, `effort`, `harness`, `harnessVersion`, all non-empty strings.
 
-Return `structuredClone()`d, recursively frozen values so callers cannot mutate validated contracts.
+Top-level measurements accept exactly `inputTokens`, `outputTokens`, `costUsd`, `latencyMs`; tokens are non-negative integers; cost/latency are null or finite non-negative numbers.
 
-- [ ] **Step 5: Run focused tests green**
+Case result accepts exactly:
+
+```js
+{ caseId, output, measurements, review }
+```
+
+`review` is either `null` or exactly:
+
+```js
+{ status: 'pending' }
+```
+
+or:
+
+```js
+{ status: 'completed', decision: 'pass' | 'fail' }
+```
+
+Case `measurements` is a plain object reserved for scalar per-case measurements; v1 scorer must not copy it into aggregate output except through explicitly recognized scalar fields later. Duplicate case IDs fail.
+
+- [ ] **Step 5: Run green and commit**
 
 ```bash
 node --test test/eval-canonical.test.js
-```
-
-Expected: all tests PASS.
-
-- [ ] **Step 6: Commit**
-
-```bash
 git add src/eval/canonical.js src/eval/schemas.js test/eval-canonical.test.js
 git commit -m "feat: define deterministic eval contracts"
 ```
 
 ---
 
-### Task 2: Frozen Corpus, Manifest Hashes, and Corpus Verification
+### Task 2: Frozen Corpus, Manifest Policy, and Hash Verification
 
 **Files:**
 - Create: `src/eval/corpus.js`
 - Create: `test/eval-corpus.test.js`
-- Create: all nine case files under `evals/corpus/v1/`
+- Create: nine case files under `evals/corpus/v1/`
 - Create: `evals/corpus/v1/manifest.json`
 
 **Interfaces:**
-- Consumes: `validateEvalCase`, `canonicalJson`, `sha256Canonical`
-- Produces: `buildCorpusManifest({ corpusId, corpusVersion, releasedAt, weights, scorerVersions, cases })`
-- Produces: `verifyCorpus({ manifest, casesByPath }) -> frozen corpus descriptor`
-- Produces: `loadCorpusDirectory(rootPath) -> { manifest, casesByPath }` using local filesystem only.
+- Produces `buildCorpusManifest({ corpusId, corpusVersion, releasedAt, weights, scorerVersions, promotionPolicy, cases })`
+- Produces `verifyCorpus({ manifest, casesByPath }) -> frozen corpus descriptor`
+- Produces `loadCorpusDirectory(rootPath)` using local filesystem only.
 
 - [ ] **Step 1: Write failing corpus tests**
 
-Create `test/eval-corpus.test.js` with these cases:
+Tests must assert valid nine-domain corpus, mutation hash failure, duplicate case ID failure, unsafe path rejection, and manifest promotion-policy presence.
 
 ```js
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
-import {
-  loadCorpusDirectory,
-  verifyCorpus,
-} from '../src/eval/corpus.js';
-
-const root = resolve('evals/corpus/v1');
-
-test('v1 corpus verifies all case hashes and corpus hash', () => {
-  const loaded = loadCorpusDirectory(root);
-  const corpus = verifyCorpus(loaded);
-  assert.equal(corpus.manifest.corpusId, 'para11ax-internal-v1');
-  assert.equal(corpus.cases.length, 9);
-  assert.equal(new Set(corpus.cases.map(item => item.domain)).size, 9);
-});
-
-test('corpus verification fails when a case is mutated after manifest creation', () => {
-  const loaded = loadCorpusDirectory(root);
-  const paths = Object.keys(loaded.casesByPath);
-  const first = paths[0];
-  const mutated = structuredClone(loaded);
-  mutated.casesByPath[first].expected = { changed: true };
-  assert.throws(() => verifyCorpus(mutated), /hash mismatch/);
-});
-
-test('corpus rejects duplicate case IDs', () => {
-  const loaded = loadCorpusDirectory(root);
-  const paths = Object.keys(loaded.casesByPath);
-  const mutated = structuredClone(loaded);
-  mutated.casesByPath[paths[1]].caseId = mutated.casesByPath[paths[0]].caseId;
-  assert.throws(() => verifyCorpus(mutated), /duplicate caseId/);
-});
+assert.equal(corpus.manifest.promotionPolicy.minimumEfficiencyReductionRatio, 0.20);
+assert.equal(corpus.cases.length, 9);
 ```
 
-- [ ] **Step 2: Run focused test and verify red**
+- [ ] **Step 2: Run red**
 
 ```bash
 node --test test/eval-corpus.test.js
 ```
 
-Expected: FAIL because `src/eval/corpus.js` and corpus files do not exist.
+Expected: FAIL because corpus module/files do not exist.
 
-- [ ] **Step 3: Implement corpus loading and hash verification**
+- [ ] **Step 3: Implement corpus verification**
 
-`src/eval/corpus.js` must:
+`loadCorpusDirectory()` reads only `manifest.json` and exact relative case paths from the manifest. Reject absolute paths, `..`, and backslashes.
 
-1. read only `manifest.json` and the exact relative paths listed by that manifest;
-2. reject paths containing `..`, absolute paths, or backslashes;
-3. validate every loaded case with `validateEvalCase()`;
-4. verify each `sha256` against `sha256Canonical(case)`;
-5. verify unique `caseId` and path values;
-6. require exactly the nine v1 domains once in the initial full profile;
-7. recompute `corpusHash` over the manifest with `corpusHash` removed and cases sorted by `caseId`;
-8. freeze the returned descriptor.
+`verifyCorpus()` must:
 
-Manifest shape:
+1. validate manifest schema and exact top-level keys;
+2. validate every case with `validateEvalCase()`;
+3. verify each case `sha256` against `sha256Canonical(case)`;
+4. require unique paths and case IDs;
+5. require exactly one initial case from each of the nine v1 domains;
+6. require domain weights sum to `1` within `1e-9`;
+7. require scorer version for every domain;
+8. require exact v1 promotion-policy keys;
+9. recompute `corpusHash` over the manifest with `corpusHash` removed and `cases` sorted by `caseId`;
+10. return a recursively frozen descriptor.
+
+Manifest promotion policy is the single runtime source of truth:
 
 ```json
 {
-  "schemaVersion": "para11ax-eval-corpus-manifest-v1.0",
-  "corpusId": "para11ax-internal-v1",
-  "corpusVersion": "1.0.0",
-  "releasedAt": "2026-09-13",
-  "profile": "full",
-  "weights": {
-    "provenance": 0.20,
-    "kql": 0.15,
-    "cti": 0.15,
-    "handoff": 0.15,
-    "attack": 0.10,
-    "classification": 0.10,
-    "context": 0.05,
-    "routing": 0.05,
-    "coding": 0.05
-  },
-  "scorerVersions": {
-    "cti": "1.0.0",
-    "provenance": "1.0.0",
-    "classification": "1.0.0",
-    "attack": "1.0.0",
-    "kql": "1.0.0",
-    "handoff": "1.0.0",
-    "context": "1.0.0",
-    "routing": "1.0.0",
-    "coding": "1.0.0"
-  },
-  "cases": [],
-  "corpusHash": "sha256:..."
+  "provenanceMaxRegression": 0.02,
+  "handoffMaxRegression": 0.02,
+  "kqlMaxRegression": 0.03,
+  "minimumWeightedImprovement": 0.02,
+  "maximumWeightedRegressionForEfficiency": 0.01,
+  "minimumEfficiencyReductionRatio": 0.20,
+  "requireHumanReviewComplete": true
 }
 ```
 
-Do not hand-edit hash values. `buildCorpusManifest()` is the single source of truth used to generate them.
+- [ ] **Step 4: Add nine synthetic/public-only cases**
 
-- [ ] **Step 4: Add the nine synthetic v1 cases**
-
-Use synthetic/public-only data. Each file must follow this shape:
+Each case follows:
 
 ```json
 {
@@ -429,23 +340,23 @@ Use synthetic/public-only data. Each file must follow this shape:
 }
 ```
 
-Use these exact domain contracts:
+Contracts:
 
-- `cti-001`: input has synthetic evidence IDs and structured facts; expected has `entities` and `relationships` arrays.
-- `provenance-001`: input has evidence IDs `ev-1`, `ev-2`; expected has `claims` where each claim has `claimId`, `allowedEvidenceIds`, `required`, `critical`.
-- `classification-001`: expected has `items: [{ id, label }]`, labels limited to `ioc`, `ioa`, `ttp`.
-- `attack-001`: expected has a unique `techniques` array using synthetic expected ATT&CK IDs such as `T1059.001` and `T1071.001`.
-- `kql-001`: expected has `requiredTables`, `forbiddenTokens`, `requiredRegexes`, `forbiddenRegexes`, and `requiredHeaderKeys`.
-- `handoff-001`: expected has exact `objective`, `constraints`, `decisions`, `nextActions` and `allowCompleted: false`.
-- `context-001`: input has `items: [{ id, tokens, durable, priority }]` plus `maxTokens`; expected has `requiredIds`.
-- `routing-001`: input has task properties; expected has `tier`, `reasoningEffort`, `contextPolicy`, `requireIndependentReview`, `requireDifferentFamilyReviewer`.
-- `coding-001`: expected has `defects`, each a stable symbolic defect code.
+- `cti-001`: structured synthetic evidence; expected `entities` and `relationships`.
+- `provenance-001`: evidence IDs `ev-1`, `ev-2`; expected `claims` with `claimId`, `allowedEvidenceIds`, `required`, `critical`; plus `criticalUnsupportedClaimIds`.
+- `classification-001`: expected `items: [{id,label}]`, labels `ioc|ioa|ttp`.
+- `attack-001`: expected unique `techniques`, e.g. `T1059.001`, `T1071.001`.
+- `kql-001`: expected `requiredTables`, `forbiddenTokens`, `requiredRegexes`, `forbiddenRegexes`, `requiredHeaderKeys`.
+- `handoff-001`: exact objective, constraints, decisions, nextActions, `allowCompleted:false`.
+- `context-001`: input `items:[{id,tokens,durable,priority}]`, `maxTokens`; expected `requiredIds`.
+- `routing-001`: task properties; expected route fields.
+- `coding-001`: expected symbolic `defects` and `forbiddenFalsePositives`.
 
-Use obviously synthetic names like `CLIENT-ULTRAVIOLET`, `198.51.100.23`, and `example.invalid` so there is no ambiguity that the corpus is not production intelligence.
+Use only reserved/synthetic material such as `CLIENT-ULTRAVIOLET`, RFC 5737 IPs like `198.51.100.23`, and `example.invalid`.
 
-- [ ] **Step 5: Generate the manifest deterministically**
+- [ ] **Step 5: Generate manifest hashes with the implementation, never by hand**
 
-After creating the case files, run this exact local command once `buildCorpusManifest()` exists:
+Run:
 
 ```bash
 node --input-type=module <<'NODE'
@@ -463,28 +374,24 @@ for (const domain of domains) {
   }
 }
 const manifest = buildCorpusManifest({
-  corpusId: 'para11ax-internal-v1',
-  corpusVersion: '1.0.0',
-  releasedAt: '2026-09-13',
+  corpusId: 'para11ax-internal-v1', corpusVersion: '1.0.0', releasedAt: '2026-09-13',
   weights: { provenance:0.20, kql:0.15, cti:0.15, handoff:0.15, attack:0.10, classification:0.10, context:0.05, routing:0.05, coding:0.05 },
   scorerVersions: Object.fromEntries(domains.map(domain => [domain, '1.0.0'])),
+  promotionPolicy: {
+    provenanceMaxRegression:0.02, handoffMaxRegression:0.02, kqlMaxRegression:0.03,
+    minimumWeightedImprovement:0.02, maximumWeightedRegressionForEfficiency:0.01,
+    minimumEfficiencyReductionRatio:0.20, requireHumanReviewComplete:true
+  },
   cases,
 });
 writeFileSync(join(root, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 NODE
 ```
 
-- [ ] **Step 6: Run corpus tests green**
+- [ ] **Step 6: Run green and commit**
 
 ```bash
 node --test test/eval-corpus.test.js
-```
-
-Expected: PASS.
-
-- [ ] **Step 7: Commit**
-
-```bash
 git add src/eval/corpus.js test/eval-corpus.test.js evals/corpus/v1
 git commit -m "feat: add frozen PARA11AX eval corpus"
 ```
@@ -501,41 +408,25 @@ git commit -m "feat: add frozen PARA11AX eval corpus"
 - Create: `test/eval-domains-core.test.js`
 
 **Interfaces:**
-Each module exports `SCORER_VERSION = '1.0.0'` and `score(caseValue, output)` returning:
+Every scorer exports `SCORER_VERSION = '1.0.0'` and `score(caseValue, output)` returning:
 
 ```js
 {
-  score: 0..1,
-  hardFail: boolean,
-  criticalHardFail: boolean,
-  violations: string[],
-  metrics: object,
-  humanReview: { required: boolean, fields: string[] },
+  score: 0,
+  hardFail: false,
+  criticalHardFail: false,
+  violations: [],
+  metrics: {},
+  humanReview: { required: false, fields: [] },
   scorerVersion: '1.0.0'
 }
 ```
 
-Violation arrays must be unique and lexicographically sorted before return.
+Set-semantic output arrays such as violations and technique IDs must be unique and lexicographically sorted before return.
 
-- [ ] **Step 1: Write failing domain tests**
+- [ ] **Step 1: Write failing positive/partial/hard-failure tests**
 
-Cover exact-match, partial, over-generation, and critical failure cases.
-
-Representative expectations:
-
-```js
-assert.deepEqual(scoreClassification(caseValue, {
-  items: [{ id: 'x', label: 'ioc' }, { id: 'y', label: 'ttp' }],
-}).metrics, { correct: 2, expected: 2, extra: 0 });
-
-assert.equal(scoreAttack(caseValue, {
-  techniques: ['T1059.001', 'T9999.999'],
-}).score < 1, true);
-
-assert.equal(scoreProvenance(caseValue, {
-  claims: [{ claimId: 'critical-false-claim', evidenceIds: [] }],
-}).criticalHardFail, true);
-```
+Required assertions include ATT&CK over-mapping lowering F1, unsupported CTI entity/relationship penalties, invalid provenance refs, critical unsupported claims, and classification invalid-label hard failure.
 
 - [ ] **Step 2: Run red**
 
@@ -543,29 +434,15 @@ assert.equal(scoreProvenance(caseValue, {
 node --test test/eval-domains-core.test.js
 ```
 
-Expected: FAIL because scorer modules do not exist.
+- [ ] **Step 3: Implement CTI + ATT&CK set scoring**
 
-- [ ] **Step 3: Implement common set-metric behavior locally without a shared premature abstraction**
+Use precision/recall/F1 over normalized stable strings. CTI entity key: `type:value`; relationship key: `source|type|target`. CTI score = mean(entity F1, relationship F1). Extra entities -> `unsupported_entity`; extra relationships -> `unsupported_relationship`.
 
-For CTI and ATT&CK use precision/recall/F1:
-
-```js
-function f1({ expected, actual }) {
-  const expectedSet = new Set(expected);
-  const actualSet = new Set(actual);
-  const tp = [...actualSet].filter(item => expectedSet.has(item)).length;
-  const precision = actualSet.size ? tp / actualSet.size : 0;
-  const recall = expectedSet.size ? tp / expectedSet.size : 1;
-  const score = precision + recall ? (2 * precision * recall) / (precision + recall) : 0;
-  return { tp, precision, recall, score };
-}
-```
-
-Normalize CTI entities as `type:value` and relationships as `source|type|target`, then average entity F1 and relationship F1. Extra invented relationships add violation `unsupported_relationship`; extra entities add `unsupported_entity`. No human review in v1 structured CTI cases.
+ATT&CK score = F1 over expected vs actual technique IDs. Extra IDs reduce precision.
 
 - [ ] **Step 4: Implement provenance scoring**
 
-Candidate output shape:
+Candidate:
 
 ```json
 { "claims": [{ "claimId": "claim-1", "evidenceIds": ["ev-1"] }] }
@@ -573,29 +450,22 @@ Candidate output shape:
 
 Rules:
 
-- expected required claim missing -> `missing_required_claim`;
-- unknown candidate claim ID -> `unsupported_claim`;
+- missing required claim -> `missing_required_claim`;
+- unknown claim ID -> `unsupported_claim`;
 - unknown evidence ID -> `invalid_evidence_reference`;
-- required claim with no evidence -> `missing_citation`;
-- citation not in that claim's `allowedEvidenceIds` -> `unsupported_citation`;
-- unknown claim whose ID is listed in case `expected.criticalUnsupportedClaimIds` -> `critical_unsupported_claim` and both hard-fail flags true;
-- score = supported required claims / total required claims, multiplied by citation precision; round at six decimals.
+- required claim without citation -> `missing_citation`;
+- citation outside allowed set -> `unsupported_citation`;
+- claim ID in `criticalUnsupportedClaimIds` -> `critical_unsupported_claim`, hard fail and critical hard fail;
+- score = required-claim recall multiplied by citation precision, rounded to six decimals.
 
-- [ ] **Step 5: Implement classification scoring**
+- [ ] **Step 5: Implement exact classification scoring**
 
-Exact ID/label accuracy. Unknown IDs count as `extra`; missing expected IDs count incorrect. Invalid labels trigger `invalid_classification_label` and hard fail.
+Expected IDs/labels are exact. Unknown IDs count extra, missing expected IDs count incorrect, and labels outside `ioc|ioa|ttp` trigger `invalid_classification_label` + hard fail.
 
-- [ ] **Step 6: Run green**
+- [ ] **Step 6: Run green and commit**
 
 ```bash
 node --test test/eval-domains-core.test.js
-```
-
-Expected: PASS.
-
-- [ ] **Step 7: Commit**
-
-```bash
 git add src/eval/domains test/eval-domains-core.test.js
 git commit -m "feat: score core intelligence eval domains"
 ```
@@ -612,21 +482,11 @@ git commit -m "feat: score core intelligence eval domains"
 - Create: `src/eval/domains/coding.js`
 - Create: `test/eval-domains-control.test.js`
 
-**Interfaces:**
-Same scorer result contract as Task 3.
+**Interfaces:** Same scorer result contract as Task 3.
 
-- [ ] **Step 1: Write failing KQL/control-plane tests**
+- [ ] **Step 1: Write failing tests**
 
-Required cases:
-
-```js
-assert.equal(scoreKql(kqlCase, { query: 'DeviceProcessEvents | where Timestamp > ago(1d)', headers: {} }).hardFail, false);
-assert.equal(scoreKql(kqlCase, { query: 'Sysmon | take 10', headers: {} }).hardFail, true);
-assert.equal(scoreHandoff(handoffCase, { ...expected, constraints: [] }).criticalHardFail, true);
-assert.equal(scoreContext(contextCase, { selectedIds: ['scratch'] }).criticalHardFail, true);
-assert.equal(scoreRouting(routingCase, { ...expectedRoute, requireIndependentReview: false }).hardFail, true);
-assert.equal(scoreCoding(codingCase, { defects: ['missing_validation'] }).score <= 1, true);
-```
+Cover forbidden KQL dependencies, missing KQL structural requirements, changed handoff objective/constraints/decisions, premature completion, lost durable context, context budget overflow, routing mismatch/review omission, and coding defect precision/recall.
 
 - [ ] **Step 2: Run red**
 
@@ -634,95 +494,54 @@ assert.equal(scoreCoding(codingCase, { defects: ['missing_validation'] }).score 
 node --test test/eval-domains-control.test.js
 ```
 
-Expected: FAIL because modules do not exist.
-
 - [ ] **Step 3: Implement KQL structural scorer**
 
-Candidate output:
+Candidate:
 
 ```json
 {
-  "query": "...",
+  "query": "DeviceProcessEvents | where Timestamp > ago(1d)",
   "headers": {
-    "title": "...",
-    "description": "...",
-    "suspiciousBehavior": "...",
-    "mitreAttack": "...",
-    "pyramidOfPain": "...",
-    "killChain": "...",
-    "ctiUrls": ["https://example.invalid/..." ]
+    "title": "Synthetic Hunt",
+    "description": "Synthetic",
+    "suspiciousBehavior": "Synthetic",
+    "mitreAttack": "T1059.001",
+    "pyramidOfPain": "Behavior",
+    "killChain": "Execution",
+    "ctiUrls": ["https://example.invalid/cti"]
   }
 }
 ```
 
-Checks:
-
-- every `requiredTables` token appears as a whole-word regex;
-- any `forbiddenTokens` whole-word match -> `forbidden_dependency` and hard fail;
-- every `requiredRegexes` source compiles and matches query;
-- any `forbiddenRegexes` match -> `forbidden_pattern` and hard fail;
-- every required header key exists and is non-empty;
-- score = passed checks / total checks;
-- do not copy query text or headers into metrics/violations.
+Checks: required tables as whole words, forbidden tokens as whole words, required regexes, forbidden regexes, non-empty required headers. Forbidden dependency/pattern is hard fail. Score = passed checks / total checks. Never put query/header bodies in metrics or violations.
 
 - [ ] **Step 4: Implement handoff scorer**
 
-Candidate output shape:
-
-```json
-{
-  "objective": "...",
-  "constraints": ["..."],
-  "decisions": ["..."],
-  "nextActions": ["..."],
-  "completed": false
-}
-```
-
-Normalize arrays as sorted unique strings only where the case contract marks them set-like. Exact objective mismatch -> `objective_changed` + critical hard fail. Missing any required constraint -> `constraint_lost` + critical hard fail. Missing accepted decision -> `accepted_decision_lost` + critical hard fail. `completed:true` while expected `nextActions` is non-empty -> `premature_completion` + critical hard fail.
+Candidate contains objective, constraints, decisions, nextActions, completed. Exact objective mismatch -> `objective_changed` critical hard fail. Lost required constraint -> `constraint_lost` critical hard fail. Lost decision -> `accepted_decision_lost` critical hard fail. `completed:true` while required next actions remain -> `premature_completion` critical hard fail.
 
 - [ ] **Step 5: Implement context scorer**
 
-Candidate output: `{ selectedIds: string[] }`.
+Candidate `{ selectedIds: string[] }`. Unknown ID -> hard fail. Token sum > budget -> `context_budget_exceeded` critical hard fail. Missing required durable ID -> `durable_context_lost` critical hard fail. Score = `0.7 * durableRetention + 0.3 * evictionQuality`; if no comparable non-durable items, evictionQuality = 1.
 
-Rules:
+- [ ] **Step 6: Implement routing scorer against production policy**
 
-- unknown selected ID -> hard fail `unknown_context_item`;
-- selected token sum > `input.maxTokens` -> critical hard fail `context_budget_exceeded`;
-- any required durable ID missing -> critical hard fail `durable_context_lost`;
-- score = 0.7 * durableRetention + 0.3 * evictionQuality;
-- eviction quality is the fraction of selected non-durable items that are not lower priority than an omitted non-durable item. If there are no comparable non-durable items, evictionQuality = 1.
-
-- [ ] **Step 6: Implement routing scorer against normative routing policy**
-
-Import `routeModelTask` from `src/core/model-routing.js` and compute normative output from the case input. The case's `expected` route remains a frozen corpus assertion; test that it agrees with `routeModelTask()` so corpus drift becomes visible.
-
-Candidate route mismatches are violations named `route_<field>_mismatch`. Missing required independent review on a high-risk/repeated-failure normative route is a hard fail. Score is exact-field accuracy across `tier`, `reasoningEffort`, `contextPolicy`, `requireIndependentReview`, and `requireDifferentFamilyReviewer`.
+Import `routeModelTask` from `src/core/model-routing.js`. Compute normative route from case input and assert corpus `expected` agrees with that normative route. Candidate field mismatches produce `route_<field>_mismatch`. Omitted required independent review is a hard fail. Score exact-field accuracy across tier, reasoning effort, context policy, and two review flags.
 
 - [ ] **Step 7: Implement coding/review scorer**
 
-Candidate output: `{ defects: string[] }`.
+Candidate `{ defects: string[] }`. F1 against expected defect codes. Any expected `forbiddenFalsePositives` reported by candidate adds `forbidden_false_positive`.
 
-Expected contains `defects` and optional `forbiddenFalsePositives`. Score is F1 over expected defect codes. Any forbidden false-positive defect code adds `forbidden_false_positive`. This domain has no source-code execution in v1.
-
-- [ ] **Step 8: Run green**
+- [ ] **Step 8: Run green and commit**
 
 ```bash
 node --test test/eval-domains-control.test.js
-```
-
-Expected: PASS.
-
-- [ ] **Step 9: Commit**
-
-```bash
 git add src/eval/domains test/eval-domains-control.test.js
 git commit -m "feat: score control and hunting eval domains"
 ```
 
 ---
 
-### Task 5: Scorecard Engine, Aggregate Metrics, Privacy Guard, and Golden Determinism
+### Task 5: Scorecard Engine, Review Projection, Privacy Guard, and Golden Determinism
 
 **Files:**
 - Create: `src/eval/privacy.js`
@@ -732,32 +551,21 @@ git commit -m "feat: score control and hunting eval domains"
 - Create: `evals/fixtures/candidate-results/baseline-v1.json`
 
 **Interfaces:**
-- Produces: `scoreResultBundle({ corpus, resultBundle, evaluatorVersion = '1.0.0' }) -> frozen scorecard`
-- Produces: `assertAggregateOnlyScorecard(scorecard) -> true or throws`
-- Produces: public exports from `src/eval/index.js`.
+- Produces `scoreResultBundle({ corpus, resultBundle, evaluatorVersion = '1.0.0' })`
+- Produces `assertAggregateOnlyScorecard(scorecard)`
 
 - [ ] **Step 1: Write failing scorecard tests**
 
-Tests must cover:
+Tests must prove:
 
-1. full corpus required;
-2. case result order does not change scorecard bytes/hash;
-3. same input twice gives byte-identical canonical JSON;
-4. marker strings seeded into raw output do not occur in serialized scorecard;
-5. `costUsd:null` and `latencyMs:null` remain null;
-6. scorecard contains only case IDs, scalar metrics, violations, review state, versions, candidate metadata, hashes, and measurements.
-
-Example determinism assertion:
-
-```js
-const a = scoreResultBundle({ corpus, resultBundle });
-const b = scoreResultBundle({ corpus, resultBundle: {
-  ...resultBundle,
-  cases: [...resultBundle.cases].reverse(),
-}});
-assert.equal(canonicalJson(a), canonicalJson(b));
-assert.equal(a.scorecardHash, b.scorecardHash);
-```
+1. full corpus required and unknown case IDs rejected;
+2. reversing result case order does not change scorecard bytes/hash;
+3. same input twice is byte-identical;
+4. distinctive marker strings seeded into raw output never appear in serialized scorecard;
+5. null cost/latency remain null;
+6. candidate result hash is present;
+7. corpus ID/version/hash/scorer versions/promotion policy are recorded;
+8. completed review is projected only as stable status/decision, never reviewer prose or raw output.
 
 - [ ] **Step 2: Run red**
 
@@ -765,11 +573,9 @@ assert.equal(a.scorecardHash, b.scorecardHash);
 node --test test/eval-scorecard.test.js
 ```
 
-Expected: FAIL because score engine does not exist.
+- [ ] **Step 3: Implement scorer dispatch and normalized case results**
 
-- [ ] **Step 3: Implement scorer dispatch and normalized case result**
-
-`score.js` maps domain -> scorer function with no dynamic import. Each case result emitted into the scorecard has exactly:
+Each scorecard case result has exactly:
 
 ```js
 {
@@ -780,130 +586,101 @@ Expected: FAIL because score engine does not exist.
   criticalHardFail,
   violations,
   metrics,
-  humanReview,
+  humanReview: {
+    required,
+    fields,
+    reviewStatus,
+    reviewDecision,
+  },
   scorerVersion,
 }
 ```
 
-Sort case results by `caseId` before aggregate calculation and hashing.
+`reviewStatus` is `not_required`, `pending`, or `completed`; `reviewDecision` is `null`, `pass`, or `fail`. Sort case results by `caseId` before aggregation/hash.
 
-- [ ] **Step 4: Implement domain and weighted aggregates**
+- [ ] **Step 4: Aggregate domain/global metrics**
 
-For each domain:
+Domain object:
+
+```js
+{ score, cases, hardFailures, criticalHardFailures, humanReviewCases }
+```
+
+Global aggregate:
+
+```js
+{ weightedScore, hardFailures, criticalHardFailures, scoredCases, humanReviewCases }
+```
+
+Domain score uses case weights within domain. Global weighted score uses manifest weights. Round all scores to six decimals.
+
+- [ ] **Step 5: Build reproducibility metadata and measurements**
+
+Scorecard includes:
 
 ```js
 {
-  score,
+  schemaVersion: 'para11ax-eval-scorecard-v1.0',
+  evaluatorVersion: '1.0.0',
+  corpus: {
+    corpusId, corpusVersion, corpusHash, scorerVersions, promotionPolicy,
+  },
+  candidate,
+  resultHash,
+  aggregate,
+  domains,
   cases,
-  hardFailures,
-  criticalHardFailures,
-  humanReviewCases,
+  measurements: { inputTokens, outputTokens, totalTokens, costUsd, latencyMs },
+  scorecardHash,
 }
 ```
 
-Domain score is the weighted average of case scores using case `weight` inside that domain. Global `weightedScore` applies manifest domain weights to domain scores.
+`resultHash = sha256Canonical(validatedResultBundle)`.
 
-Top-level aggregate:
+- [ ] **Step 6: Implement structural privacy guard**
 
-```js
-{
-  weightedScore,
-  hardFailures,
-  criticalHardFailures,
-  scoredCases,
-  humanReviewCases,
-}
-```
-
-All score values use `roundScore()`.
-
-- [ ] **Step 5: Implement scorecard measurements**
-
-Expose only:
-
-```js
-{
-  inputTokens,
-  outputTokens,
-  totalTokens,
-  costUsd,
-  latencyMs,
-}
-```
-
-`totalTokens = inputTokens + outputTokens`. Do not derive cost or latency when missing.
-
-- [ ] **Step 6: Implement privacy structural guard**
-
-`privacy.js` must recursively reject any scorecard key named or ending in these payload-bearing names:
+Reject payload-bearing keys anywhere outside validated candidate metadata:
 
 ```js
 const FORBIDDEN_KEYS = new Set([
-  'output', 'query', 'text', 'body', 'evidence', 'prompt', 'content',
-  'indicator', 'observable', 'clientName', 'serviceNow', 'raw',
+  'output','query','text','body','evidence','prompt','content',
+  'indicator','observable','clientName','serviceNow','raw',
 ]);
 ```
 
-Also reject strings under case results except stable identifiers/codes/scorer versions. Candidate metadata strings are allowed only under `candidate`. This makes privacy a shape invariant rather than unreliable secret-string guessing.
+Case-result string fields are limited to IDs, domains, violation codes, review status/decision, and scorer versions. Metrics must be booleans, finite numbers, null, or bounded arrays of stable symbolic codes/IDs explicitly allowed by the scorer contract.
 
-Before returning a scorecard, `scoreResultBundle()` calls `assertAggregateOnlyScorecard()`.
+`scoreResultBundle()` calls `assertAggregateOnlyScorecard()` before hashing/return.
 
-- [ ] **Step 7: Hash the scorecard**
+- [ ] **Step 7: Add baseline synthetic result fixture**
 
-Create the scorecard without `scorecardHash`, canonicalize it, then add:
+One result for each of nine case IDs. Seed `PRIVATE-MARKER-ULTRAVIOLET-9F4E` in a raw output value valid for one domain and assert it never occurs in scorecard serialization.
 
-```js
-scorecardHash: sha256Canonical(scorecardWithoutHash)
-```
-
-Return a recursively frozen scorecard.
-
-- [ ] **Step 8: Add the baseline synthetic result fixture**
-
-`baseline-v1.json` must contain one output for each of the nine case IDs. Include distinctive marker strings such as `PRIVATE-MARKER-ULTRAVIOLET-9F4E` inside one raw candidate output field that is valid for that domain. The scorecard test must prove this marker never appears in `canonicalJson(scorecard)`.
-
-- [ ] **Step 9: Run green**
+- [ ] **Step 8: Run green and commit**
 
 ```bash
 node --test test/eval-scorecard.test.js
-```
-
-Expected: PASS.
-
-- [ ] **Step 10: Commit**
-
-```bash
 git add src/eval evals/fixtures/candidate-results/baseline-v1.json test/eval-scorecard.test.js
 git commit -m "feat: build deterministic eval scorecards"
 ```
 
 ---
 
-### Task 6: Baseline Comparison and Explicit Promotion Gate
+### Task 6: Baseline Comparison and Manifest-Driven Promotion Gate
 
 **Files:**
 - Create: `src/eval/compare.js`
+- Modify: `src/eval/index.js`
 - Create: `test/eval-compare.test.js`
 - Create: `evals/fixtures/candidate-results/improved-v1.json`
-- Modify: `src/eval/index.js`
 
 **Interfaces:**
-- Produces: `compareScorecards({ baseline, candidate, requirePromotion = false })`
-- Produces: `DEFAULT_PROMOTION_POLICY` constant.
+- Produces `compareScorecards({ baseline, candidate, requirePromotion = false })`
+- Consumes promotion policy only from compatible scorecards' corpus metadata.
 
-- [ ] **Step 1: Write failing comparison tests**
+- [ ] **Step 1: Write failing compatibility/promotion tests**
 
-Required tests:
-
-```js
-assert.throws(() => compareScorecards({ baseline, candidate: wrongCorpus }), /corpus/);
-assert.equal(compareScorecards({ baseline, candidate: better }).promotion.passed, true);
-assert.equal(compareScorecards({ baseline, candidate: criticalRegression }).promotion.passed, false);
-assert.equal(compareScorecards({ baseline, candidate: cheaperButEqual }).promotion.passed, true);
-assert.equal(compareScorecards({ baseline, candidate: missingCost }).deltas.costUsd, null);
-```
-
-Also test that a higher weighted score cannot override a new critical hard failure.
+Cover mismatched corpus/scorer/evaluator versions, critical regression blocking, provenance/handoff/KQL thresholds, >=20% cost efficiency path, >=20% token efficiency path, null measurement deltas, pending human review blocking, completed `pass` review allowing evaluation, and completed `fail` review blocking promotion.
 
 - [ ] **Step 2: Run red**
 
@@ -911,22 +688,11 @@ Also test that a higher weighted score cannot override a new critical hard failu
 node --test test/eval-compare.test.js
 ```
 
-Expected: FAIL because `compare.js` does not exist.
+- [ ] **Step 3: Implement strict compatibility**
 
-- [ ] **Step 3: Implement strict compatibility checks**
+Require exact equality for corpus ID/version/hash, scorer-version map, evaluator version, domain set, and promotion policy. Reject any mismatch.
 
-Reject comparisons unless these fields match exactly:
-
-- corpus ID;
-- corpus version;
-- corpus hash;
-- scorer-version map;
-- evaluator version;
-- domain set.
-
-- [ ] **Step 4: Implement deltas**
-
-Return scalar deltas only:
+- [ ] **Step 4: Implement scalar deltas**
 
 ```js
 {
@@ -942,62 +708,39 @@ Return scalar deltas only:
 }
 ```
 
-For nullable measurements, delta is `null` unless both baseline and candidate values are known.
+Nullable delta is `null` unless both values known.
 
-- [ ] **Step 5: Implement exact default promotion policy**
+- [ ] **Step 5: Implement manifest-driven promotion**
 
-```js
-export const DEFAULT_PROMOTION_POLICY = Object.freeze({
-  provenanceMaxRegression: 0.02,
-  handoffMaxRegression: 0.02,
-  kqlMaxRegression: 0.03,
-  minimumWeightedImprovement: 0.02,
-  maximumWeightedRegressionForEfficiency: 0.01,
-  minimumCostReductionRatio: 0.10,
-  minimumTokenReductionRatio: 0.15,
-  requireHumanReviewComplete: true,
-});
-```
-
-Promotion passes only if:
+Read policy from `candidate.corpus.promotionPolicy` after compatibility succeeds. Promotion passes only if:
 
 1. candidate critical hard failures <= baseline critical hard failures;
-2. provenance, handoff, and KQL deltas satisfy regression limits;
-3. no candidate human-review cases remain when review completion is required;
-4. either weighted delta >= 0.02, or weighted delta >= -0.01 and at least one known efficiency criterion passes:
-   - `(baselineCost - candidateCost) / baselineCost >= 0.10`, when both costs are non-null and baseline cost > 0; OR
-   - `(baselineTokens - candidateTokens) / baselineTokens >= 0.15`, when baseline total tokens > 0.
+2. provenance delta >= `-provenanceMaxRegression`;
+3. handoff delta >= `-handoffMaxRegression`;
+4. KQL delta >= `-kqlMaxRegression`;
+5. every required human review is completed with decision `pass`;
+6. either weighted delta >= `minimumWeightedImprovement`, or weighted delta >= `-maximumWeightedRegressionForEfficiency` and one known efficiency reduction ratio is >= `minimumEfficiencyReductionRatio` (20%) for cost or total tokens.
 
-Return stable reason codes, never prose copied from model output.
+Return stable reason codes only.
 
-- [ ] **Step 6: Add improved fixture and run green**
-
-`improved-v1.json` should improve at least one quality domain and reduce total tokens enough to exercise the promotion path without changing corpus identity.
+- [ ] **Step 6: Add improved fixture, run green, commit**
 
 ```bash
 node --test test/eval-compare.test.js
-```
-
-Expected: PASS.
-
-- [ ] **Step 7: Commit**
-
-```bash
 git add src/eval/compare.js src/eval/index.js test/eval-compare.test.js evals/fixtures/candidate-results/improved-v1.json
 git commit -m "feat: compare eval candidates against routing baselines"
 ```
 
 ---
 
-### Task 7: Offline CLI, Package Scripts, and Golden Reproduction
+### Task 7: Offline CLI and Package Scripts
 
 **Files:**
 - Create: `scripts/run-evals.mjs`
 - Create: `test/eval-cli.test.js`
 - Modify: `package.json`
 
-**Interfaces:**
-CLI contracts:
+**CLI:**
 
 ```text
 npm run eval -- --results <file>
@@ -1007,23 +750,11 @@ npm run eval -- --results <file> --json
 npm run eval:verify
 ```
 
-Exit codes:
-- `0`: valid evaluation/comparison and promotion either not requested or passed;
-- `2`: invalid CLI arguments or malformed/invalid input/corpus;
-- `3`: valid comparison but explicit `--require-promotion` failed.
+Exit codes: `0` valid; `2` bad args/input/corpus; `3` valid comparison but required promotion failed.
 
-- [ ] **Step 1: Write failing CLI tests using `spawnSync`**
+- [ ] **Step 1: Write failing `spawnSync` CLI tests**
 
-Cover:
-
-- `--verify-corpus` exits 0;
-- malformed results exits 2;
-- JSON mode parses as JSON and does not contain raw marker strings;
-- comparison output contains promotion result;
-- failed `--require-promotion` exits 3;
-- invoking without `--results` unless `--verify-corpus` exits 2.
-
-Use only local files and set a minimal environment. Do not mock network because the CLI must not import any network client at all.
+Cover verify-corpus success, malformed results exit 2, JSON parsing, marker non-leakage, comparison promotion field, failed require-promotion exit 3, unknown flag exit 2, and missing results exit 2 unless verifying corpus.
 
 - [ ] **Step 2: Run red**
 
@@ -1031,73 +762,50 @@ Use only local files and set a minimal environment. Do not mock network because 
 node --test test/eval-cli.test.js
 ```
 
-Expected: FAIL because CLI does not exist.
+- [ ] **Step 3: Implement dependency-free argument parsing**
 
-- [ ] **Step 3: Implement argument parsing without adding dependencies**
-
-Accepted flags only:
+Allow only:
 
 ```js
-new Set([
-  '--results', '--baseline', '--json', '--verify-corpus', '--require-promotion',
-])
+new Set(['--results','--baseline','--json','--verify-corpus','--require-promotion'])
 ```
 
-Unknown flags fail with exit 2. Paths are read as UTF-8 JSON. Default corpus path resolves from repo root to `evals/corpus/v1`.
-
-Human-readable output must contain only candidate metadata, hashes, aggregate/domain scores, measurement scalars, violation counts, and promotion reason codes. It must never print raw case output.
+Default corpus path: repo-root `evals/corpus/v1`. Read local UTF-8 JSON only. Human-readable output may include candidate metadata, hashes, aggregate/domain scores, scalar measurements, violation counts, review status, and promotion reason codes. Never print raw case output.
 
 - [ ] **Step 4: Add package scripts**
-
-Modify `package.json` scripts to include:
 
 ```json
 "eval": "node scripts/run-evals.mjs",
 "eval:verify": "node scripts/run-evals.mjs --verify-corpus"
 ```
 
-Do not change the Node engine or add packages.
+No new npm dependencies.
 
-- [ ] **Step 5: Run CLI tests and direct commands**
+- [ ] **Step 5: Run green and commit**
 
 ```bash
 node --test test/eval-cli.test.js
 npm run eval:verify
 npm run eval -- --results evals/fixtures/candidate-results/baseline-v1.json --json
 npm run eval -- --results evals/fixtures/candidate-results/improved-v1.json --baseline evals/fixtures/candidate-results/baseline-v1.json --json
-```
-
-Expected: all commands exit 0 and JSON outputs parse.
-
-- [ ] **Step 6: Commit**
-
-```bash
 git add scripts/run-evals.mjs test/eval-cli.test.js package.json
 git commit -m "feat: add offline PARA11AX eval CLI"
 ```
 
 ---
 
-### Task 8: Documentation and Routing-Evidence Contract
+### Task 8: Operator Documentation and Routing-Evidence Contract
 
 **Files:**
 - Create: `docs/PARA11AX-EVALS.md`
 - Modify: `docs/AGENT-ORCHESTRATION.md`
-- Create or modify: `test/eval-docs.test.js`
+- Create: `test/eval-docs.test.js`
 
-**Interfaces:**
-Documentation must match the actual CLI flags, schema names, promotion thresholds, and privacy boundaries implemented above.
+- [ ] **Step 1: Write failing documentation contract test**
 
-- [ ] **Step 1: Write a failing documentation contract test**
+Require both docs to reflect schema names and trust boundary, and require operator doc to contain exact thresholds: provenance/handoff `2%`, KQL `3%`, efficiency `20%`, weighted improvement `2%`, weighted efficiency tolerance `1%`.
 
-Test that both documents contain:
-
-- `para11ax-eval-result-v1.0`;
-- `para11ax-eval-scorecard-v1.0`;
-- `npm run eval:verify`;
-- explicit statement that v1 makes no model API calls;
-- explicit statement that routing never auto-mutates from scorecards;
-- exact default promotion thresholds `2%`, `3%`, `10%`, `15%` in the operator doc.
+Also require `npm run eval:verify`, no model API calls in v1, and no automatic routing mutation.
 
 - [ ] **Step 2: Run red**
 
@@ -1105,71 +813,41 @@ Test that both documents contain:
 node --test test/eval-docs.test.js
 ```
 
-Expected: FAIL until docs are written.
-
 - [ ] **Step 3: Write `docs/PARA11AX-EVALS.md`**
 
-Document:
+Document purpose/trust boundary, corpus/version/hash model, candidate/review contract, domain scoring, hard failures vs weighted score, exact manifest-driven promotion policy, privacy boundary, CLI/exit codes, corpus versioning procedure, and routing review procedure.
 
-1. purpose and trust boundary;
-2. corpus/version/hash model;
-3. candidate result schema and one sanitized example;
-4. domain scoring summary;
-5. hard failures vs weighted score;
-6. exact promotion policy;
-7. privacy and data-minimization boundary;
-8. CLI commands and exit codes;
-9. corpus update procedure: new version, regenerate hashes, update scorer version only when behavior changes;
-10. routing-review procedure: compare exact same corpus/scorers, review human-review cases, then change routing explicitly in a separate reviewed source commit if justified.
+- [ ] **Step 4: Update `docs/AGENT-ORCHESTRATION.md`**
 
-- [ ] **Step 4: Link orchestration policy to internal eval evidence**
+Add a normative subsection: public benchmarks do not directly change routes; internal scorecard evidence is advisory input to a separately reviewed source change; production routing has no runtime dependency on eval results.
 
-Add a short normative subsection to `docs/AGENT-ORCHESTRATION.md` stating that public benchmark changes do not directly alter routes and internal scorecard evidence is advisory input to a reviewed source change.
-
-- [ ] **Step 5: Run green**
+- [ ] **Step 5: Run green and commit**
 
 ```bash
 node --test test/eval-docs.test.js
-```
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
-
-```bash
 git add docs/PARA11AX-EVALS.md docs/AGENT-ORCHESTRATION.md test/eval-docs.test.js
 git commit -m "docs: define PARA11AX eval operations"
 ```
 
 ---
 
-### Task 9: CI Integration and Full Repository Verification
+### Task 9: CI Integration and Exact-Head Verification
 
 **Files:**
 - Modify: `package.json`
-- Modify only if needed after inspection: `.github/workflows/tooling-smoke.yml`
-- Test: entire repository
+- Modify `.github/workflows/tooling-smoke.yml` only if it no longer runs `npm run check` at execution time.
 
-**Interfaces:**
-`npm run check` becomes the authoritative local deterministic gate for eval self-tests plus corpus verification. Tooling smoke already calls `npm run check`, so prefer changing `package.json` rather than duplicating logic in the workflow.
+- [ ] **Step 1: Integrate corpus verification into existing local/CI gate**
 
-- [ ] **Step 1: Write the intended package-script change**
-
-Change `check` from:
-
-```json
-"check": "bash -n scripts/*.sh && npm run lint:shell && npm run verify:repo && npm run audit:public && npm test"
-```
-
-to:
+Change `check` to:
 
 ```json
 "check": "bash -n scripts/*.sh && npm run lint:shell && npm run verify:repo && npm run audit:public && npm test && npm run eval:verify"
 ```
 
-Do not change `.github/workflows/tooling-smoke.yml` if it still invokes `npm run check`. Duplication would only give future humans two places to forget updating.
+Because current Tooling smoke already runs `npm run check`, do not duplicate `npm run eval:verify` in the workflow unless that workflow has changed before execution.
 
-- [ ] **Step 2: Run the full deterministic suite locally**
+- [ ] **Step 2: Run full deterministic verification**
 
 ```bash
 npm ci --ignore-scripts
@@ -1177,11 +855,9 @@ npm audit --omit=dev
 npm run check
 ```
 
-Expected: dependency audit has no blocking vulnerability and all checks pass.
+Expected: PASS with no blocking audit result.
 
-- [ ] **Step 3: Prove the CLI has no network dependency by static import audit**
-
-Run:
+- [ ] **Step 3: Static no-network import audit**
 
 ```bash
 rg -n "from ['\"](node:https|node:http|https|http|undici|axios|got|openai|@anthropic)" src/eval scripts/run-evals.mjs
@@ -1189,7 +865,7 @@ rg -n "from ['\"](node:https|node:http|https|http|undici|axios|got|openai|@anthr
 
 Expected: no matches.
 
-- [ ] **Step 4: Run corpus/golden commands one final time**
+- [ ] **Step 4: Reproduce canonical JSON output**
 
 ```bash
 npm run eval:verify
@@ -1206,56 +882,32 @@ git add package.json
 git commit -m "ci: verify eval corpus in tooling gate"
 ```
 
-- [ ] **Step 6: Open/update the feature PR and freeze the final head SHA**
+- [ ] **Step 6: Open/update PR and freeze final head**
 
-PR title:
+PR title: `Add deterministic PARA11AX internal eval harness`.
 
-```text
-Add deterministic PARA11AX internal eval harness
-```
+PR body summarizes offline/no-provider architecture, nine-domain corpus, deterministic scoring/comparison, review contract, privacy-bounded outputs, manifest-driven promotion gate, TDD evidence, and exact-head completion rule.
 
-PR body must summarize:
+- [ ] **Step 7: Verify exact-head Tooling smoke and CodeQL**
 
-- offline/no-provider-call architecture;
-- nine-domain frozen corpus;
-- deterministic scorecard/comparison;
-- privacy-bounded aggregate outputs;
-- explicit promotion gate;
-- TDD evidence;
-- completion rule: exact-head Tooling smoke + CodeQL success.
+Do not accept earlier-run green. Any patch changes head SHA and requires fresh exact-head evidence.
 
-- [ ] **Step 7: Wait for exact-head CI and inspect failures by exact SHA**
+- [ ] **Step 8: Squash merge only after both gates succeed**
 
-Required workflows:
-
-- `Tooling smoke`
-- `CodeQL`
-
-Do not merge based on earlier commits. If any test changes are needed, the head SHA changes and both workflows must be re-evaluated on the new final SHA.
-
-- [ ] **Step 8: Squash merge only after both exact-head gates succeed**
-
-Use repository-allowed squash merge with `expected_head_sha` pinned to the verified final feature head. Then verify:
-
-1. PR state is `closed` and `merged=true`;
-2. `main` points to the returned squash commit SHA;
-3. the merged commit contains the eval harness files.
-
-Expected final state: deterministic eval evidence is available from `main`, while production MCP/model routing behavior remains unchanged unless a future reviewed routing commit explicitly consumes the evidence.
+Use repository-allowed squash with `expected_head_sha` pinned to the verified final feature head. Verify PR `merged=true`, `main` points to returned squash commit, and merged commit contains eval harness files.
 
 ---
 
 ## Self-Review Checklist
 
-Before execution begins, the implementing agent must verify these plan invariants:
-
-- Every spec deliverable maps to at least one task above.
-- No task requires a live provider key or network request.
-- No scorecard structure contains raw candidate output fields.
-- Corpus hashing has one deterministic generation path and one independent verification path.
-- The routing scorer imports production routing policy, while production routing imports nothing from `src/eval/`.
-- Nullable measurements remain nullable through result validation, scorecard generation, and comparison.
-- Promotion cannot be passed by weighted score if critical hard failures regress.
-- Human-review-required cases block automatic promotion.
-- Full-corpus-only behavior is enforced in v1.
-- The existing Tooling smoke workflow remains authoritative through `npm run check`; avoid redundant workflow edits unless the workflow has changed before implementation.
+- Every approved spec deliverable maps to a task above.
+- No task requires provider keys, network access, or LLM judging.
+- Promotion thresholds exactly match the approved spec: 2% provenance/handoff, 3% KQL, 2% quality improvement, 1% quality tolerance for efficiency, 20% cost-or-token efficiency.
+- Promotion policy is stored in the corpus manifest and comparison consumes it rather than maintaining another runtime copy.
+- Human review has an explicit result-bundle representation and promotion semantics.
+- Scorecards record result hash, corpus/scorer versions, evaluator version, and promotion policy.
+- Raw candidate outputs are absent from scorecards/comparisons by structure and privacy tests.
+- Set-semantic arrays are normalized before canonical serialization; order-significant arrays are preserved.
+- Nullable measurements remain nullable through validation, scorecard, and comparison.
+- Production routing imports nothing from `src/eval/`; routing scorer may import production routing.
+- Existing Tooling smoke stays authoritative through `npm run check`; avoid redundant workflow logic.
