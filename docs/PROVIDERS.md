@@ -1,13 +1,13 @@
 <!-- PARA11AX-DOC-STANDARD: GER1E/PARA11AX v1 -->
 ### Providers
 
-The executable provider registry is the source of truth for the canonical Evidence v2 and Intelligence Fabric provider surface. The active registry contains **43 provider capabilities** spanning **39 upstream services**. The difference is intentional: VirusTotal, Censys and urlscan.io each expose bounded sibling capabilities under a shared provider family rather than pretending each execution mode is a new upstream source. `release-manifest.json` records active adapter/parser versions, and `/api/para11ax/meta` exposes static capabilities without credential values or secret configuration state.
+The executable provider registry is the source of truth for the canonical Evidence v2 and Intelligence Fabric provider surface. The active registry contains **45 provider capabilities** spanning **41 upstream services**. The difference is intentional: VirusTotal, Censys and urlscan.io each expose bounded sibling capabilities under a shared provider family rather than pretending each execution mode is a new upstream source. VulnCheck and deps.dev add two explicit graph-only upstream services and do not widen the 39-source baseline enrichment fabric. `release-manifest.json` records active adapter/parser versions, and `/api/para11ax/meta` exposes static capabilities without credential values or secret configuration state.
 
 #### Registry contract
 
 Every active provider declares and is validated for supported indicator/observation types, tier/cost class, timeout/cache policy, response ceiling, exact fixed host(s), allowed methods/protocols, parser version, source URL, credential posture and source semantics. Intelligence Fabric capabilities can additionally declare execution mode, fanout eligibility, sensitivity, authorization, retention, bounded paging/relationship limits and provider family. Scheduler-aware providers can expose declarative execution-value metadata; that metadata does not change fixed hosts, credentials or provider admission.
 
-A canonical workflow cannot route to an unregistered provider or a provider that does not support that indicator type. The nine Evidence v2 enrichment workflows remain `ip`, `domain`, `url`, `hash`, `cve`, `attack`, `asn`, `cidr`, and `certificate`. Non-enrichment Intelligence Fabric capabilities, such as `virustotal-graph`, `urlscan-graph`, `censys-search` and `censys-history`, are selectable only through their declared mode and do not enter ordinary enrichment fanout.
+A canonical workflow cannot route to an unregistered provider or a provider that does not support that indicator type. The nine Evidence v2 enrichment workflows remain `ip`, `domain`, `url`, `hash`, `cve`, `attack`, `asn`, `cidr`, and `certificate`. Non-enrichment Intelligence Fabric capabilities, such as `virustotal-graph`, `urlscan-graph`, `censys-search`, `censys-history`, `vulncheck` and `deps-dev`, are selectable only through their declared mode and do not enter ordinary enrichment fanout.
 
 #### Current provider fabric
 
@@ -17,7 +17,9 @@ A canonical workflow cannot route to an unregistered provider or a provider that
 
 **File / malware:** CIRCL Hashlookup · MalwareBazaar · Malpedia · Hybrid Analysis.
 
-**Vulnerability / ATT&CK:** CISA KEV · CISA ADP SSVC · FIRST EPSS · CIRCL Vulnerability-Lookup · NVD · OSV · MITRE ATT&CK TAXII.
+**Vulnerability / ATT&CK:** CISA KEV · CISA ADP SSVC · FIRST EPSS · CIRCL Vulnerability-Lookup · NVD · OSV · VulnCheck exploit intelligence · MITRE ATT&CK TAXII.
+
+**Supply chain:** deps.dev package/dependency graph intelligence.
 
 **Ransomware:** RansomLook · Ransomware.live API-PRO.
 
@@ -82,6 +84,8 @@ Provider observations preserve their own meaning. Examples:
 - CISA ADP SSVC: CISA Stakeholder-Specific Vulnerability Categorization context from the CVE record's CISA ADP container; upstream `Exploitation`, `Automatable`, and `Technical Impact` decisions remain separate axes and are not collapsed into a score.
 - EPSS: exploitation probability.
 - NVD/CIRCL/OSV: vulnerability metadata.
+- VulnCheck: exploit-presence and exploit-maturity context from its bounded CVE exploit index; presence does not replace KEV/EPSS/CVSS axes.
+- deps.dev: package identity, direct/transitive dependency and supply-chain relationship context; dependency presence is not a maliciousness verdict.
 - MITRE ATT&CK TAXII: knowledge/mapping context.
 - VirusTotal point enrichment: provider-specific reputation, malware association and certificate context.
 - VirusTotal graph: explicit bounded relationships such as resolutions, communicating files, historical certificates and contacted infrastructure; relationship presence is context, not a new maliciousness vote.
