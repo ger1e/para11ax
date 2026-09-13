@@ -39,7 +39,7 @@ test('two known independent families can BLOCK', () => {
   const r = registry([['vt', 'google-vt'], ['urlhaus', 'abuse-ch']]);
   const rec = applyProviderIndependencePolicy(artifact(['vt', 'urlhaus']), r).recommendations[0];
   assert.equal(rec.disposition, 'BLOCK');
-  assert.equal(rec.ruleId, 'DI-BLOCK-2-INDEPENDENT-GROUPS');
+  assert.equal(rec.ruleId, 'DI-BLOCK-2-DIRECT');
   assert.equal(rec.independence.quorumEligibleGroupCount, 2);
 });
 
