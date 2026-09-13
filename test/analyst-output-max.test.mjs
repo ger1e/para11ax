@@ -76,11 +76,11 @@ test('full CTI workflow budget permits at most two bounded attempts per configur
   }
 });
 
-test('terminal chrome reports the canonical 38-source fabric', () => {
+test('terminal chrome reports the canonical 39-upstream-source fabric', () => {
   const polish = readFileSync('app/terminal-polish.js', 'utf8');
-  assert.match(polish, /38 SOURCES/);
-  assert.match(polish, /38 SRC/);
-  assert.doesNotMatch(polish, /37 SOURCES|37 SRC/);
+  assert.match(polish, /39 SOURCES/);
+  assert.match(polish, /39 SRC/);
+  assert.doesNotMatch(polish, /38 SOURCES|38 SRC|40 SOURCES|40 SRC/);
 });
 
 test('report renderers format structured analyst content without JSON object syntax', () => {
