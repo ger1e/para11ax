@@ -14,7 +14,7 @@ import { censysProvider as rawCensysProvider } from './censys.js';
 import { modatProvider as rawModatProvider } from './modat.js';
 import { cloudflareRadarProvider as rawCloudflareRadarProvider } from './cloudflare-radar.js';
 import { cloudflareDnsProvider as rawCloudflareDnsProvider } from './cloudflare-dns.js';
-import { virustotalProvider as rawVirustotalProvider } from './virustotal.js';
+import { virustotalProvider as rawVirustotalProvider, virustotalGraphProvider as rawVirustotalGraphProvider } from './virustotal.js';
 import { otxProvider as rawOtxProvider } from './otx.js';
 import { threatfoxProvider as rawThreatfoxProvider } from './threatfox.js';
 import { urlscanProvider as rawUrlscanProvider } from './urlscan.js';
@@ -56,6 +56,7 @@ export const modatProvider = withProviderMetadata(rawModatProvider);
 export const cloudflareRadarProvider = withProviderMetadata(rawCloudflareRadarProvider);
 export const cloudflareDnsProvider = withProviderMetadata(rawCloudflareDnsProvider);
 export const virustotalProvider = withProviderMetadata(rawVirustotalProvider);
+export const virustotalGraphProvider = withProviderMetadata(rawVirustotalGraphProvider);
 export const otxProvider = withProviderMetadata(rawOtxProvider);
 export const threatfoxProvider = withProviderMetadata(rawThreatfoxProvider);
 export const urlscanProvider = withProviderMetadata(rawUrlscanProvider);
@@ -82,7 +83,7 @@ export const ALL_PROVIDERS = Object.freeze([
   ipinfoProvider, rdapProvider, ripestatProvider, dshieldProvider, spamhausDropProvider, torExitProvider,
   feodoTrackerProvider, threatminerProvider, mispCirclOsintProvider, mispBotvrijOsintProvider,
   greynoiseProvider, abuseipdbProvider, shodanProvider, censysProvider, modatProvider, cloudflareRadarProvider,
-  cloudflareDnsProvider, virustotalProvider, otxProvider, threatfoxProvider, urlscanProvider, webamonProvider,
+  cloudflareDnsProvider, virustotalProvider, virustotalGraphProvider, otxProvider, threatfoxProvider, urlscanProvider, webamonProvider,
   pulsediveProvider, openphishProvider, urlhausProvider, circlHashlookupProvider,
   malwarebazaarProvider, malpediaProvider, hybridAnalysisProvider, cisaKevProvider, cisaAdpProvider, epssProvider,
   circlVulnerabilityProvider, nvdProvider, osvProvider, attackTaxiiProvider,
