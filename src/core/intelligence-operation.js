@@ -15,6 +15,10 @@ function cacheTtl(adapter, result) {
   return NEGATIVE_VERDICTS.has(verdict) ? adapter.negativeCacheTtlMs : adapter.cacheTtlMs;
 }
 
+function cacheAllowed(adapter) {
+  return adapter?.retentionClass !== 'no_store';
+}
+
 function providerState(adapter, env) {
   if (!adapter) return 'missing';
   if (adapter.active === false) return 'inactive';
@@ -71,11 +75,11 @@ export async function runIntelligenceMode({
   const executed = [];
 
   for (const adapter of ranked) {
+    const canCache = cacheAllowed(adapter);
     const key = cacheKey(adapter.name, subject.type, subject.value);
-    let result = cache?.get?.(key);
-    let cacheState = 'hit';
+    let result = canCache ? cache?.get?.(key) : undefined;
+    let cacheState = canCache && result !== undefined ? 'hit' : 'miss';
     if (result === undefined) {
-      cacheState = 'miss';
       result = await runProvider(adapter, subject, {
         timeoutMs: adapter.timeoutMs,
         now,
@@ -84,7 +88,7 @@ export async function runIntelligenceMode({
         telemetry,
         context,
       });
-      if (result?.ok) cache?.set?.(key, result, cacheTtl(adapter, result));
+      if (canCache && result?.ok) cache?.set?.(key, result, cacheTtl(adapter, result));
     }
     executed.push(adapter.name);
     if (!result?.ok) {
