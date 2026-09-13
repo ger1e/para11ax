@@ -5,14 +5,10 @@ import { COMMAND_REGISTRY } from '../app/shell-core/catalog.js';
 import { MISSION_HANDLERS, executeMissionCommand } from '../src/core/mission/command-adapter.js';
 
 const EXPECTED = Object.freeze([
-  ['domain-investigation', 'build'],
-  ['domain-investigation', 'surface-import'],
-  ['domain-investigation', 'vulnerability-import'],
-  ['domain-investigation', 'show'],
-  ['domain-investigation', 'report'],
-  ['domain-investigation', 'stix'],
-  ['domain-investigation', 'handoff'],
-  ['domain-investigation', 'clear'],
+  ['domain-investigation', 'build'], ['domain-investigation', 'surface-import'],
+  ['domain-investigation', 'vulnerability-import'], ['domain-investigation', 'show'],
+  ['domain-investigation', 'report'], ['domain-investigation', 'stix'],
+  ['domain-investigation', 'handoff'], ['domain-investigation', 'clear'],
 ]);
 
 function enrichment() {
@@ -60,17 +56,18 @@ test('shared command adapter keeps volatile Domain Investigation state and prese
   let outcome = await executeMissionCommand({ handler: 'domain-investigation-build', args: ['--stdin'], workspace, loadContent: loader });
   workspace = outcome.workspace;
   assert.equal(outcome.output.value.schemaVersion, 'domain-investigation-v1.0');
+  assert.equal(outcome.output.value._authoritative, undefined);
 
   const prior = workspace;
   outcome = await executeMissionCommand({ handler: 'domain-investigation-surface-import', args: ['--stdin'], workspace, loadContent: loader });
   workspace = outcome.workspace;
   assert.notEqual(workspace, prior);
-  assert.equal(outcome.output.value.operatorContext.surface.length, 1);
-  assert.ok(outcome.output.value.operatorContext.surface.every(item => item.authority === undefined));
+  assert.equal(outcome.output.value.imports.surface.length, 1);
+  assert.equal(outcome.output.value._authoritative, undefined);
 
   outcome = await executeMissionCommand({ handler: 'domain-investigation-vulnerability-import', args: ['--stdin'], workspace, loadContent: loader });
   workspace = outcome.workspace;
-  assert.equal(outcome.output.value.operatorContext.vulnerabilities.length, 1);
+  assert.equal(outcome.output.value.imports.vulnerabilities.length, 1);
 
   const shown = await executeMissionCommand({ handler: 'domain-investigation-show', workspace, loadContent: loader });
   assert.equal(shown.output.value._authoritative, undefined);
