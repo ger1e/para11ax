@@ -2,7 +2,7 @@ import { buildAgentExecutionPlan } from '../core/agent-execution-plan.js';
 import { executeDomainInvestigationCommand } from '../core/domain-investigation-command-adapter.js';
 import { INVESTIGATION_LIMITS } from '../core/investigation/index.js';
 import { securityHeaders } from '../core/http.js';
-import { verifyMcpAuthorization } from './oauth.js';
+import { MCP_OAUTH_SCOPE, verifyMcpAuthorization } from './oauth.js';
 import {
   MCP_PROTOCOL_VERSION,
   MCP_TOOLS as RUNTIME_MCP_TOOLS,
@@ -20,7 +20,7 @@ const DOMAIN_ACTIONS = Object.freeze([
 const DOMAIN_TOOL = {
   name: 'para11ax_domain_investigation',
   title: 'PARA11AX Domain Investigation',
-  description: 'Build and advance a passive suspicious-domain investigation with explicit client-carried state, bounded operator-context imports, report, STIX, and handoff projections.',
+  description: 'Use this when you need a passive suspicious-domain investigation with explicit client-carried state, bounded authorized operator-context imports, deterministic report/STIX/handoff output, and no hosted active scanning.',
   inputSchema: Object.freeze({
     type: 'object',
     properties: Object.freeze({
@@ -32,7 +32,13 @@ const DOMAIN_TOOL = {
     required: Object.freeze(['action']),
     additionalProperties: false,
   }),
-  annotations: { readOnlyHint: false },
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: false,
+    idempotentHint: false,
+  },
+  securitySchemes: [{ type: 'oauth2', scopes: [MCP_OAUTH_SCOPE] }],
 };
 
 export const MCP_TOOLS = Object.freeze([...RUNTIME_MCP_TOOLS, DOMAIN_TOOL]);
