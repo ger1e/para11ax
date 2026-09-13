@@ -140,6 +140,10 @@ The handoff is bounded to 128 KiB and contains:
 
 Raw Evidence v2 bodies, raw scanner datasets, and credentials are excluded from the handoff.
 
+## Verification
+
+Repository verification covers the core workflow, canonical gateway schema contract, Web/CLI command parity, stateless MCP catalog/conformance, deterministic STIX export, and bounded handoff behavior. Tooling smoke is the protected-branch gate and CodeQL runs alongside it.
+
 ## Security boundary
 
 Domain Investigation adds no new provider, host, credential, persistence mechanism, arbitrary execution primitive, or active scanning path. Its core and STIX projection are deterministic transformations over already supplied data. Existing PARA11AX gateway validation, fixed egress, OAuth/bearer policy, and analyst-approval boundaries remain authoritative.
