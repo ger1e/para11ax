@@ -92,13 +92,6 @@ export function completeShellInput(input, {
   const legacyCase = legacyCaseCompletions(tokens, trailingSpace, caseTypes);
   if (legacyCase !== null) return legacyCase;
 
-  // Preserve the established `intel <observable-type>` completion contract.
-  // Normalized intelligence operations remain explicit commands but do not
-  // displace type completion on the legacy generic `intel` front door.
-  if (trailingSpace && tokens.length === 1 && tokens[0].toLowerCase() === 'intel' && observableTypes.length) {
-    return uniqueSorted(observableTypes);
-  }
-
   const prefixTokens = trailingSpace ? tokens : tokens.slice(0, -1);
   const fragment = trailingSpace ? '' : tokens[tokens.length - 1];
   const children = childCompletions(prefixTokens, fragment, surface);
