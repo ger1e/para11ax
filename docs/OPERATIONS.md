@@ -101,11 +101,11 @@ When validating a particular paid/quota provider, use a provider-specific bounde
 
 MODAT Magnify uses `api.magnify.modat.io` and is tier 3/quota. Production acceptance must execute a MODAT-specific provider call if the claim is “MODAT works”; a generic enrichment smoke is insufficient.
 
-### GreyNoise / Project Swarm
+### GreyNoise Project Swarm
 
-The enrichment adapter and Swarm operator utility are separate surfaces. A configured `GREYNOISE_API_KEY` does not prove Sensors/Swarm entitlement. Validate the exact scope/operation required.
+The GreyNoise enrichment adapter and GreyNoise Project Swarm operator utility are separate surfaces. A configured `GREYNOISE_API_KEY` does not prove Sensors/Swarm entitlement. Validate the exact scope/operation required.
 
-Swarm supports `search`, `get`, `unique`, `timeseries`, `diff`, and explicit single-session `export`. Arbitrary destinations/fields and bulk export remain outside the surface.
+GreyNoise Swarm supports `search`, `get`, `unique`, `timeseries`, `diff`, and explicit single-session `export`. Arbitrary destinations/fields and bulk export remain outside the surface.
 
 ### User Scanner
 
@@ -117,11 +117,13 @@ Web / MCP
   -> configured isolated worker
 ```
 
+The hosted worker URL is configured through `PARA11AX_USER_SCANNER_URL`; the production alias is `https://user-scanner-kappa.vercel.app`. Optional static service authentication uses `PARA11AX_USER_SCANNER_TOKEN`; trusted Vercel workload identity remains the preferred deployment path where configured. Never log or expose the token value.
+
 The handler accepts `email|username`, bounded category/module selectors and boolean controls. Normalized `found` counts only exact matches; ambiguous upstream hits remain `unverified`. Worker authentication may use the configured static token or trusted workload identity according to deployment configuration.
 
 ### Shodan
 
-The native analyst surface is bounded to `host`, `search`, `count`, `stats`, `domain`, and `info`. It is separate from the Evidence v2 provider adapter. Search/domain credit behavior is operational account state, not a static-code guarantee.
+The native analyst surface is bounded to `shodan host`, `shodan search`, `shodan count`, `shodan stats`, `shodan domain`, and `shodan info`. It is separate from the Evidence v2 provider adapter. Search/domain credit behavior is operational account state, not a static-code guarantee.
 
 ## Provider scheduling
 
