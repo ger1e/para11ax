@@ -13,6 +13,8 @@ export const PROBE_SAMPLE_BY_TYPE = Object.freeze({
   cidr: '8.8.8.0/24',
   package: 'pkg:npm/lodash@4.17.21',
   'tls-fingerprint': 'ja3:72a589da586844d7f0818ce684948eea',
+  'crypto-address': 'eth:0000000000000000000000000000000000000000',
+  'secret-fingerprint': `hmsl-sha256:${'0'.repeat(64)}`,
 });
 
 const STATUS_PRIORITY = Object.freeze({
