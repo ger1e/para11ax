@@ -5,6 +5,7 @@ import {
   createHandoffEnvelope,
   detectAgentDrift,
   importAgentState,
+  importHandoffEnvelope,
   reduceAgentState,
 } from '../src/core/agent-state.js';
 
@@ -89,17 +90,23 @@ test('detects invariant drift and loss of accepted decisions without flagging le
   assert.equal(noDrift.severity, 'none');
 });
 
-test('handoff envelope preserves durable state and both integrity hashes', () => {
+test('handoff envelope is compact and independently verifiable', () => {
   let state = createAgentState({ objective: 'Continue safely', constraints: ['Exact refs'], ...fixed });
   state = reduceAgentState(state, { type: 'DECISION_ADD', text: 'Keep raw tool output out of handoff state.' }, { now: () => LATER, uuid: () => 'evt-1' });
   state = reduceAgentState(state, { type: 'ARTIFACT_ADD', value: { kind: 'url', ref: 'https://example.test/evidence', summary: 'Retrievable evidence' } }, { now: () => LATER, uuid: () => 'evt-2' });
 
   const handoff = createHandoffEnvelope(state, { to: 'reviewer', reason: 'Verify', contextRefs: ['repo:ger1e/para11ax'] });
   assert.equal(handoff.invariantHash, state.checkpoint.invariantHash);
-  assert.equal(handoff.stateHash, state.checkpoint.stateHash);
+  assert.equal(handoff.sourceStateHash, state.checkpoint.stateHash);
+  assert.match(handoff.handoffHash, /^[a-f0-9]{64}$/);
   assert.deepEqual(handoff.decisions, state.decisions);
   assert.deepEqual(handoff.artifacts, state.artifacts);
   assert.equal(Object.hasOwn(handoff, 'timeline'), false);
+  assert.equal(importHandoffEnvelope(handoff).handoffHash, handoff.handoffHash);
+
+  const forged = structuredClone(handoff);
+  forged.artifacts[0].ref = 'https://evil.example/forged';
+  assert.throws(() => importHandoffEnvelope(forged), /handoff hash mismatch/i);
 });
 
 test('import rejects forged intent and provenance-bearing state', () => {
