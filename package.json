@@ -15,7 +15,7 @@
     "verify:governance": "node scripts/verify-github-governance.mjs",
     "lint:shell": "shellcheck scripts/*.sh",
     "audit:public": "node scripts/audit-public-release.mjs",
-    "check": "bash -n scripts/*.sh && npm run lint:shell && npm run verify:repo && npm run audit:public && npm test",
+    "check": "bash -n scripts/*.sh && npm run lint:shell && npm run verify:repo && npm run audit:public && npm test && npm run eval:verify",
     "test": "node --test",
     "eval": "node scripts/run-evals.mjs",
     "eval:verify": "node scripts/run-evals.mjs --verify-corpus"
