@@ -6,7 +6,7 @@ import { toDomainInvestigationStix } from '../src/export/domain-investigation-st
 
 function enrichment() {
   return {
-    schemaVersion: 'evidence-v2.0', gatewayVersion: 'test', requestId: 'stix-test',
+    schemaVersion: '2.0', gatewayVersion: 'test', requestId: 'stix-test',
     indicator: 'suspicious.example', type: 'domain', queriedAt: '2026-09-13T12:00:00.000Z', profile: 'standard', status: 'ok',
     evidence: [{
       provider: 'virustotal', indicator: 'suspicious.example', type: 'domain',
