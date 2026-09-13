@@ -17,7 +17,7 @@ function normalizeRegistry(value) {
   throw new TypeError('provider independence registry must be a v1 registry or registry entry array');
 }
 
-function classify(rec, independence) {
+function classify(rec, independence, hasAnalystAttestation) {
   const knownGroups = independence.quorumEligibleGroupCount;
   const contradictions = Array.isArray(rec.contradictions) ? rec.contradictions : [];
   const contextSources = Array.isArray(rec.contextSources) ? rec.contextSources : [];
@@ -39,13 +39,13 @@ function classify(rec, independence) {
       reasons: ['Independent direct provider quorum exists, but explicit negative evidence requires analyst review before blocking.'],
     };
   }
-  if (knownGroups >= 1 && (contextSources.length > 0 || hasOperatorContext)) {
+  if (knownGroups >= 1 && (contextSources.length > 0 || hasOperatorContext || hasAnalystAttestation)) {
     return {
       disposition: 'BLOCK_CANDIDATE',
       ruleId: contradictions.length ? 'DI-CANDIDATE-CONTRADICTION' : 'DI-CANDIDATE-DIRECT-CONTEXT',
       reasons: contradictions.length
         ? ['A known direct malicious provider family exists with corroborating context, but contradiction pressure requires analyst review.']
-        : ['One known direct malicious provider family is corroborated by contextual or operator evidence; human approval remains required.'],
+        : ['One known direct malicious provider family is corroborated by contextual, operator, or approved analyst evidence; human approval remains required.'],
     };
   }
   if (directSources.length > 0) {
@@ -57,11 +57,11 @@ function classify(rec, independence) {
         : 'Direct malicious evidence is present, but its provider lineage is unknown or non-quorum-eligible.'],
     };
   }
-  if (contextSources.length > 0 || hasOperatorContext) {
+  if (contextSources.length > 0 || hasOperatorContext || hasAnalystAttestation) {
     return {
       disposition: 'MONITOR',
       ruleId: 'DI-MONITOR-CONTEXT',
-      reasons: ['Only contextual or operator evidence is present; it does not satisfy direct provider-family quorum.'],
+      reasons: ['Only contextual, operator, or approved analyst evidence is present; it does not satisfy direct provider-family quorum.'],
     };
   }
   return {
@@ -73,20 +73,28 @@ function classify(rec, independence) {
   };
 }
 
-export function applyProviderIndependencePolicy(artifact, registryInput) {
+export function applyProviderIndependencePolicy(artifact, registryInput, effectiveAttestations = []) {
   if (!artifact || typeof artifact !== 'object' || !Array.isArray(artifact.recommendations)) {
     throw new TypeError('Domain Investigation artifact with recommendations is required');
   }
   const registry = normalizeRegistry(registryInput);
+  if (!Array.isArray(effectiveAttestations)) throw new TypeError('effectiveAttestations must be an array');
   const recommendations = artifact.recommendations.map((rec) => {
     const directSources = Array.isArray(rec.directSources) ? rec.directSources : [];
     const independence = summarizeProviderIndependence(directSources, registry);
-    const decision = classify(rec, independence);
+    const matchingAttestations = effectiveAttestations.filter(attestation =>
+      attestation?.authorityClass === 'analyst_attestation'
+      && attestation?.observable?.type === rec.type
+      && attestation?.observable?.value === rec.value);
+    const decision = classify(rec, independence, matchingAttestations.length > 0);
+    const authority = [...new Set([...(Array.isArray(rec.authority) ? rec.authority : []), ...(matchingAttestations.length ? ['analyst_promoted'] : [])])].sort();
     return {
       ...rec,
       disposition: decision.disposition,
       ruleId: decision.ruleId,
       reasons: decision.reasons,
+      authority,
+      analystAttestations: matchingAttestations.map(item => item.id).sort(),
       independence: {
         registryVersion: independence.registryVersion,
         rawProviderCount: independence.rawProviderCount,
