@@ -1,3 +1,4 @@
+<!-- PARA11AX-DOC-STANDARD: GER1E/PARA11AX v1 -->
 # PARA11AX Agent Orchestration Policy
 
 Status: normative for agent/harness integrations
@@ -17,15 +18,15 @@ Durable source of truth:
 - accepted decisions;
 - retrievable artifact references;
 - next actions;
-- revision, epoch, and invariant hash.
+- revision, epoch, invariant hash, and full-state hash.
 
 Raw transcripts, copied tool results, search logs, scratch reasoning, and recursive summaries are not durable state.
 
 Rules:
 1. Never silently rewrite objective or constraints. Use explicit reducer actions so the epoch advances.
-2. Verify the invariant hash at import, checkpoint, and handoff boundaries. A mismatch fails closed.
+2. Verify the intent invariant hash and full-state hash on state import/checkpoint boundaries, and verify the compact handoff hash on handoff import. A mismatch fails closed.
 3. Keep accepted decisions append-only unless an explicit scope change supersedes them.
-4. Hand off durable state plus references, not the whole transcript.
+4. Hand off durable state plus references, not the whole transcript. The handoff carries both an independently verifiable handoff hash and the source-state hash for provenance linkage.
 5. Prefer commit SHAs, file paths, URLs, query/incident IDs, and evidence hashes over pasted payloads.
 6. After context reset, reconstruct from canonical state plus just-in-time retrieval, never conversational memory.
 7. Do not declare completion from context alone. Re-check objective, next actions, artifacts, and external verification.
@@ -150,10 +151,15 @@ A generic coding benchmark does not prove a model is the best CTI analyst. Human
 A task is complete only when:
 1. canonical objective is satisfied;
 2. required next actions are empty;
-3. state import and invariant hash validate;
-4. referenced artifacts exist;
-5. task-specific verification has been rerun on the final state;
-6. required high-risk review passed;
-7. final reporting separates verified evidence from inference and residual limitations.
+3. state import and both state hashes validate;
+4. compact handoffs validate their own handoff hash and retain the source-state hash;
+5. referenced artifacts exist;
+6. task-specific verification has been rerun on the final state;
+7. required high-risk review passed;
+8. final reporting separates verified evidence from inference and residual limitations.
 
 For repository changes, the authoritative signal is CI/status on the exact final head SHA, never an earlier run or the agent's memory of one.
+
+---
+
+<p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
