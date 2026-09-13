@@ -31,14 +31,24 @@ test('architecture and API document all canonical workflow types', () => {
   requireTokens(api, workflowTokens(), 'API workflow contract');
 });
 
-test('README and provider docs distinguish capabilities from upstream services', () => {
+test('README, provider docs and terminal distinguish capabilities from upstream services', () => {
   const readme = read('README.md');
   const providers = read('docs/PROVIDERS.md');
+  const terminal = read('app/terminal-polish.js');
   assert.equal(capabilityCount, 40, 'registered provider capability count drifted');
   assert.equal(upstreamSourceCount, 39, 'upstream provider-family count drifted');
   assert.ok(readme.includes(`${upstreamSourceCount} upstream APIs and feeds`), 'README upstream-source count drifted');
   assert.ok(providers.includes(`**${capabilityCount} provider capabilities**`), 'PROVIDERS capability count drifted');
   assert.ok(providers.includes(`**${upstreamSourceCount} upstream services**`), 'PROVIDERS upstream-service count drifted');
+  assert.ok(terminal.includes(`${upstreamSourceCount} SOURCES`), 'terminal must report upstream sources, not capability count');
+  assert.ok(terminal.includes(`${upstreamSourceCount} SRC`), 'mobile terminal must report upstream sources, not capability count');
+  assert.doesNotMatch(terminal, new RegExp(`${capabilityCount} SOURCES`), 'terminal must not label capability count as sources');
+  requireTokens(providers, [
+    'CISA ADP SSVC',
+    'Exploitation',
+    'Automatable',
+    'Technical Impact',
+  ], 'CISA ADP provider documentation');
   assert.match(
     readme,
     /https:\/\/para11ax\.vercel\.app(?:\/app\/|\/)?/,
