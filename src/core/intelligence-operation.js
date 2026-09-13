@@ -1,6 +1,7 @@
 import { runUserScannerScan } from '../user-scanner.js';
 import { authorizeCapability } from './intelligence-policy.js';
 import { createTrustedAuthorizationContext } from './authorization-context.js';
+import { createProviderExecutionAuthorization } from './execution-authorization.js';
 import { rankProvidersForExecution } from './provider-priority.js';
 import { runProvider } from './provider-runner.js';
 import { normalizeEvidence } from './normalize.js';
@@ -187,13 +188,14 @@ export async function runIntelligenceMode({
     let result = canCache ? cache?.get?.(key) : undefined;
     let cacheState = canCache && result !== undefined ? 'hit' : 'miss';
     if (result === undefined) {
+      const executionAuthorization = createProviderExecutionAuthorization({ adapter, subject });
       result = await runProvider(adapter, subject, {
         timeoutMs: adapter.timeoutMs,
         now,
         nowMs,
         requestId,
         telemetry,
-        context,
+        context: { ...context, executionAuthorization },
       });
       if (canCache && result?.ok) cache?.set?.(key, result, cacheTtl(adapter, result));
     }
