@@ -119,6 +119,11 @@
       "active": true
     },
     {
+      "name": "mwdb",
+      "parserVersion": "mwdb-2026-09-13.1",
+      "active": true
+    },
+    {
       "name": "nvd",
       "parserVersion": "2.0-2026-08-20",
       "active": true
@@ -174,6 +179,11 @@
       "active": true
     },
     {
+      "name": "sslbl",
+      "parserVersion": "sslbl-ja3-2026-09-13.1",
+      "active": true
+    },
+    {
       "name": "threatfox",
       "parserVersion": "2026-08-22.1",
       "active": true
@@ -224,8 +234,18 @@
       "active": true
     },
     {
+      "name": "wayback-cdx",
+      "parserVersion": "wayback-cdx-2026-09-13.1",
+      "active": true
+    },
+    {
       "name": "webamon",
       "parserVersion": "2026-08-23.1",
+      "active": true
+    },
+    {
+      "name": "yaraify",
+      "parserVersion": "yaraify-2026-09-13.1",
       "active": true
     }
   ]
