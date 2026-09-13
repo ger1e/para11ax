@@ -1,3 +1,4 @@
+// TDD RED contract for the intelligence-fabric provider policy.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PROVIDER_MANIFEST, validateProviderPolicy } from '../src/providers/manifest.js';
