@@ -194,6 +194,11 @@
       "active": true
     },
     {
+      "name": "virustotal-graph",
+      "parserVersion": "v3-2026-09-13.1",
+      "active": true
+    },
+    {
       "name": "webamon",
       "parserVersion": "2026-08-23.1",
       "active": true
