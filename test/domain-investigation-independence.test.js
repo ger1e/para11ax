@@ -71,3 +71,13 @@ test('contradiction prevents BLOCK despite two-family quorum', () => {
   assert.equal(rec.disposition, 'BLOCK_CANDIDATE');
   assert.equal(rec.ruleId, 'DI-CANDIDATE-CONTRADICTION');
 });
+
+test('no-direct legacy DO_NOT_BLOCK remains DO_NOT_BLOCK', () => {
+  const input = artifact([]);
+  input.recommendations[0].disposition = 'DO_NOT_BLOCK';
+  input.recommendations[0].ruleId = 'DI-NO-DIRECT-EVIDENCE';
+  input.recommendations[0].reasons = ['No direct malicious Evidence v2 source supports blocking this IOC.'];
+  const rec = applyProviderIndependencePolicy(input, registry([])).recommendations[0];
+  assert.equal(rec.disposition, 'DO_NOT_BLOCK');
+  assert.equal(rec.ruleId, 'DI-NO-DIRECT-EVIDENCE');
+});
