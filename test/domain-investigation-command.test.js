@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { COMMAND_REGISTRY } from '../app/shell-core/catalog.js';
-import { MISSION_HANDLERS, executeMissionCommand } from '../src/core/mission/command-adapter.js';
+import { WORKFLOW_HANDLERS, executeMissionCommand } from '../src/core/mission/command-adapter.js';
 
 const EXPECTED = Object.freeze([
   ['domain-investigation', 'build'], ['domain-investigation', 'surface-import'],
@@ -49,7 +49,7 @@ test('Domain Investigation build/import commands never request scanner/provider 
 
 test('shared command adapter keeps volatile Domain Investigation state and preserves authority boundaries', async () => {
   for (const name of ['domain-investigation-build', 'domain-investigation-surface-import', 'domain-investigation-vulnerability-import', 'domain-investigation-show', 'domain-investigation-report', 'domain-investigation-stix', 'domain-investigation-handoff', 'domain-investigation-clear']) {
-    assert.ok(MISSION_HANDLERS.includes(name), `${name} must be dispatched by the shared shell adapter`);
+    assert.ok(WORKFLOW_HANDLERS.includes(name), `${name} must be dispatched by the shared shell adapter`);
   }
 
   let workspace = null;
@@ -80,5 +80,5 @@ test('shared command adapter keeps volatile Domain Investigation state and prese
   assert.match(handoff.output.value.schemaVersion, /handoff/i);
 
   const cleared = await executeMissionCommand({ handler: 'domain-investigation-clear', workspace, loadContent: loader });
-  assert.equal(cleared.workspace.domainInvestigation, null);
+  assert.equal(cleared.workspace, null);
 });
