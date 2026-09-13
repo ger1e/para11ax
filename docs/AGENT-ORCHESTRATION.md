@@ -4,14 +4,13 @@ Status: normative for agent/harness integrations
 Benchmark snapshot: 2026-09-13
 Runtime boundary: host/agent layer only
 
-PARA11AX remains a deterministic CTI MCP server. The Intelligence Kernel, Evidence v2, provider orchestration, hunt generation, and provenance paths do not call an LLM. This document defines how an external agent or ChatGPT host should preserve task state, allocate context, and choose a model when using PARA11AX.
+PARA11AX remains a deterministic CTI MCP server. The Intelligence Kernel, Evidence v2, provider orchestration, hunt generation, and provenance paths do not call an LLM. This policy governs external agent/ChatGPT hosts using PARA11AX.
 
-## 1. Non-negotiable invariants
+## 1. Drift-resistant state
 
 Every long-running task gets one canonical `AgentState` from `src/core/agent-state.js`.
 
-The durable source of truth is:
-
+Durable source of truth:
 - objective;
 - task class and risk;
 - explicit constraints;
@@ -20,25 +19,24 @@ The durable source of truth is:
 - next actions;
 - revision, epoch, and invariant hash.
 
-Raw transcripts, copied tool results, search logs, scratch reasoning, and recursively generated summaries are not durable state.
+Raw transcripts, copied tool results, search logs, scratch reasoning, and recursive summaries are not durable state.
 
 Rules:
+1. Never silently rewrite objective or constraints. Use explicit reducer actions so the epoch advances.
+2. Verify the invariant hash at import, checkpoint, and handoff boundaries. A mismatch fails closed.
+3. Keep accepted decisions append-only unless an explicit scope change supersedes them.
+4. Hand off durable state plus references, not the whole transcript.
+5. Prefer commit SHAs, file paths, URLs, query/incident IDs, and evidence hashes over pasted payloads.
+6. After context reset, reconstruct from canonical state plus just-in-time retrieval, never conversational memory.
+7. Do not declare completion from context alone. Re-check objective, next actions, artifacts, and external verification.
 
-1. Do not silently rewrite the objective or constraints. Use the explicit reducer actions so the epoch advances and the scope change is auditable.
-2. Check the invariant hash at import, checkpoint, and handoff boundaries. A mismatch fails closed.
-3. Treat accepted decisions as append-only unless a later explicit scope change supersedes them.
-4. Hand off durable state and references, not the entire transcript.
-5. Prefer retrievable identifiers such as commit SHAs, file paths, URLs, query IDs, incident IDs, and evidence hashes over pasted payloads.
-6. After a context reset, reconstruct the working set from canonical state plus just-in-time retrieval. Do not reconstruct intent from conversational memory.
-7. Never declare completion from conversational context alone. Verify against the task's objective, next actions, artifacts, and external test/status evidence.
-
-This is intentionally stricter than generic auto-compaction. Anthropic's context-engineering guidance recommends keeping high-signal context tight, using just-in-time retrieval, clearing old tool results, and preserving architectural decisions during compaction. Its long-running-agent work also found compaction alone insufficient and used persistent progress state plus git history to make fresh sessions recoverable.
+Anthropic's context-engineering guidance independently recommends high-signal context, just-in-time retrieval, clearing stale tool results, and preserving important decisions. Its long-running-agent work found compaction alone insufficient and used persistent progress plus git history for recoverable fresh sessions.
 
 Sources:
 - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
 - https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents
 
-Community reports point in the same direction: long sessions frequently degrade after opaque compaction, while durable external state, checkpoints, and narrower working sets reduce re-exploration. Treat these reports as operational anecdotes, not benchmark evidence.
+Recent practitioner reports describe the same failure mode: opaque compaction loses constraints/status, while external checkpoints and smaller reconstructed working sets reduce re-exploration. These are operational anecdotes, not benchmark evidence.
 
 Examples:
 - https://www.reddit.com/r/ClaudeAI/comments/1uc6jp5/how_do_agents_avoid_context_drift/
@@ -47,135 +45,115 @@ Examples:
 
 ## 2. Context and token policy
 
-Use `planContextBudget()` before assembling a large prompt and `selectContextItems()` when pruning.
+Use `planContextBudget()` before large requests and `selectContextItems()` when pruning.
 
-Default reservation for a model context window:
+Default context accounting:
+- reserve the requested `maxOutputTokens` once;
+- reasoning tokens are inside that output allowance on current OpenAI Responses APIs, so do not subtract a second reasoning reserve;
+- reserve 5% context headroom by default, tunable by caller/internal evals;
+- allocate the remaining input budget as a priority guide: invariants 12%, decisions 12%, active work 24%, evidence 30%, raw tool output 14%, scratch remainder.
 
-| Bucket | Share / rule |
-| --- | ---: |
-| Requested output | explicit maximum |
-| Reasoning reserve | 18% of total context |
-| Safety/headroom reserve | 8% of total context |
-| Invariants | 12% of usable input budget |
-| Accepted decisions | 12% |
-| Active work | 24% |
-| Evidence | 30% |
-| Raw tool output | 14% |
-| Scratch | remainder, normally 8% |
+The percentages are ceilings/priority guidance, not fill targets. Unused context is preferable to low-signal context. When provider tokenizer counts are available, pass exact per-item token counts; `estimateTokens()` is only a conservative fallback.
 
-These are guardrails, not a reason to fill the window. Empty budget is better than irrelevant tokens. Context has diminishing marginal value and can become actively harmful when it buries the working set.
-
-Eviction order under pressure:
-
+Evict in this order under pressure:
 1. scratch;
 2. reproducible raw tool output;
 3. stale/redundant working notes;
-4. duplicated evidence bodies after their retrievable references are preserved.
+4. duplicated evidence bodies after preserving retrievable references.
 
-Never evict the objective, constraints, or accepted decisions. If durable state alone does not fit, fail closed and split the task instead of lossy-compressing the task contract.
+Never evict objective, constraints, or accepted decisions. If durable state alone cannot fit, split the task instead of lossy-compressing the task contract.
 
-For working sets above 250k tokens, default to durable state plus just-in-time retrieval rather than preloading all potentially relevant material. For long-running work, prefer checkpoints and clean context resets over repeated summary-of-summary compaction.
+For very large working sets (default threshold: 250k input tokens), prefer durable state plus just-in-time retrieval over preloading everything. For long-running work, checkpoint and reset cleanly rather than repeatedly summarizing summaries.
 
-## 3. Routing policy
+OpenAI token-accounting reference:
+- https://platform.openai.com/docs/api-reference/responses
 
-`src/core/model-routing.js` routes by task properties, not vendor name. A separate benchmark snapshot maps the abstract tier to currently strong models. This prevents a leaderboard update from changing deterministic PARA11AX logic.
+## 3. Vendor-neutral routing
 
-Base routing:
+`src/core/model-routing.js` routes by task properties, not model brand.
 
-| Task class | Default tier | Reasoning | Review |
+| Task class | Tier | Effort | Review |
 | --- | --- | --- | --- |
 | simple transform / formatting | economy | low | no |
 | routine research / analysis | balanced | medium | risk-dependent |
-| coding / debugging | frontier | high | for high risk or repeated failure |
+| coding / debugging | frontier | high | high-risk/repeated failure |
 | security analysis | frontier | high | different-family reviewer when high risk |
 | long-context synthesis | frontier | high | risk-dependent |
 | deep reasoning | frontier_max | max | independent |
 | explicit review | frontier | high | different family |
 
 Escalation:
-
-- zero failures: use the base route;
+- zero failures: base route;
 - one material failure: minimum frontier/high;
-- two or more material failures: frontier_max/max plus independent different-family review;
-- high-risk tasks can never be cost-demoted below frontier/high and require independent review;
-- a reviewer should not share the primary model family when an alternative is available, reducing correlated failure modes.
+- two or more: frontier_max/max plus independent different-family review;
+- high-risk work cannot be cost-demoted below frontier/high and requires independent review;
+- when possible, use a reviewer from another model family to reduce correlated failure modes.
 
-Cost sensitivity only demotes low-risk, low-complexity work. Latency sensitivity only lowers effort on low-risk work. Model capability is not sacrificed to save pennies on tasks where a wrong answer is expensive.
+Cost sensitivity only demotes low-risk, low-complexity work. Latency sensitivity only lowers effort on low-risk work.
 
-## 4. Model snapshot: 2026-09-13
+## 4. Deployable model mapping, 2026-09-13
 
-This table is advisory host configuration. Re-evaluate it whenever a major model or benchmark version changes.
+This mapping has two gates: capability and verified availability. A public benchmark result does not prove the model is exposed in the operator's API/account.
 
-| Workload | Preferred model / mode | Why |
+Current official OpenAI API catalog mapping:
+
+| Tier / workload | Deployable default | Rationale |
 | --- | --- | --- |
-| cheap extraction, normalization, formatting, bulk low-risk transforms | GPT-5.6 Luna | OpenAI positions Luna for cost-sensitive high-volume work. Do not spend frontier reasoning tokens on deterministic clerical work. |
-| default complex research, CTI synthesis, general professional analysis | GPT-5.6 Sol medium/high | OpenAI's default flagship recommendation for complex reasoning/coding, 1.05M context, substantially cheaper than current top-end Astra. Escalate only when the task warrants it. |
-| hard coding, repo-wide debugging, difficult agentic implementation | GPT-6 Astra high/max | Artificial Analysis Coding Agent Index v4.3 places Astra max at 62, tied for first, ahead of GPT-5.6 Sol at 55; Astra also used materially fewer tokens per task in that harness. |
-| deepest reasoning or repeated-failure escalation | GPT-6 Astra max | Tied for first on Artificial Analysis Intelligence Index v4.3. Use only when the expected quality gain justifies its higher price and latency. |
-| independent high-stakes reviewer | Claude Fable 5.1 high/max | Current independent benchmark leader/tie from a different model family. Different-family review is for error diversity, not because any benchmark proves independence. |
-| low-risk second pass / critique | strongest economical non-primary-family model meeting context needs | Diversity matters more than paying max effort for a routine critique. |
+| economy: extraction, normalization, formatting, high-volume low-risk transforms | GPT-5.6 Luna low | OpenAI positions Luna for cost-sensitive high-volume workloads. |
+| balanced: routine research/analysis where quality still matters | GPT-5.6 Terra medium | OpenAI positions Terra as the intelligence/cost balance. |
+| frontier: complex CTI synthesis, coding, security analysis | GPT-5.6 Sol high | OpenAI's documented flagship for complex reasoning/coding; 1.05M context. |
+| frontier_max: deep reasoning or repeated failure | GPT-5.6 Sol max | Highest documented effort on the currently listed flagship API model. |
 
-Current evidence:
+Official source:
+- https://platform.openai.com/docs/models
 
-- OpenAI model selection and GPT-5.6 family: https://platform.openai.com/docs/models
-- Artificial Analysis, GPT-6 Astra: https://artificialanalysis.ai/articles/benchmarking-gpt-6-astra
-- Artificial Analysis Intelligence Index v4.3: https://artificialanalysis.ai/articles/artificial-analysis-intelligence-index-v4-3
-- Artificial Analysis coding-agent comparison: https://artificialanalysis.ai/agents/coding-agents/comparisons/claude-code-vs-codex
-- Artificial Analysis, Claude Fable 5.1: https://artificialanalysis.ai/articles/claude-fable-5-1
-- ARC Prize technical analysis of GPT-6 Astra: use the current ARC Prize GPT-6 Astra evaluation when validating reasoning/harness behavior.
+Benchmark-advisory alternatives:
+- Artificial Analysis v4.3 currently reports GPT-6 Astra max tied with Claude Fable 5.1 max for the Intelligence Index lead and tied at 62 on its Coding Agent Index, ahead of GPT-5.6 Sol at 55 for coding. If Astra is actually exposed in the target runtime/API, validate availability and internal evals before mapping `frontier_max` to it.
+- Claude Fable 5.1 high/max is a strong different-family reviewer candidate where available. Use a different-family reviewer for error diversity, not because public benchmarks prove statistical independence.
 
-Benchmark caution: model results depend on harness, tool access, effort level, and benchmark version. ARC-AGI-3 results for GPT-6 Astra vary sharply across tool/harness configurations, so the harness is part of the evaluated system. Never copy a leaderboard ordering into a permanent router without recording its date and evaluation setup.
+Independent benchmark sources:
+- https://artificialanalysis.ai/articles/benchmarking-gpt-6-astra
+- https://artificialanalysis.ai/articles/artificial-analysis-intelligence-index-v4-3
+- https://artificialanalysis.ai/agents/coding-agents/comparisons/claude-code-vs-codex
+- https://artificialanalysis.ai/articles/claude-fable-5-1
 
-## 5. Benchmark refresh procedure
+Benchmark caution: model scores depend on harness, tool access, effort, and benchmark version. The harness is part of the evaluated system. Never hard-code a leaderboard ordering as permanent routing logic.
 
-Refresh the advisory model mapping when any of these occurs:
+## 5. Refresh procedure
 
+Refresh the advisory mapping when:
 - a new frontier model is released;
-- Artificial Analysis changes its Intelligence or Coding Agent Index version;
-- a materially better task-specific benchmark becomes available;
-- provider pricing changes enough to alter the Pareto frontier;
-- internal PARA11AX evals contradict the public ranking.
+- a benchmark index version changes;
+- provider availability/pricing changes materially;
+- a better task-specific benchmark appears;
+- internal PARA11AX evals disagree with public rankings.
 
-For each candidate, record:
+For every candidate record model+effort, family, availability, context, task-specific score, token use/task, cost/task, latency where relevant, harness/tool configuration, and snapshot date. Feed normalized scores to `rankModelCandidates()`. Change generic routing only when the policy itself changes.
 
-- model and effort level;
-- model family;
-- context window;
-- task-relevant benchmark score;
-- token use per task when available;
-- cost per task when available;
-- latency when material;
-- harness/tool configuration;
-- snapshot date.
+## 6. Internal PARA11AX eval target
 
-Then feed normalized task-specific scores to `rankModelCandidates()`. The generic router remains unchanged unless the routing policy itself changes.
-
-## 6. Internal evaluation beats generic leaderboard worship
-
-Public benchmarks are priors. PARA11AX should eventually maintain a small frozen eval corpus covering:
-
-- CTI article-to-structured-intelligence extraction;
+Public leaderboards are priors. Prefer a frozen internal eval corpus for:
+- CTI article to structured intelligence extraction;
 - provenance correctness and unsupported-claim rate;
-- IOC/IOA/TTP distinction;
+- IOC vs IOA/TTP distinction;
 - ATT&CK mapping precision;
 - KQL validity against supported schemas;
-- evidence preservation through handoff/context reset;
-- instruction and constraint retention after long tool traces;
-- code-change correctness on representative repo tasks;
-- token and cost per successful task.
+- evidence retention through handoff/context reset;
+- constraint retention after long tool traces;
+- representative repo coding tasks;
+- token/cost per successful task.
 
-Route changes should prefer statistically meaningful improvement on these internal tasks over a generic benchmark lead. A model being excellent at a public coding suite does not magically make it the best analyst for CTI, because apparently benchmarks have not yet abolished specialization.
+A generic coding benchmark does not prove a model is the best CTI analyst. Humanity continues to require domain-specific evaluation. Tragic, but manageable.
 
 ## 7. Completion gate
 
-A long-running task is complete only when:
+A task is complete only when:
+1. canonical objective is satisfied;
+2. required next actions are empty;
+3. state import and invariant hash validate;
+4. referenced artifacts exist;
+5. task-specific verification has been rerun on the final state;
+6. required high-risk review passed;
+7. final reporting separates verified evidence from inference and residual limitations.
 
-1. the canonical objective is satisfied;
-2. no required next action remains;
-3. invariant hash and state import validate;
-4. referenced artifacts exist and are retrievable;
-5. task-specific tests or factual verification have been rerun on the final state;
-6. high-risk work has passed its required independent review;
-7. the final report distinguishes verified evidence from inference and names residual limitations.
-
-For repository changes, the authoritative completion signal is the exact-head CI/status result, not an earlier run and not the agent's recollection of one.
+For repository changes, the authoritative signal is CI/status on the exact final head SHA, never an earlier run or the agent's memory of one.
