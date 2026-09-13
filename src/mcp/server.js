@@ -4,6 +4,7 @@ import { createShodanCommandHandler } from '../shodan-command.js';
 import { createUserScannerHandler } from '../user-scanner.js';
 import { createGreyNoiseSwarmCommandHandler } from '../greynoise-swarm-command.js';
 import { executeMissionCommand } from '../core/mission/command-adapter.js';
+import { executeDomainInvestigationCommand } from '../core/domain-investigation-command-adapter.js';
 import { buildAgentExecutionPlan } from '../core/agent-execution-plan.js';
 import {
   createInvestigation,
@@ -41,6 +42,9 @@ export const MCP_PROTOCOL_VERSION = '2026-07-28';
 const LEGACY_PROTOCOL_VERSION = '2025-06-18';
 const MAX_BODY_BYTES = 128 * 1024;
 const MAX_INVESTIGATION_IMPORT_BODY_BYTES = (2 * INVESTIGATION_LIMITS.bundleBytes) + (64 * 1024);
+const DOMAIN_INVESTIGATION_ACTIONS = Object.freeze([
+  'build', 'surface_import', 'vulnerability_import', 'show', 'report', 'stix', 'handoff',
+]);
 const DENIED_COMMAND_IDS = new Set([
   'system.doctor', 'system.setup', 'system.repair', 'system.release-verify', 'system.maltego-check',
   'provider.probe', 'provider.env-template', 'report.compile', 'report.diff',
@@ -171,6 +175,18 @@ const TOOLS = Object.freeze([
     annotations: { readOnlyHint: false },
   },
   {
+    name: 'para11ax_domain_investigation',
+    title: 'PARA11AX Domain Investigation',
+    description: 'Build and advance a passive suspicious-domain investigation with explicit client-carried state, bounded operator-context imports, report, STIX, and handoff projections.',
+    inputSchema: schema({
+      action: string('Domain Investigation action.', { enum: DOMAIN_INVESTIGATION_ACTIONS }),
+      artifact: object('Existing Domain Investigation v1 artifact for stateful actions.'),
+      enrichment: object('Canonical Evidence v2 domain enrichment for build.'),
+      records: array('Bounded authorized operator-context records for an import action.', { type: 'object', additionalProperties: true }),
+    }, ['action']),
+    annotations: { readOnlyHint: false },
+  },
+  {
     name: 'para11ax_investigation',
     title: 'PARA11AX investigation workflow',
     description: 'Create, inspect, mutate, report, import, or export Investigation Workspace v2 using explicit state-in/state-out.',
@@ -260,12 +276,20 @@ function parseBody(request, maxBodyBytes = MAX_BODY_BYTES) {
   return { body, bodyBytes };
 }
 
-function isLargeInvestigationImport(body, authorization) {
-  return authorization?.authorized === true
-    && body?.method === 'tools/call'
-    && body?.params?.name === 'para11ax_investigation'
-    && body?.params?.arguments?.operation === 'import'
-    && typeof body.params.arguments.bundle === 'string';
+function isLargeAuthorizedToolCall(body, authorization) {
+  if (authorization?.authorized !== true || body?.method !== 'tools/call') return false;
+  const name = body?.params?.name;
+  const args = body?.params?.arguments;
+  if (!args || typeof args !== 'object' || Array.isArray(args)) return false;
+  if (name === 'para11ax_investigation') {
+    return args.operation === 'import' && typeof args.bundle === 'string';
+  }
+  if (name !== 'para11ax_domain_investigation' || !DOMAIN_INVESTIGATION_ACTIONS.includes(args.action)) return false;
+  if (args.action === 'build') return Boolean(args.enrichment && typeof args.enrichment === 'object' && !Array.isArray(args.enrichment));
+  if (args.action === 'surface_import' || args.action === 'vulnerability_import') {
+    return Boolean(args.artifact && typeof args.artifact === 'object' && !Array.isArray(args.artifact) && Array.isArray(args.records));
+  }
+  return Boolean(args.artifact && typeof args.artifact === 'object' && !Array.isArray(args.artifact));
 }
 
 function rpcResult(id, result) {
@@ -385,6 +409,45 @@ async function runMission(args) {
   };
 }
 
+async function runDomainInvestigation(args) {
+  const map = {
+    build: 'domain-investigation-build',
+    surface_import: 'domain-investigation-surface-import',
+    vulnerability_import: 'domain-investigation-vulnerability-import',
+    show: 'domain-investigation-show',
+    report: 'domain-investigation-report',
+    stix: 'domain-investigation-stix',
+    handoff: 'domain-investigation-handoff',
+  };
+  const handler = map[args.action];
+  if (!handler) throw new Error('unsupported Domain Investigation action');
+  if (args.action === 'build') {
+    if (!args.enrichment || typeof args.enrichment !== 'object' || Array.isArray(args.enrichment)) throw new Error('Evidence v2 enrichment required for Domain Investigation build');
+  } else {
+    if (!args.artifact || typeof args.artifact !== 'object' || Array.isArray(args.artifact)) throw new Error('Domain Investigation artifact required; build first');
+  }
+  if (args.action === 'surface_import' || args.action === 'vulnerability_import') {
+    if (!Array.isArray(args.records)) throw new Error('Domain Investigation import records required');
+  }
+  const content = args.action === 'build'
+    ? JSON.stringify(args.enrichment)
+    : (args.action === 'surface_import' || args.action === 'vulnerability_import' ? JSON.stringify(args.records) : null);
+  const outcome = await executeDomainInvestigationCommand({
+    handler,
+    args: [],
+    artifact: args.artifact ?? null,
+    loadContent: content === null ? null : async () => content,
+  });
+  if (args.action === 'build' || args.action === 'surface_import' || args.action === 'vulnerability_import') {
+    return { artifact: outcome.artifact, result: outcome.output.value };
+  }
+  if (args.action === 'show') return { result: outcome.output.value };
+  if (args.action === 'report') return { report: outcome.output.value };
+  if (args.action === 'stix') return { bundle: outcome.output.value };
+  if (args.action === 'handoff') return { handoff: outcome.output.value };
+  throw new Error('unsupported Domain Investigation action');
+}
+
 function runInvestigation(args, now) {
   if (args.operation === 'create') return { investigation: createInvestigation({ title: args.title, now }) };
   if (args.operation === 'import') return { investigation: importInvestigation(args.bundle) };
@@ -473,6 +536,7 @@ export function createMcpHttpHandler({
       };
     }
     if (name === 'para11ax_mission') return runMission(args);
+    if (name === 'para11ax_domain_investigation') return runDomainInvestigation(args);
     if (name === 'para11ax_investigation') return runInvestigation(args, now);
     if (name === 'para11ax_case') return runCase(args, now);
     if (name === 'para11ax_report') return runReport(args, now);
@@ -504,7 +568,7 @@ export function createMcpHttpHandler({
     catch (error) { return response(error.status ?? 400, rpcError(null, -32700, error.message === 'payload_too_large' ? 'Payload too large' : 'Parse error')); }
 
     const id = body.id ?? null;
-    if (bodyBytes > MAX_BODY_BYTES && !isLargeInvestigationImport(body, authorization)) {
+    if (bodyBytes > MAX_BODY_BYTES && !isLargeAuthorizedToolCall(body, authorization)) {
       return response(413, rpcError(id, -32700, 'Payload too large'));
     }
     if (body.jsonrpc !== '2.0' || typeof body.method !== 'string') return response(400, rpcError(id, -32600, 'Invalid Request'));
@@ -529,7 +593,7 @@ export function createMcpHttpHandler({
         protocolVersion: body.method === 'initialize' && body.params?.protocolVersion === LEGACY_PROTOCOL_VERSION ? LEGACY_PROTOCOL_VERSION : MCP_PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: 'para11ax', version: GATEWAY_VERSION },
-        instructions: 'Authenticated PARA11AX cybersecurity control plane. Use explicit state handles for mission, investigation, and case workflows.',
+        instructions: 'Authenticated PARA11AX cybersecurity control plane. Use explicit state handles for mission, Domain Investigation, investigation, and case workflows.',
       }));
     }
     if (body.method === 'notifications/initialized') return response(202, null);
