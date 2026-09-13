@@ -397,9 +397,21 @@ function buildHandoff(target, passive, surface, vulnerabilities, phases, iocs, r
     limitations,
     nextActions,
   };
-  const serializedBytes = utf8Bytes(base);
-  if (serializedBytes >= MAX_HANDOFF_BYTES) throw new RangeError('handoff context exceeds bounded context budget');
-  return { ...base, contextBudget: { serializedBytes, maximumBytes: MAX_HANDOFF_BYTES, rawEvidenceIncluded: false } };
+
+  let serializedBytes = 0;
+  for (let iteration = 0; iteration < 8; iteration += 1) {
+    const handoff = {
+      ...base,
+      contextBudget: { serializedBytes, maximumBytes: MAX_HANDOFF_BYTES, rawEvidenceIncluded: false },
+    };
+    const actualBytes = utf8Bytes(handoff);
+    if (actualBytes === serializedBytes) {
+      if (actualBytes >= MAX_HANDOFF_BYTES) throw new RangeError('handoff context exceeds bounded context budget');
+      return handoff;
+    }
+    serializedBytes = actualBytes;
+  }
+  throw new RangeError('handoff context budget could not be stabilized');
 }
 
 function rebuild(enrichment, surface, vulnerabilities, expectedTarget) {
