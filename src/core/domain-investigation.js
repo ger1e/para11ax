@@ -1,4 +1,5 @@
-import { createHash, isIP } from 'node:crypto';
+import { createHash } from 'node:crypto';
+import { isIP } from 'node:net';
 
 const SCHEMA_VERSION = 'domain-investigation-v1.0';
 const HANDOFF_SCHEMA_VERSION = 'domain-investigation-handoff-v1.0';
