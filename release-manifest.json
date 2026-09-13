@@ -19,6 +19,16 @@
       "active": true
     },
     {
+      "name": "censys-history",
+      "parserVersion": "v3-history-2026-09-13.1",
+      "active": true
+    },
+    {
+      "name": "censys-search",
+      "parserVersion": "v3-search-2026-09-13.1",
+      "active": true
+    },
+    {
       "name": "circl-hashlookup",
       "parserVersion": "2026-08-22.1",
       "active": true
@@ -186,6 +196,11 @@
     {
       "name": "urlscan",
       "parserVersion": "2026-08-20",
+      "active": true
+    },
+    {
+      "name": "urlscan-graph",
+      "parserVersion": "2026-09-13.1",
       "active": true
     },
     {
