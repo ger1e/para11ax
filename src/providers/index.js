@@ -32,6 +32,8 @@ import { epssProvider as rawEpssProvider } from './epss.js';
 import { circlVulnerabilityProvider as rawCirclVulnerabilityProvider } from './circl-vulnerability.js';
 import { nvdProvider as rawNvdProvider } from './nvd.js';
 import { osvProvider as rawOsvProvider } from './osv.js';
+import { vulncheckProvider as rawVulncheckProvider } from './vulncheck.js';
+import { depsDevProvider as rawDepsDevProvider } from './deps-dev.js';
 import { attackTaxiiProvider as rawAttackTaxiiProvider } from './attack-taxii.js';
 import { tweetfeedProvider as rawTweetfeedProvider } from './tweetfeed.js';
 import { ransomlookProvider as rawRansomlookProvider } from './ransomlook.js';
@@ -77,6 +79,8 @@ export const epssProvider = withProviderMetadata(rawEpssProvider);
 export const circlVulnerabilityProvider = withProviderMetadata(rawCirclVulnerabilityProvider);
 export const nvdProvider = withProviderMetadata(rawNvdProvider);
 export const osvProvider = withProviderMetadata(rawOsvProvider);
+export const vulncheckProvider = withProviderMetadata(rawVulncheckProvider);
+export const depsDevProvider = withProviderMetadata(rawDepsDevProvider);
 export const attackTaxiiProvider = withProviderMetadata(rawAttackTaxiiProvider);
 export const tweetfeedProvider = withProviderMetadata(rawTweetfeedProvider);
 export const ransomlookProvider = withProviderMetadata(rawRansomlookProvider);
@@ -89,6 +93,6 @@ export const ALL_PROVIDERS = Object.freeze([
   cloudflareDnsProvider, virustotalProvider, virustotalGraphProvider, otxProvider, threatfoxProvider, urlscanProvider, urlscanGraphProvider, webamonProvider,
   pulsediveProvider, openphishProvider, urlhausProvider, circlHashlookupProvider,
   malwarebazaarProvider, malpediaProvider, hybridAnalysisProvider, cisaKevProvider, cisaAdpProvider, epssProvider,
-  circlVulnerabilityProvider, nvdProvider, osvProvider, attackTaxiiProvider,
+  circlVulnerabilityProvider, nvdProvider, osvProvider, vulncheckProvider, depsDevProvider, attackTaxiiProvider,
   tweetfeedProvider, ransomlookProvider, ransomwareLiveProvider,
 ]);
