@@ -97,6 +97,22 @@ Escalation:
 
 Cost sensitivity only demotes low-risk, low-complexity work. Latency sensitivity only lowers effort on low-risk work.
 
+### 3.1 Live Mission MCP execution-plan contract
+
+Every successful `para11ax_mission` call returns the portable deterministic `workspace`, the existing command `output`, and an ephemeral `executionPlan` generated from that workspace. The execution plan is not written back into Mission state, so Mission export/import remains independent of host-model policy.
+
+`executionPlan` contains four bounded surfaces:
+- `route`: task/risk-derived tier, reasoning effort, context policy, and review requirements;
+- `budget`: context/output budget accounting and aggregate token counts;
+- `context`: selected and dropped context item identifiers only, never selected payload values;
+- `telemetry`: aggregate routing/budget metadata only.
+
+Raw client names, IOCs, evidence bodies, hunt results, ServiceNow payloads, and other Mission values must not be duplicated into `context` or `telemetry`. The portable `workspace` still contains whatever explicit Mission state the caller supplied; the privacy boundary here is that routing metadata does not create another payload-bearing copy.
+
+The MCP server recommends execution policy. It does not and cannot silently switch the calling ChatGPT/client model. The host/client is responsible for mapping `executionPlan.route` to a model actually exposed in its runtime, applying required review, and reporting any unavailable tier or specialist capability rather than pretending the route was honored.
+
+The request-level regression in `test/agent-execution-plan.test.js` exercises the authenticated MCP handler and verifies that text and structured MCP results expose the same workspace-plus-plan contract.
+
 ## 4. Deployable model mapping, 2026-09-13
 
 This mapping has two gates: capability and verified availability. A public benchmark result does not prove the model is exposed in the operator's API/account.
