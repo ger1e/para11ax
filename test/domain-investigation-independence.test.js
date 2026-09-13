@@ -26,6 +26,14 @@ function registry(entries) {
   })));
 }
 
+const attestation = (overrides = {}) => ({
+  id: 'PA-1',
+  authority: 'analyst_promoted',
+  authorityClass: 'analyst_attestation',
+  observable: { type: 'domain', value: 'suspicious.example' },
+  ...overrides,
+});
+
 test('two providers in the same family count as one vote', () => {
   const r = registry([['vt', 'google-vt'], ['vt-mirror', 'google-vt']]);
   const rec = applyProviderIndependencePolicy(artifact(['vt', 'vt-mirror']), r).recommendations[0];
@@ -80,4 +88,31 @@ test('no-direct legacy DO_NOT_BLOCK remains DO_NOT_BLOCK', () => {
   const rec = applyProviderIndependencePolicy(input, registry([])).recommendations[0];
   assert.equal(rec.disposition, 'DO_NOT_BLOCK');
   assert.equal(rec.ruleId, 'DI-NO-DIRECT-EVIDENCE');
+});
+
+test('one known direct family plus approved analyst attestation is only BLOCK_CANDIDATE', () => {
+  const r = registry([['known', 'family-known']]);
+  const rec = applyProviderIndependencePolicy(artifact(['known']), r, [attestation()]).recommendations[0];
+  assert.equal(rec.disposition, 'BLOCK_CANDIDATE');
+  assert.equal(rec.independence.quorumEligibleGroupCount, 1);
+  assert.deepEqual(rec.analystAttestations, ['PA-1']);
+  assert.ok(rec.authority.includes('analyst_promoted'));
+});
+
+test('analyst attestation alone is MONITOR and never provider quorum', () => {
+  const input = artifact([]);
+  input.recommendations[0].disposition = 'DO_NOT_BLOCK';
+  input.recommendations[0].ruleId = 'DI-NO-DIRECT-EVIDENCE';
+  const rec = applyProviderIndependencePolicy(input, registry([]), [attestation()]).recommendations[0];
+  assert.equal(rec.disposition, 'MONITOR');
+  assert.equal(rec.independence.quorumEligibleGroupCount, 0);
+  assert.deepEqual(rec.analystAttestations, ['PA-1']);
+});
+
+test('non-matching or unapproved candidate objects have zero recommendation impact', () => {
+  const r = registry([['known', 'family-known']]);
+  const candidate = { id: 'PC-1', status: 'candidate', observable: { type: 'domain', value: 'suspicious.example' } };
+  const rec = applyProviderIndependencePolicy(artifact(['known']), r, [candidate]).recommendations[0];
+  assert.equal(rec.disposition, 'MONITOR');
+  assert.deepEqual(rec.analystAttestations, []);
 });
