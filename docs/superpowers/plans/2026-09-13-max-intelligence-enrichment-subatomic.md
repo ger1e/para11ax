@@ -1,3 +1,6 @@
+<!-- PARA11AX-DOC-STANDARD: GER1E/PARA11AX v1 -->
+> **Document status:** Historical design record. Preserved for implementation history; current behavior is defined by [docs/ARCHITECTURE.md](https://github.com/ger1e/para11ax/blob/main/docs/ARCHITECTURE.md) and the current README.
+
 # MAX Intelligence Enrichment Sub-Atomic Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Each task is independently testable, reviewable, and committable. Do not batch adjacent tasks merely because they touch the same file.
@@ -671,3 +674,7 @@ The original MAX Intelligence Enrichment work is complete only when:
 - targeted and full repository gates pass on the exact head SHA;
 - protected merge completes; and
 - production exact-SHA smoke verification passes.
+
+---
+
+<p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
