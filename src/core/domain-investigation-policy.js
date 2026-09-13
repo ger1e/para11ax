@@ -57,7 +57,7 @@ function classify(rec, independence) {
         : 'Direct malicious evidence is present, but its provider lineage is unknown or non-quorum-eligible.'],
     };
   }
-  if (contextSources.length > 0 || hasOperatorContext || (Array.isArray(rec.authority) && rec.authority.length > 0)) {
+  if (contextSources.length > 0 || hasOperatorContext) {
     return {
       disposition: 'MONITOR',
       ruleId: 'DI-MONITOR-CONTEXT',
@@ -65,9 +65,11 @@ function classify(rec, independence) {
     };
   }
   return {
-    disposition: 'DO_NOT_BLOCK',
-    ruleId: 'DI-NO-DIRECT-EVIDENCE',
-    reasons: ['No direct malicious Evidence v2 source supports blocking this IOC.'],
+    disposition: rec.disposition === 'MONITOR' ? 'MONITOR' : 'DO_NOT_BLOCK',
+    ruleId: rec.disposition === 'MONITOR' ? rec.ruleId : 'DI-NO-DIRECT-EVIDENCE',
+    reasons: rec.disposition === 'MONITOR'
+      ? rec.reasons
+      : ['No direct malicious Evidence v2 source supports blocking this IOC.'],
   };
 }
 
