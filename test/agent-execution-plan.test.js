@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { buildAgentExecutionPlan } from '../src/core/agent-execution-plan.js';
 import {
@@ -85,4 +86,10 @@ test('execution plan context projection exposes identifiers only, never selected
   assert.deepEqual(Object.keys(plan.context).sort(), ['droppedIds', 'selectedIds']);
   assert.equal(serialized.includes('CLIENT-ULTRAVIOLET-SECRET'), false);
   assert.equal(serialized.includes('fortinet'), false);
+});
+
+test('Mission MCP host path attaches the execution plan instead of leaving policy dead', () => {
+  const source = readFileSync(new URL('../src/mcp/server.js', import.meta.url), 'utf8');
+  assert.match(source, /import\s*\{\s*buildAgentExecutionPlan\s*\}\s*from\s*['"]\.\.\/core\/agent-execution-plan\.js['"]/);
+  assert.match(source, /executionPlan\s*:\s*buildAgentExecutionPlan\(/);
 });
