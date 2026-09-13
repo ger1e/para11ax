@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { normalizeExternalMcpResponse } from '../src/mcp/external-auth-recovery.js';
-import { MCP_OAUTH_SCOPE, MCP_OFFLINE_SCOPE } from '../src/mcp/oauth.js';
 
 const CHALLENGE = 'Bearer resource_metadata="https://para11ax.vercel.app/.well-known/oauth-protected-resource", scope="para11ax:use", error="invalid_token"';
 
@@ -38,21 +37,17 @@ test('external response normalization does not rewrite ordinary successful MCP c
   assert.deepEqual(normalizeExternalMcpResponse('', input), input);
 });
 
-test('protected-resource metadata advertises refresh-capable authorization scope once', () => {
+test('external recovery leaves OAuth discovery metadata untouched', () => {
   const input = {
     status: 200,
     headers: { 'content-type': 'application/json; charset=utf-8' },
     body: {
       resource: 'https://para11ax.vercel.app/mcp',
       authorization_servers: ['https://para11ax.vercel.app'],
-      scopes_supported: [MCP_OAUTH_SCOPE],
+      scopes_supported: ['para11ax:use'],
     },
   };
-  const once = normalizeExternalMcpResponse('protected-resource', input);
-  const twice = normalizeExternalMcpResponse('protected-resource', once);
-  assert.deepEqual(once.body.scopes_supported, [MCP_OAUTH_SCOPE, MCP_OFFLINE_SCOPE]);
-  assert.deepEqual(twice.body.scopes_supported, [MCP_OAUTH_SCOPE, MCP_OFFLINE_SCOPE]);
-  assert.deepEqual(input.body.scopes_supported, [MCP_OAUTH_SCOPE]);
+  assert.deepEqual(normalizeExternalMcpResponse('protected-resource', input), input);
 });
 
 test('malformed auth errors fail closed without inventing a challenge', () => {
