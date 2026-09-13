@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { isIP } from 'node:net';
+import { EVIDENCE_SCHEMA_VERSION } from './version.js';
 
 const SCHEMA_VERSION = 'domain-investigation-v1.0';
 const HANDOFF_SCHEMA_VERSION = 'domain-investigation-handoff-v1.0';
@@ -104,7 +105,7 @@ function normalizeImport(input, fields, prefix) {
 
 function validateEnrichment(enrichment, expectedTarget) {
   if (!enrichment || typeof enrichment !== 'object' || Array.isArray(enrichment)) throw new TypeError('Evidence v2 enrichment is required');
-  if (enrichment.schemaVersion !== 'evidence-v2.0') throw new TypeError('Evidence v2 enrichment is required');
+  if (enrichment.schemaVersion !== EVIDENCE_SCHEMA_VERSION) throw new TypeError('Evidence v2 enrichment is required');
   if (enrichment.type !== 'domain') throw new TypeError('Domain Investigation requires domain Evidence v2');
   const indicator = normalizeDomain(enrichment.indicator);
   if (expectedTarget !== undefined && normalizeDomain(expectedTarget) !== indicator) throw new TypeError('target domain does not match enrichment indicator');
