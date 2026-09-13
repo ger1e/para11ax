@@ -19,6 +19,7 @@
   <a href="docs/IDENTITY-OSINT.md">IDENTITY OSINT</a> ·
   <a href="docs/GOOGLE-DORKING.md">DORKING</a> ·
   <a href="docs/ANALYST-MISSION-PACK.md">MISSION</a> ·
+  <a href="docs/DOMAIN-INVESTIGATION.md">DOMAIN INVESTIGATION</a> ·
   <a href="docs/SHODAN-SHELL.md">SHODAN SHELL</a> ·
   <a href="docs/GREYNOISE-SWARM.md">GREYNOISE SWARM</a> ·
   <a href="SECURITY.md">SECURITY</a>
@@ -31,7 +32,7 @@
 
 PARA11AX is a bounded, read-only CTI enrichment/correlation core with deterministic analysis and isolated analyst utilities. Canonical observables enter fixed Evidence v2 workflows. Profile admission stays separate from execution priority: the **Provider Value Scheduler v1.0** deterministically orders admitted providers without evidence-dependent source suppression. The IP reference path then projects **Intelligence Kernel v1.0** derived context over normalized evidence and correlation before Decision Support, Guidance and the analyst report consume it.
 
-**MCP control plane** exposes the functional analyst surface through `POST https://para11ax.vercel.app/mcp`. ChatGPT links with OAuth 2.1 authorization-code + PKCE; existing trusted clients can retain the direct gateway bearer. The stateless MCP surface covers capabilities, enrichment/batch/provider work, User Scanner, Shodan, GreyNoise Swarm, STIX, Mission Workspace, Investigation Workspace, portable cases, deterministic reports, and registered server-safe commands. Browser cosmetics, arbitrary shell/fetch/filesystem access and local-admin operations remain outside MCP.
+**MCP control plane** exposes the functional analyst surface through `POST https://para11ax.vercel.app/mcp`. ChatGPT links with OAuth 2.1 authorization-code + PKCE; existing trusted clients can retain the direct gateway bearer. The stateless MCP surface covers capabilities, enrichment/batch/provider work, User Scanner, Shodan, GreyNoise Swarm, STIX, Mission Workspace, Domain Investigation, Investigation Workspace, portable cases, deterministic reports, and registered server-safe commands. Browser cosmetics, arbitrary shell/fetch/filesystem access and local-admin operations remain outside MCP.
 
 **Mission Workspace v1** adds a portable, deterministic analyst loop across Web, CLI, and explicit MCP state handles: explicit client profile → relevance → hunt package → conservative KQL validation → bounded result analysis → ServiceNow-ready projection. It adds no model call, secret access, query execution or ticket submission. Web/CLI remain local/volatile as documented; MCP state is client-carried and stateless server-side.
 
@@ -39,7 +40,7 @@ The Kernel does not fetch, mutate or manufacture evidence. Raw **Evidence v2 rem
 
 <sub><strong>STATE</strong> — OPERATIONAL CORE<br/>
 <strong>INPUTS</strong> — `ip` · `domain` · `url` · `hash` · `cve` · `attack` · `asn` · `cidr` · `certificate` (`cert-sha256:&lt;64-hex&gt;`)<br/>
-<strong>MCP</strong> — `/mcp` · stateless `2026-07-28` profile · 13 grouped tools · OAuth 2.1/PKCE or gateway bearer · registered-only execution<br/>
+<strong>MCP</strong> — `/mcp` · stateless `2026-07-28` profile · 14 grouped tools · OAuth 2.1/PKCE or gateway bearer · registered-only execution<br/>
 <strong>SCHEDULER</strong> — Provider Value Scheduler v1.0 · deterministic static ordering · profile admission stays separate<br/>
 <strong>IP REFERENCE</strong> — 24-provider IP workflow · 48-call ceiling · max 4 active · max 2 attempts/provider · 20 s request deadline<br/>
 <strong>INTELLIGENCE</strong> — Intelligence Kernel v1.0 on IP · deterministic derived context · no LLM · no synthetic threat score<br/>
@@ -47,6 +48,7 @@ The Kernel does not fetch, mutate or manufacture evidence. Raw **Evidence v2 rem
 <strong>SHODAN OPS</strong> — `shodan host|search|count|stats|domain|info` · fixed upstream · server-side key · explicit credit impact<br/>
 <strong>GREYNOISE SWARM</strong> — `swarm search|get|unique|timeseries|diff|export` · fixed upstream · server-side key · bounded session/pivot/workspace-diff/export surface<br/>
 <strong>MISSION</strong> — deterministic workspace · relevance · hunt · KQL validation · result analysis · ServiceNow projection<br/>
+<strong>DOMAIN INVESTIGATION</strong> — passive Evidence v2 · bounded operator-context imports · deterministic IOC guidance · report/STIX/handoff · no hosted active scanning<br/>
 <strong>PROFILES</strong> — `fast` · `standard` · `full`; callers cannot select arbitrary Evidence v2 providers<br/>
 <strong>OUTPUT</strong> — Evidence v2 · `intelligence` · Decision Support · Evidence Graph v1.0 · Guidance v1.0 · JSON · batch · STIX 2.1 · deterministic reports<br/>
 <strong>LOCAL</strong> — browser-local cases · snapshots/diffs · exact typed cross-case index · case graph · `.para11ax` bundles; no server-side browser-case persistence<br/>
@@ -150,7 +152,7 @@ Swarm request example:
 {"command":"diff","query":"classification:malicious","sourceWorkspace":"personal","targetWorkspace":"greynoise","mode":"source-only","size":10}
 ```
 
-Complete contracts: [`docs/MCP.md`](docs/MCP.md), [`docs/API.md`](docs/API.md), [`docs/SHELL.md`](docs/SHELL.md), [`docs/IDENTITY-OSINT.md`](docs/IDENTITY-OSINT.md), [`docs/GOOGLE-DORKING.md`](docs/GOOGLE-DORKING.md), [`docs/SHODAN-SHELL.md`](docs/SHODAN-SHELL.md), and [`docs/GREYNOISE-SWARM.md`](docs/GREYNOISE-SWARM.md).
+Complete contracts: [`docs/MCP.md`](docs/MCP.md), [`docs/API.md`](docs/API.md), [`docs/SHELL.md`](docs/SHELL.md), [`docs/DOMAIN-INVESTIGATION.md`](docs/DOMAIN-INVESTIGATION.md), [`docs/IDENTITY-OSINT.md`](docs/IDENTITY-OSINT.md), [`docs/GOOGLE-DORKING.md`](docs/GOOGLE-DORKING.md), [`docs/SHODAN-SHELL.md`](docs/SHODAN-SHELL.md), and [`docs/GREYNOISE-SWARM.md`](docs/GREYNOISE-SWARM.md).
 
 </details>
 
@@ -175,7 +177,7 @@ No LLM, adaptive model, runtime learning or universal maliciousness score partic
 **ANALYST SURFACE** — [https://para11ax.vercel.app/app/](https://para11ax.vercel.app/app/)  
 **REMOTE MCP** — `https://para11ax.vercel.app/mcp`
 
-The terminal keeps the gateway bearer in volatile memory only, exposes the shared bounded command fabric documented in [`docs/SHELL.md`](docs/SHELL.md), and preserves the API semantic model. The IndexedDB-backed case workspace is browser-local; active-case state and gateway authentication remain runtime-only. MCP accepts resource-bound scoped OAuth access tokens from the ChatGPT link flow while preserving the direct gateway bearer for existing clients. It carries mission/investigation/case state explicitly in requests and responses and does not borrow browser IndexedDB or hidden server sessions.
+The terminal keeps the gateway bearer in volatile memory only, exposes the shared bounded command fabric documented in [`docs/SHELL.md`](docs/SHELL.md), and preserves the API semantic model. The IndexedDB-backed case workspace is browser-local; active-case state and gateway authentication remain runtime-only. MCP accepts resource-bound scoped OAuth access tokens from the ChatGPT link flow while preserving the direct gateway bearer for existing clients. It carries mission/Domain Investigation/investigation/case state explicitly in requests and responses and does not borrow browser IndexedDB or hidden server sessions.
 
 Mission Workspace examples:
 
@@ -239,7 +241,7 @@ swarm export <session-id> pcap
 Swarm session search/pivot data is bounded to explicit time ranges, vetted pivot fields and fixed GreyNoise session endpoints. Workspace Diff is fixed to `/v3/workspaces/diff`, accepts only `personal|community|greynoise` aliases, and caps result size/pagination input. Session `scope=workspace` and `scope=demo`, plus Workspace Diff access, depend on the corresponding upstream GreyNoise entitlement; demo export is rejected before egress. JSON results and individual exports are capped at 4 MiB. See [`docs/GREYNOISE-SWARM.md`](docs/GREYNOISE-SWARM.md).
 
 <sub><strong>PROMPT</strong> — `analyst@para11ax:~$`<br/>
-<strong>MCP</strong> — 13 grouped remote tools over existing handlers · explicit stateless workflow state · registered-only command fallback<br/>
+<strong>MCP</strong> — 14 grouped remote tools over existing handlers · explicit stateless workflow state · registered-only command fallback<br/>
 <strong>WORKSPACE</strong> — local cases · pins · snapshots · semantic diffs · exact sightings · case graph<br/>
 <strong>ACTIVE OSINT</strong> — exact-identifier dorking + User Scanner email/username enumeration, separate from Evidence v2<br/>
 <strong>SHODAN</strong> — bounded infrastructure/exposure operator lookups, separate from Evidence v2<br/>
@@ -270,7 +272,7 @@ para11ax mission import --file mission.json '|' mission show
 **OBSERVED ≠ INFERRED ≠ CONTEXTUAL.** These states remain explicit across evidence, deterministic derived context and infrastructure/knowledge surfaces regardless of whether the caller is Web, CLI, REST or MCP.
 
 <sub><strong>DERIVED CONTEXT ≠ EVIDENCE</strong> — Intelligence Kernel output never becomes a new Evidence v2 observation<br/>
-<strong>OPERATOR CONTEXT ≠ EVIDENCE</strong> — Shodan, User Scanner and GreyNoise Swarm read results remain contextual unless an explicit Evidence-v2 workflow independently observes the same fact<br/>
+<strong>OPERATOR CONTEXT ≠ EVIDENCE</strong> — Domain Investigation imports, Shodan, User Scanner and GreyNoise Swarm read results remain contextual unless an explicit Evidence-v2 workflow independently observes the same fact<br/>
 <strong>ABSENCE ≠ BENIGN</strong> — `not_listed`, `not_found`, `no_result` and `no_association` remain source-scoped absence semantics<br/>
 <strong>CONTEXT ≠ REPUTATION</strong> — routing, registration, Tor, scanners, Shodan exposure, GreyNoise session activity, Workspace Diff, certificates and ATT&CK cannot vote an IOC malicious<br/>
 <strong>IDENTITY HIT ≠ IDENTITY PROOF</strong> — matching usernames or registration signals do not prove same-person identity, ownership or compromise<br/>
@@ -308,7 +310,7 @@ PARA11AX has **39 configured sources** (upstream APIs and feeds) in the canonica
 <strong>MCP ROUTING</strong> — modern `Mcp-Method` must match JSON-RPC method; `Mcp-Name` must match `tools/call` name; mismatch fails closed<br/>
 <strong>EGRESS</strong> — exact declared provider hosts; Kernel/Scheduler add no new egress; Shodan shell uses exact `https://api.shodan.io`; Swarm uses exact `https://api.greynoise.io`; User Scanner uses its configured worker only<br/>
 <strong>SECRETS</strong> — `SHODAN_API_KEY`, `GREYNOISE_API_KEY` and all provider/worker credentials remain server-side; MCP does not expose environment-secret values<br/>
-<strong>STATE</strong> — operator utilities do not silently mutate Evidence v2 or Intelligence Kernel state; MCP mission/investigation/case state is explicit state-in/state-out, not hidden server persistence<br/>
+<strong>STATE</strong> — operator utilities do not silently mutate Evidence v2 or Intelligence Kernel state; MCP mission/Domain Investigation/investigation/case state is explicit state-in/state-out, not hidden server persistence<br/>
 <strong>CI</strong> — protected `main` requires Tooling smoke; CodeQL runs alongside it<br/>
 <strong>DEPLOY</strong> — repository/CI proof and production deployment proof remain separate; see Operations/QA for exact current state</sub>
 
@@ -318,7 +320,7 @@ PARA11AX has **39 configured sources** (upstream APIs and feeds) in the canonica
 
 <sub><strong>07 // DEEP DOCS</strong></sub>
 
-<sub>[BRAND](docs/BRAND.md) · [MCP](docs/MCP.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) · [END-TO-END](docs/END-TO-END-EXAMPLE.md) · [EVIDENCE](docs/EVIDENCE-SCHEMA.md) · [PROVIDERS](docs/PROVIDERS.md) · [API](docs/API.md) · [SHELL](docs/SHELL.md) · [IDENTITY OSINT](docs/IDENTITY-OSINT.md) · [GOOGLE DORKING](docs/GOOGLE-DORKING.md) · [MISSION](docs/ANALYST-MISSION-PACK.md) · [SHODAN SHELL](docs/SHODAN-SHELL.md) · [GREYNOISE SWARM](docs/GREYNOISE-SWARM.md) · [THREAT MODEL](docs/THREAT-MODEL.md) · [SECURITY CONTROLS](docs/SECURITY-CONTROLS.md) · [OPERATIONS](docs/OPERATIONS.md) · [QA](docs/QA-REPORT.md) · [PUBLIC RELEASE](docs/PUBLIC-RELEASE-CHECKLIST.md) · [MANIFEST](release-manifest.json)</sub>
+<sub>[BRAND](docs/BRAND.md) · [MCP](docs/MCP.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) · [END-TO-END](docs/END-TO-END-EXAMPLE.md) · [EVIDENCE](docs/EVIDENCE-SCHEMA.md) · [PROVIDERS](docs/PROVIDERS.md) · [API](docs/API.md) · [SHELL](docs/SHELL.md) · [DOMAIN INVESTIGATION](docs/DOMAIN-INVESTIGATION.md) · [IDENTITY OSINT](docs/IDENTITY-OSINT.md) · [GOOGLE DORKING](docs/GOOGLE-DORKING.md) · [MISSION](docs/ANALYST-MISSION-PACK.md) · [SHODAN SHELL](docs/SHODAN-SHELL.md) · [GREYNOISE SWARM](docs/GREYNOISE-SWARM.md) · [THREAT MODEL](docs/THREAT-MODEL.md) · [SECURITY CONTROLS](docs/SECURITY-CONTROLS.md) · [OPERATIONS](docs/OPERATIONS.md) · [QA](docs/QA-REPORT.md) · [PUBLIC RELEASE](docs/PUBLIC-RELEASE-CHECKLIST.md) · [MANIFEST](release-manifest.json)</sub>
 
 <p align="center"><img src="assets/brand/para11ax-readme-footer-v2.svg" alt="PARA11AX operating principles — Per Aspera Ad Astra" width="100%"></p>
 
