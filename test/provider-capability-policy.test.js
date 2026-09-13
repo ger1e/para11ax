@@ -1,7 +1,9 @@
-// TDD RED contract for the intelligence-fabric provider policy.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PROVIDER_MANIFEST, validateProviderPolicy } from '../src/providers/manifest.js';
+import {
+  INTELLIGENCE_PROVIDER_MANIFEST,
+  validateIntelligenceProviderPolicy,
+} from '../src/providers/intelligence-manifest.js';
 
 const base = {
   displayName: 'Fixture',
@@ -35,7 +37,7 @@ const base = {
 };
 
 test('accepts validated intelligence capability policy', () => {
-  const policy = validateProviderPolicy('fixture', base);
+  const policy = validateIntelligenceProviderPolicy('fixture', base);
   assert.equal(policy.mode, 'enrich');
   assert.equal(policy.fanoutEligible, true);
   assert.equal(policy.sensitivity, 'public');
@@ -44,7 +46,7 @@ test('accepts validated intelligence capability policy', () => {
 });
 
 test('rejects sensitive capability with automatic fanout', () => {
-  assert.throws(() => validateProviderPolicy('fixture', {
+  assert.throws(() => validateIntelligenceProviderPolicy('fixture', {
     ...base,
     mode: 'sensitive',
     sensitivity: 'pii',
@@ -59,20 +61,20 @@ test('rejects privileged enrich fanout combinations', () => {
     { sensitivity: 'credential' },
     { mode: 'graph' },
   ]) {
-    assert.throws(() => validateProviderPolicy('fixture', { ...base, ...override }), /fanout/i);
+    assert.throws(() => validateIntelligenceProviderPolicy('fixture', { ...base, ...override }), /fanout/i);
   }
 });
 
 test('validates optional graph bounds', () => {
-  assert.equal(validateProviderPolicy('fixture', { ...base, maxPages: 10, maxRelationships: 250 }).maxPages, 10);
-  assert.throws(() => validateProviderPolicy('fixture', { ...base, maxPages: 0 }), /maxPages/);
-  assert.throws(() => validateProviderPolicy('fixture', { ...base, maxPages: 101 }), /maxPages/);
-  assert.throws(() => validateProviderPolicy('fixture', { ...base, maxRelationships: 0 }), /maxRelationships/);
-  assert.throws(() => validateProviderPolicy('fixture', { ...base, maxRelationships: 1001 }), /maxRelationships/);
+  assert.equal(validateIntelligenceProviderPolicy('fixture', { ...base, maxPages: 10, maxRelationships: 250 }).maxPages, 10);
+  assert.throws(() => validateIntelligenceProviderPolicy('fixture', { ...base, maxPages: 0 }), /maxPages/);
+  assert.throws(() => validateIntelligenceProviderPolicy('fixture', { ...base, maxPages: 101 }), /maxPages/);
+  assert.throws(() => validateIntelligenceProviderPolicy('fixture', { ...base, maxRelationships: 0 }), /maxRelationships/);
+  assert.throws(() => validateIntelligenceProviderPolicy('fixture', { ...base, maxRelationships: 1001 }), /maxRelationships/);
 });
 
-test('every registered provider declares capability policy explicitly', () => {
-  for (const [name, policy] of Object.entries(PROVIDER_MANIFEST)) {
+test('every registered provider has a deterministic capability policy', () => {
+  for (const [name, policy] of Object.entries(INTELLIGENCE_PROVIDER_MANIFEST)) {
     assert.equal(typeof policy.mode, 'string', `${name}.mode`);
     assert.equal(typeof policy.fanoutEligible, 'boolean', `${name}.fanoutEligible`);
     assert.equal(policy.sensitivity, 'public', `${name}.sensitivity`);
