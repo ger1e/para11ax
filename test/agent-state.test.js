@@ -12,7 +12,7 @@ const NOW = '2026-09-13T12:00:00.000Z';
 const LATER = '2026-09-13T12:05:00.000Z';
 const fixed = { now: () => NOW, uuid: () => 'agent-001' };
 
-test('creates a frozen canonical task state with an invariant checkpoint', () => {
+test('creates a frozen canonical task state with intent and full-state checkpoints', () => {
   const state = createAgentState({
     objective: 'Harden PARA11AX orchestration without adding nondeterministic model calls to the core.',
     constraints: ['Preserve provenance', 'Fail closed on drift'],
@@ -26,6 +26,7 @@ test('creates a frozen canonical task state with an invariant checkpoint', () =>
   assert.equal(state.epoch, 0);
   assert.equal(state.checkpoint.revision, 0);
   assert.match(state.checkpoint.invariantHash, /^[a-f0-9]{64}$/);
+  assert.match(state.checkpoint.stateHash, /^[a-f0-9]{64}$/);
   assert.equal(Object.isFrozen(state), true);
   assert.equal(Object.isFrozen(state.constraints), true);
   assert.equal(importAgentState(state).id, 'agent-001');
@@ -63,7 +64,7 @@ test('objective and constraint changes require explicit reducer actions and adva
   assert.equal(state.timeline.filter(item => item.type === 'SCOPE_CHANGE').length, 2);
 });
 
-test('detects invariant drift and distinguishes loss of accepted decisions', () => {
+test('detects invariant drift and loss of accepted decisions without flagging legitimate additions', () => {
   let baseline = createAgentState({ objective: 'Keep objective stable', constraints: ['C1'], ...fixed });
   baseline = reduceAgentState(baseline, { type: 'DECISION_ADD', text: 'D1' }, { now: () => LATER, uuid: () => 'evt-1' });
 
@@ -80,20 +81,36 @@ test('detects invariant drift and distinguishes loss of accepted decisions', () 
   assert.equal(high.drifted, true);
   assert.equal(high.severity, 'high');
   assert.ok(high.fields.includes('decisions'));
+
+  const legitimateGrowth = structuredClone(baseline);
+  legitimateGrowth.decisions.push('D2');
+  const noDrift = detectAgentDrift(baseline, legitimateGrowth);
+  assert.equal(noDrift.drifted, false);
+  assert.equal(noDrift.severity, 'none');
 });
 
-test('handoff envelope preserves only durable state and rejects forged checkpoints on import', () => {
+test('handoff envelope preserves durable state and both integrity hashes', () => {
   let state = createAgentState({ objective: 'Continue safely', constraints: ['Exact refs'], ...fixed });
   state = reduceAgentState(state, { type: 'DECISION_ADD', text: 'Keep raw tool output out of handoff state.' }, { now: () => LATER, uuid: () => 'evt-1' });
   state = reduceAgentState(state, { type: 'ARTIFACT_ADD', value: { kind: 'url', ref: 'https://example.test/evidence', summary: 'Retrievable evidence' } }, { now: () => LATER, uuid: () => 'evt-2' });
 
   const handoff = createHandoffEnvelope(state, { to: 'reviewer', reason: 'Verify', contextRefs: ['repo:ger1e/para11ax'] });
   assert.equal(handoff.invariantHash, state.checkpoint.invariantHash);
+  assert.equal(handoff.stateHash, state.checkpoint.stateHash);
   assert.deepEqual(handoff.decisions, state.decisions);
   assert.deepEqual(handoff.artifacts, state.artifacts);
   assert.equal(Object.hasOwn(handoff, 'timeline'), false);
+});
 
-  const forged = structuredClone(state);
-  forged.checkpoint.invariantHash = '0'.repeat(64);
-  assert.throws(() => importAgentState(forged), /checkpoint mismatch/i);
+test('import rejects forged intent and provenance-bearing state', () => {
+  let state = createAgentState({ objective: 'Verify integrity', constraints: ['Exact refs'], ...fixed });
+  state = reduceAgentState(state, { type: 'ARTIFACT_ADD', value: { kind: 'commit', ref: 'sha:abc', summary: 'Verified commit' } }, { now: () => LATER, uuid: () => 'evt-1' });
+
+  const forgedIntent = structuredClone(state);
+  forgedIntent.checkpoint.invariantHash = '0'.repeat(64);
+  assert.throws(() => importAgentState(forgedIntent), /checkpoint invariant mismatch/i);
+
+  const forgedArtifact = structuredClone(state);
+  forgedArtifact.artifacts[0].ref = 'sha:evil';
+  assert.throws(() => importAgentState(forgedArtifact), /checkpoint state mismatch/i);
 });
