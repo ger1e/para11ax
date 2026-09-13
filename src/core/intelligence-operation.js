@@ -1,5 +1,6 @@
 import { runUserScannerScan } from '../user-scanner.js';
 import { authorizeCapability } from './intelligence-policy.js';
+import { createTrustedAuthorizationContext } from './authorization-context.js';
 import { rankProvidersForExecution } from './provider-priority.js';
 import { runProvider } from './provider-runner.js';
 import { normalizeEvidence } from './normalize.js';
@@ -40,6 +41,35 @@ function providerState(adapter, env) {
   if (adapter.active === false) return 'inactive';
   if (requiredCredentialEnvs(adapter).some(name => !env?.[name])) return 'unconfigured';
   return 'configured';
+}
+
+function configuredOwnedCidrs(env) {
+  const raw = typeof env?.PARA11AX_OWNED_CIDRS === 'string' ? env.PARA11AX_OWNED_CIDRS.trim() : '';
+  if (!raw) return [];
+  const values = raw.split(',').map(value => value.trim()).filter(Boolean);
+  if (values.length < 1 || values.length > 32) return [];
+  const canonical = [];
+  for (const value of values) {
+    const parsed = parseCanonicalCidr(value);
+    if (!parsed || parsed.cidr !== value) return [];
+    canonical.push(parsed.cidr);
+  }
+  return [...new Set(canonical)].sort();
+}
+
+function withServerOwnedScopes(authz, env) {
+  if (authz?.trusted !== true || (Array.isArray(authz?.ownedCidrs) && authz.ownedCidrs.length > 0)) return authz;
+  const ownedCidrs = configuredOwnedCidrs(env);
+  if (!ownedCidrs.length) return authz;
+  return createTrustedAuthorizationContext({
+    principal: authz.principal ?? undefined,
+    caseId: authz.caseId ?? undefined,
+    verifiedDomains: authz.verifiedDomains ?? undefined,
+    ownedCidrs,
+    tenant: authz.tenant ?? undefined,
+    explicitAnalysis: authz.explicitAnalysis === true,
+    requestedMode: authz.requestedMode ?? undefined,
+  });
 }
 
 function ownedNetworkContainsSubject(subject, authz) {
@@ -120,6 +150,7 @@ export async function runIntelligenceMode({
     return runUsernameSearch({ operation, mode, subject, env, nowMs, context });
   }
 
+  const effectiveAuthz = withServerOwnedScopes(authz, env);
   const selected = [];
   const denied = [];
   const unavailable = [];
@@ -130,12 +161,12 @@ export async function runIntelligenceMode({
       unavailable.push(Object.freeze({ provider: adapter.name, state }));
       continue;
     }
-    const decision = authorizeCapability({ adapter, requestedMode: mode, authz });
+    const decision = authorizeCapability({ adapter, requestedMode: mode, authz: effectiveAuthz });
     if (!decision.allowed) {
       denied.push(Object.freeze({ provider: adapter.name, reason: decision.reason }));
       continue;
     }
-    if (adapter.authorization === 'owned_network' && !ownedNetworkContainsSubject(subject, authz)) {
+    if (adapter.authorization === 'owned_network' && !ownedNetworkContainsSubject(subject, effectiveAuthz)) {
       denied.push(Object.freeze({ provider: adapter.name, reason: 'owned_network_scope_mismatch' }));
       continue;
     }
