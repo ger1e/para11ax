@@ -21,6 +21,10 @@ export const MISSION_HANDLERS = Object.freeze([
   'mission-clear',
 ]);
 
+// Backward-compatible alias retained for the browser shell introduced on main.
+// Both names point at the same frozen handler set so command admission cannot drift.
+export const WORKFLOW_HANDLERS = MISSION_HANDLERS;
+
 const ACTIONS = Object.freeze({
   'mission-profile-set': Object.freeze({ type: 'PROFILE_SET', kind: 'profile', format: 'json' }),
   'mission-context-set': Object.freeze({ type: 'CONTEXT_SET', kind: 'context', format: 'json' }),
