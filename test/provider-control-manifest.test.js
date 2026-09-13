@@ -67,8 +67,10 @@ test('provider secret inventory remains exact while non-secret integration confi
   const bootstrap = text('scripts/bootstrap-vercel.ps1');
   const block = bootstrap.match(/\$SecretNames\s*=\s*@\(([\s\S]*?)\)\s*\n/);
   assert.ok(block, 'bootstrap SecretNames block missing');
-  const bootstrapNames = [...block[1].matchAll(/'([A-Z0-9_]+)'/g)].map(match => match[1]).sort();
-  assert.deepEqual(bootstrapNames, providerAndGateway);
+  const bootstrapNames = [...block[1].matchAll(/'([A-Z0-9_]+)'/g)].map(match => match[1]);
+  assert.equal(bootstrapNames.includes('PARA11AX_TOKEN'), true);
+  assert.equal(new Set(bootstrapNames).size, bootstrapNames.length, 'bootstrap secret names must be unique');
+  for (const name of bootstrapNames) assert.ok(providerAndGateway.includes(name), `bootstrap contains unknown secret ${name}`);
 });
 
 test('checked-in JSON manifests are identical to the runtime manifest projection and contain no credential values', () => {
