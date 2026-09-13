@@ -4,13 +4,17 @@ import { readFileSync } from 'node:fs';
 import { WORKFLOWS } from '../src/workflows.js';
 import { createProviderRegistry } from '../src/core/provider-registry.js';
 import { ALL_PROVIDERS } from '../src/providers/index.js';
+import { INTELLIGENCE_PROVIDER_MANIFEST } from '../src/providers/intelligence-manifest.js';
 import { EVIDENCE_SCHEMA_VERSION } from '../src/core/version.js';
 import { EVIDENCE_GRAPH_SCHEMA_VERSION } from '../src/core/evidence-graph.js';
 import { GUIDANCE_SCHEMA_VERSION } from '../src/core/guidance.js';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const workflows = Object.keys(WORKFLOWS).sort();
-const providerCount = createProviderRegistry(ALL_PROVIDERS).names().length;
+const capabilityCount = createProviderRegistry(ALL_PROVIDERS).names().length;
+const upstreamSourceCount = new Set(
+  Object.entries(INTELLIGENCE_PROVIDER_MANIFEST).map(([name, policy]) => policy.providerFamily ?? name),
+).size;
 
 function requireTokens(text, tokens, label) {
   for (const token of tokens) assert.ok(text.includes(token), `${label}: missing ${token}`);
@@ -27,11 +31,18 @@ test('architecture and API document all canonical workflow types', () => {
   requireTokens(api, workflowTokens(), 'API workflow contract');
 });
 
-test('README and provider docs match canonical provider policy', () => {
+test('README, provider docs and terminal distinguish capabilities from upstream services', () => {
   const readme = read('README.md');
   const providers = read('docs/PROVIDERS.md');
-  assert.ok(readme.includes(`${providerCount} upstream APIs and feeds`), 'README provider count drifted');
-  assert.ok(providers.includes(`**${providerCount} providers**`), 'PROVIDERS provider count drifted');
+  const terminal = read('app/terminal-polish.js');
+  assert.equal(capabilityCount, 43, 'registered provider capability count drifted');
+  assert.equal(upstreamSourceCount, 39, 'upstream provider-family count drifted');
+  assert.ok(readme.includes(`${upstreamSourceCount} upstream APIs and feeds`), 'README upstream-source count drifted');
+  assert.ok(providers.includes(`**${capabilityCount} provider capabilities**`), 'PROVIDERS capability count drifted');
+  assert.ok(providers.includes(`**${upstreamSourceCount} upstream services**`), 'PROVIDERS upstream-service count drifted');
+  assert.ok(terminal.includes(`${upstreamSourceCount} SOURCES`), 'terminal must report upstream sources, not capability count');
+  assert.ok(terminal.includes(`${upstreamSourceCount} SRC`), 'mobile terminal must report upstream sources, not capability count');
+  assert.doesNotMatch(terminal, new RegExp(`${capabilityCount} SOURCES`), 'terminal must not label capability count as sources');
   requireTokens(providers, [
     'CISA ADP SSVC',
     'Exploitation',

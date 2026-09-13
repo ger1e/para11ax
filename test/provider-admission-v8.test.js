@@ -19,13 +19,17 @@ const EXPECTED = Object.freeze({
   abuseipdb: ['first_party', 'near_real_time'],
   shodan: ['first_party', 'near_real_time'],
   censys: ['first_party', 'near_real_time'],
+  'censys-search': ['first_party', 'near_real_time'],
+  'censys-history': ['first_party', 'near_real_time'],
   modat: ['first_party', 'near_real_time'],
   'cloudflare-radar': ['first_party', 'near_real_time'],
   'cloudflare-dns': ['first_party', 'live'],
   virustotal: ['aggregator', 'near_real_time'],
+  'virustotal-graph': ['aggregator', 'near_real_time'],
   otx: ['aggregator', 'near_real_time'],
   threatfox: ['first_party', 'near_real_time'],
   urlscan: ['first_party', 'near_real_time'],
+  'urlscan-graph': ['first_party', 'near_real_time'],
   webamon: ['first_party', 'near_real_time'],
   pulsedive: ['aggregator', 'near_real_time'],
   openphish: ['first_party', 'periodic'],
@@ -46,8 +50,8 @@ const EXPECTED = Object.freeze({
   'ransomware-live': ['contextual', 'near_real_time'],
 });
 
-test('all 39 canonical providers have the approved v8 source and execution admission semantics', () => {
-  assert.equal(Object.keys(PROVIDER_MANIFEST).length, 39);
+test('all 43 canonical provider capabilities have the approved v8 source and execution admission semantics', () => {
+  assert.equal(Object.keys(PROVIDER_MANIFEST).length, 43);
   assert.deepEqual(Object.keys(PROVIDER_MANIFEST).sort(), Object.keys(EXPECTED).sort());
   for (const [name, [sourceRole, freshnessClass]] of Object.entries(EXPECTED)) {
     const policy = PROVIDER_MANIFEST[name];
@@ -59,7 +63,7 @@ test('all 39 canonical providers have the approved v8 source and execution admis
 });
 
 test('runtime adapters project exactly the canonical v8 admission metadata', () => {
-  assert.equal(ALL_PROVIDERS.length, 39);
+  assert.equal(ALL_PROVIDERS.length, 43);
   for (const provider of ALL_PROVIDERS) {
     const policy = PROVIDER_MANIFEST[provider.name];
     assert.equal(provider.sourceRole, policy.sourceRole, `${provider.name}.sourceRole`);
