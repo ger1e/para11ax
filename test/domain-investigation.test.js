@@ -264,6 +264,8 @@ test('report and handoff preserve authority boundaries and compact continuity st
   assert.ok(artifact.handoff.evidence.fingerprints.includes(fp('e')));
   assert.ok(artifact.handoff.operatorContext.recordIds.includes(artifact.imports.surface[0].id));
   assert.ok(Array.isArray(artifact.handoff.nextActions));
-  assert.ok(artifact.handoff.contextBudget.serializedBytes < 128_000);
+  const handoffBytes = Buffer.byteLength(JSON.stringify(artifact.handoff), 'utf8');
+  assert.equal(artifact.handoff.contextBudget.serializedBytes, handoffBytes);
+  assert.ok(handoffBytes < artifact.handoff.contextBudget.maximumBytes);
   assert.equal(JSON.stringify(artifact.handoff).includes('authorized-discovery'), false);
 });
