@@ -1,3 +1,4 @@
+import { runUserScannerScan } from '../user-scanner.js';
 import { authorizeCapability } from './intelligence-policy.js';
 import { rankProvidersForExecution } from './provider-priority.js';
 import { runProvider } from './provider-runner.js';
@@ -5,6 +6,15 @@ import { normalizeEvidence } from './normalize.js';
 
 const MAX_DIRECT_PROVIDERS = 4;
 const NEGATIVE_VERDICTS = new Set(['not_listed','not_found','no_result','no_association','clean','benign']);
+const USERNAME_POLICY = Object.freeze({
+  source: 'user-scanner',
+  mode: 'search',
+  fanoutEligible: false,
+  sensitivity: 'pii',
+  authorization: 'none',
+  retentionClass: 'no_store',
+  distribution: 'internal',
+});
 
 function cacheKey(provider, type, value) {
   return `intelligence:${provider}:${type}:${value}`;
@@ -24,6 +34,43 @@ function providerState(adapter, env) {
   if (adapter.active === false) return 'inactive';
   if (adapter.requiredEnv && !env?.[adapter.requiredEnv]) return 'unconfigured';
   return 'configured';
+}
+
+async function runUsernameSearch({ operation, mode, subject, env, nowMs, context }) {
+  const scan = await runUserScannerScan({
+    scanType: 'username',
+    target: subject.value,
+    crossScan: false,
+    noNsfw: true,
+  }, {
+    env,
+    fetchImpl: context.fetchImpl,
+    nowMs,
+    workloadToken: context.workloadToken ?? null,
+  });
+
+  if (scan.status < 200 || scan.status >= 300) {
+    const error = new Error(scan.body?.error ?? 'user_scanner_unavailable');
+    error.status = scan.status;
+    throw error;
+  }
+
+  return Object.freeze({
+    operation,
+    mode,
+    subject: Object.freeze({ ...subject }),
+    policy: USERNAME_POLICY,
+    scanner: Object.freeze(scan.body),
+    providers: Object.freeze({
+      selected: Object.freeze(['user-scanner']),
+      executed: Object.freeze(['user-scanner']),
+      denied: Object.freeze([]),
+      unavailable: Object.freeze([]),
+    }),
+    evidence: Object.freeze([]),
+    relationships: Object.freeze([]),
+    failures: Object.freeze([]),
+  });
 }
 
 export async function runIntelligenceMode({
@@ -46,6 +93,10 @@ export async function runIntelligenceMode({
   }
   if (!Number.isSafeInteger(maxProviders) || maxProviders < 1 || maxProviders > MAX_DIRECT_PROVIDERS) {
     throw new TypeError('maxProviders must be between 1 and 4');
+  }
+
+  if (operation === 'search' && mode === 'search' && subject.type === 'username') {
+    return runUsernameSearch({ operation, mode, subject, env, nowMs, context });
   }
 
   const selected = [];
