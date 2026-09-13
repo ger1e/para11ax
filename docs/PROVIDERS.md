@@ -79,7 +79,7 @@ Provider observations preserve their own meaning. Examples:
 - Spamhaus DROP/ASN-DROP: netblock/ASN listing context.
 - Tor exit: Tor infrastructure context.
 - CISA KEV: known exploited status.
-- CISA ADP SSVC: authoritative SSVC assessment axes.
+- CISA ADP SSVC: CISA Stakeholder-Specific Vulnerability Categorization context from the CVE record's CISA ADP container; upstream `Exploitation`, `Automatable`, and `Technical Impact` decisions remain separate axes and are not collapsed into a score.
 - EPSS: exploitation probability.
 - NVD/CIRCL/OSV: vulnerability metadata.
 - MITRE ATT&CK TAXII: knowledge/mapping context.
