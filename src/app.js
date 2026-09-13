@@ -111,10 +111,6 @@ function publicProvider(adapter) {
     maxResponseBytes: adapter.maxResponseBytes, fixedHosts: [...adapter.fixedHosts],
     methods: [...(adapter.methods ?? ['GET'])], protocols: [...(adapter.protocols ?? ['https:'])],
     parserVersion: adapter.parserVersion, sourceUrl: adapter.sourceUrl, active: adapter.active !== false,
-    mode: adapter.mode ?? 'enrich', fanoutEligible: adapter.fanoutEligible === true,
-    sensitivity: adapter.sensitivity ?? 'public', authorization: adapter.authorization ?? 'none',
-    retentionClass: adapter.retentionClass ?? 'normal', distribution: adapter.distribution ?? null,
-    providerFamily: adapter.providerFamily ?? null,
     scheduler: schedulerMetadata(adapter),
   });
 }
