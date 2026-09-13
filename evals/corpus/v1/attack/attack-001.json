@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "para11ax-eval-case-v1.0",
+  "caseId": "attack-001",
+  "domain": "attack",
+  "weight": 1,
+  "input": {
+    "observations": ["PowerShell execution", "HTTPS application-layer command and control"]
+  },
+  "expected": {
+    "techniques": ["T1059.001", "T1071.001"]
+  }
+}

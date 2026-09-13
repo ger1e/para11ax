@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "para11ax-eval-case-v1.0",
+  "caseId": "routing-001",
+  "domain": "routing",
+  "weight": 1,
+  "input": {
+    "taskClass": "security_analysis",
+    "risk": "high",
+    "complexity": "high",
+    "contextTokens": 300000,
+    "latencySensitive": false,
+    "costSensitive": false,
+    "failures": 0
+  },
+  "expected": {
+    "tier": "frontier",
+    "reasoningEffort": "high",
+    "specialistHint": null,
+    "requireIndependentReview": true,
+    "requireDifferentFamilyReviewer": true,
+    "contextPolicy": "durable-state-plus-jit-retrieval"
+  }
+}

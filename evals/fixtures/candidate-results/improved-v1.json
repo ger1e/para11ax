@@ -1,0 +1,102 @@
+{
+  "schemaVersion": "para11ax-eval-result-v1.0",
+  "corpusId": "para11ax-internal-v1",
+  "runId": "improved-run-v1",
+  "candidate": {
+    "provider": "openai",
+    "model": "synthetic-model-efficient",
+    "family": "synthetic-family",
+    "effort": "high",
+    "harness": "offline-fixture",
+    "harnessVersion": "1.0.0"
+  },
+  "measurements": {
+    "inputTokens": 700,
+    "outputTokens": 100,
+    "costUsd": null,
+    "latencyMs": null
+  },
+  "cases": [
+    {
+      "caseId": "attack-001",
+      "output": {"techniques": ["T1059.001", "T1071.001"]},
+      "measurements": {},
+      "review": null
+    },
+    {
+      "caseId": "classification-001",
+      "output": {"items": [{"id":"item-1","label":"ioc"},{"id":"item-2","label":"ioa"},{"id":"item-3","label":"ttp"}]},
+      "measurements": {},
+      "review": null
+    },
+    {
+      "caseId": "coding-001",
+      "output": {"defects": ["missing-input-validation", "nondeterministic-wall-clock"]},
+      "measurements": {},
+      "review": null
+    },
+    {
+      "caseId": "context-001",
+      "output": {"selectedIds": ["objective", "constraints", "decision-1"]},
+      "measurements": {},
+      "review": null
+    },
+    {
+      "caseId": "cti-001",
+      "output": {
+        "entities": ["actor:ORCHID", "malware:TEST-RAT", "cve:CVE-2026-12345"],
+        "relationships": ["uses:ORCHID:TEST-RAT", "exploits:TEST-RAT:CVE-2026-12345"]
+      },
+      "measurements": {},
+      "review": null
+    },
+    {
+      "caseId": "handoff-001",
+      "output": {
+        "objective": "Complete the synthetic investigation without changing accepted scope.",
+        "constraints": ["Preserve provenance.", "Do not treat missing evidence as benign."],
+        "decisions": ["Use DeviceProcessEvents as the primary synthetic telemetry source."],
+        "nextActions": ["validate-kql", "analyze-results"],
+        "completed": false
+      },
+      "measurements": {},
+      "review": null
+    },
+    {
+      "caseId": "kql-001",
+      "output": {
+        "query": "DeviceProcessEvents | where Timestamp > ago(1d) | summarize Count=count() by DeviceName",
+        "headers": {
+          "Title": "Synthetic PowerShell hunt",
+          "Description": "Synthetic case only",
+          "Suspicious Behavior": "PowerShell process activity",
+          "MITRE ATT&CK": "T1059.001",
+          "Pyramid of Pain": "TTP",
+          "Kill Chain": "Execution",
+          "CTI URLs": "https://example.invalid/cti"
+        }
+      },
+      "measurements": {},
+      "review": null
+    },
+    {
+      "caseId": "provenance-001",
+      "output": {"claims": [{"claimId":"claim-actor-malware","evidenceIds":["ev-1"]},{"claimId":"claim-c2","evidenceIds":["ev-2"]}]},
+      "measurements": {},
+      "review": null
+    },
+    {
+      "caseId": "routing-001",
+      "output": {
+        "tier": "frontier",
+        "reasoningEffort": "high",
+        "specialistHint": null,
+        "requireIndependentReview": true,
+        "requireDifferentFamilyReviewer": true,
+        "contextPolicy": "durable-state-plus-jit-retrieval"
+      },
+      "measurements": {},
+      "review": null
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "para11ax-eval-case-v1.0",
+  "caseId": "provenance-001",
+  "domain": "provenance",
+  "weight": 1,
+  "input": {
+    "evidence": [
+      {"id": "ev-1", "text": "Synthetic report states ORCHID used TEST-RAT."},
+      {"id": "ev-2", "text": "Synthetic report states TEST-RAT contacted control.example.invalid."}
+    ]
+  },
+  "expected": {
+    "claims": [
+      {"claimId": "claim-actor-malware", "allowedEvidenceIds": ["ev-1"], "required": true, "critical": true},
+      {"claimId": "claim-c2", "allowedEvidenceIds": ["ev-2"], "required": true, "critical": false}
+    ],
+    "criticalUnsupportedClaimIds": ["claim-exclusive-attribution"]
+  }
+}

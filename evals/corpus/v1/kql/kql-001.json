@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "para11ax-eval-case-v1.0",
+  "caseId": "kql-001",
+  "domain": "kql",
+  "weight": 1,
+  "input": {
+    "telemetry": ["DeviceProcessEvents"],
+    "goal": "Hunt synthetic suspicious PowerShell execution with a bounded time window."
+  },
+  "expected": {
+    "requiredTables": ["DeviceProcessEvents"],
+    "forbiddenTokens": ["Sysmon", "_GetWatchlist", "ASIM"],
+    "requiredRegexes": ["ago\\s*\\(", "summarize"],
+    "forbiddenRegexes": ["union\\s+\\*"],
+    "requiredHeaderKeys": ["Title", "Description", "Suspicious Behavior", "MITRE ATT&CK", "Pyramid of Pain", "Kill Chain", "CTI URLs"]
+  }
+}
