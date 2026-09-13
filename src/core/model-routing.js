@@ -1,4 +1,4 @@
-const TASK_CLASSES = new Set(['simple_transform', 'research', 'coding', 'security_analysis', 'deep_reasoning', 'long_context', 'review', 'analysis']);
+const TASK_CLASSES = new Set(['simple_transform', 'research', 'coding', 'security_analysis', 'cyber_research', 'deep_reasoning', 'long_context', 'review', 'analysis']);
 const LEVEL = Object.freeze({ economy: 0, balanced: 1, frontier: 2, frontier_max: 3 });
 const EFFORT = Object.freeze(['low', 'medium', 'high', 'max']);
 const WEIGHTS = Object.freeze({
@@ -6,6 +6,7 @@ const WEIGHTS = Object.freeze({
   research: { coding: 0.05, reasoning: 0.25, knowledge: 0.30, longContext: 0.20, speed: 0.05, costEfficiency: 0.15 },
   coding: { coding: 0.55, reasoning: 0.20, knowledge: 0.05, longContext: 0.05, speed: 0.10, costEfficiency: 0.05 },
   security_analysis: { coding: 0.15, reasoning: 0.35, knowledge: 0.25, longContext: 0.10, speed: 0.05, costEfficiency: 0.10 },
+  cyber_research: { coding: 0.40, reasoning: 0.35, knowledge: 0.15, longContext: 0.05, speed: 0.025, costEfficiency: 0.025 },
   deep_reasoning: { coding: 0.05, reasoning: 0.55, knowledge: 0.20, longContext: 0.10, speed: 0.025, costEfficiency: 0.075 },
   long_context: { coding: 0.05, reasoning: 0.20, knowledge: 0.15, longContext: 0.45, speed: 0.05, costEfficiency: 0.10 },
   review: { coding: 0.15, reasoning: 0.40, knowledge: 0.20, longContext: 0.10, speed: 0.05, costEfficiency: 0.10 },
@@ -38,6 +39,7 @@ export function routeModelTask({
 
   let tier = 'balanced';
   let reasoningEffort = 'medium';
+  let specialistHint = null;
   let requireIndependentReview = false;
   let requireDifferentFamilyReviewer = false;
   const reasons = [];
@@ -49,6 +51,8 @@ export function routeModelTask({
       tier = 'frontier'; reasoningEffort = 'high'; reasons.push('coding_agent_quality'); break;
     case 'security_analysis':
       tier = 'frontier'; reasoningEffort = 'high'; reasons.push('security_reasoning'); break;
+    case 'cyber_research':
+      tier = 'frontier_max'; reasoningEffort = 'max'; specialistHint = 'cyber'; requireIndependentReview = true; requireDifferentFamilyReviewer = true; reasons.push('advanced_authorized_cyber_research'); break;
     case 'deep_reasoning':
       tier = 'frontier_max'; reasoningEffort = 'max'; requireIndependentReview = true; reasons.push('deep_reasoning'); break;
     case 'long_context':
@@ -62,7 +66,7 @@ export function routeModelTask({
       else reasons.push('balanced_default');
   }
 
-  if (complexity === 'high' && taskClass !== 'deep_reasoning') {
+  if (complexity === 'high' && !['deep_reasoning', 'cyber_research'].includes(taskClass)) {
     tier = atLeast(tier, 'frontier');
     reasoningEffort = EFFORT[Math.max(EFFORT.indexOf(reasoningEffort), EFFORT.indexOf('high'))];
   }
@@ -104,6 +108,7 @@ export function routeModelTask({
     taskClass,
     tier,
     reasoningEffort,
+    specialistHint,
     requireIndependentReview,
     requireDifferentFamilyReviewer,
     contextPolicy: contextTokens >= 250_000 ? 'durable-state-plus-jit-retrieval' : 'durable-state-first',
@@ -117,6 +122,14 @@ function score(value, field) {
   return Number(value);
 }
 
+function normalizeSpecialties(value) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 16) throw new TypeError('invalid model candidate: specialties');
+  const specialties = value.map(item => String(item ?? '').trim()).filter(Boolean);
+  if (specialties.length !== value.length || new Set(specialties).size !== specialties.length) throw new TypeError('invalid model candidate: specialties');
+  return specialties;
+}
+
 function normalizeModel(model) {
   if (!model || typeof model !== 'object' || Array.isArray(model)) throw new TypeError('invalid model candidate');
   const id = String(model.id ?? '').trim();
@@ -126,6 +139,7 @@ function normalizeModel(model) {
     ...model,
     id,
     family,
+    specialties: normalizeSpecialties(model.specialties),
     coding: score(model.coding, 'coding'),
     reasoning: score(model.reasoning, 'reasoning'),
     knowledge: score(model.knowledge, 'knowledge'),
@@ -135,15 +149,22 @@ function normalizeModel(model) {
   };
 }
 
-export function rankModelCandidates(models, { taskClass = 'analysis', contextTokens = 0, excludeFamilies = [] } = {}) {
+export function rankModelCandidates(models, {
+  taskClass = 'analysis',
+  contextTokens = 0,
+  excludeFamilies = [],
+  requiredSpecialty = null,
+} = {}) {
   enumValue(taskClass, TASK_CLASSES, 'taskClass');
   if (!Array.isArray(models) || !Array.isArray(excludeFamilies)) throw new TypeError('invalid model candidates');
   if (!Number.isFinite(contextTokens) || contextTokens < 0) throw new TypeError('invalid model route: contextTokens');
+  if (requiredSpecialty !== null && (typeof requiredSpecialty !== 'string' || !requiredSpecialty.trim())) throw new TypeError('invalid model route: requiredSpecialty');
   const excluded = new Set(excludeFamilies);
+  const specialty = requiredSpecialty?.trim() ?? null;
   const weights = WEIGHTS[taskClass];
   return models
     .map(normalizeModel)
-    .filter(model => model.contextWindow >= contextTokens && !excluded.has(model.family))
+    .filter(model => model.contextWindow >= contextTokens && !excluded.has(model.family) && (!specialty || model.specialties.includes(specialty)))
     .map(model => ({
       ...model,
       routeScore: Object.entries(weights).reduce((total, [metric, weight]) => total + (model[metric] * weight), 0),
