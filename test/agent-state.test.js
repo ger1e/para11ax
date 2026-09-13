@@ -33,6 +33,18 @@ test('creates a frozen canonical task state with intent and full-state checkpoin
   assert.equal(importAgentState(state).id, 'agent-001');
 });
 
+test('canonical state accepts the shared specialist cyber research task class', () => {
+  const state = createAgentState({
+    objective: 'Perform approved vulnerability research in a controlled environment.',
+    constraints: ['Authorized scope only'],
+    taskClass: 'cyber_research',
+    risk: 'high',
+    ...fixed,
+  });
+  assert.equal(state.taskClass, 'cyber_research');
+  assert.equal(importAgentState(state).taskClass, 'cyber_research');
+});
+
 test('reducer persists decisions, artifact references, next actions, and explicit handoffs', () => {
   let sequence = 0;
   const deps = { now: () => LATER, uuid: () => `id-${++sequence}` };
