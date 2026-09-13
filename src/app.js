@@ -7,6 +7,7 @@ import { classifyIntelligenceIndicator } from './core/intelligence-observables.j
 import { createTrustedAuthorizationContext } from './core/authorization-context.js';
 import { runIntelligenceMode } from './core/intelligence-operation.js';
 import { runIntelligencePivots } from './core/intelligence-orchestrator.js';
+import { runUserScannerScan } from './user-scanner.js';
 import { TtlCache } from './core/cache.js';
 import { CircuitBreaker } from './core/circuit-breaker.js';
 import { createTelemetry } from './core/telemetry.js';
@@ -39,6 +40,11 @@ const INTELLIGENCE_OPERATION_MODES = Object.freeze({
   'supply-chain': 'graph',
   malware: 'analysis',
   knowledge: 'knowledge',
+});
+const USERNAME_INTELLIGENCE_POLICY = Object.freeze({
+  mode: 'search',
+  fanoutEligible: false,
+  retentionClass: 'no_store',
 });
 
 function response(status, body, extraHeaders = {}) {
@@ -279,6 +285,22 @@ export function createApp({
       if (body.type !== undefined && body.type !== classified.type) return renderHttpError(request, 400, 'indicator_type_mismatch');
       const profile = body.profile ?? 'standard';
       if (!PROFILE_NAMES.includes(profile)) return renderHttpError(request, 400, 'invalid_profile');
+      if (operation === 'search' && classified.type === 'username') {
+        const scan = await runUserScannerScan({ scanType: 'username', target: classified.value }, {
+          env,
+          fetchImpl,
+          nowMs,
+          workloadToken: headerValue(request.headers, 'x-vercel-oidc-token'),
+        });
+        if (!scan || scan.status < 200 || scan.status >= 300) return scan;
+        return response(200, {
+          operation,
+          mode,
+          subject: Object.freeze({ ...classified }),
+          policy: USERNAME_INTELLIGENCE_POLICY,
+          scanner: scan.body,
+        }, { 'cache-control': 'no-store' });
+      }
       const authz = createTrustedAuthorizationContext({ requestedMode: mode });
       const requestId = randomUUID();
       try {
