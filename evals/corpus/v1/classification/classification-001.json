@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "para11ax-eval-case-v1.0",
+  "caseId": "classification-001",
+  "domain": "classification",
+  "weight": 1,
+  "input": {
+    "items": [
+      {"id": "item-1", "value": "198.51.100.23", "context": "Synthetic remote address observable."},
+      {"id": "item-2", "value": "Encoded PowerShell invocation", "context": "Observed suspicious behavior."},
+      {"id": "item-3", "value": "T1059.001", "context": "Technique-level behavior abstraction."}
+    ]
+  },
+  "expected": {
+    "items": [
+      {"id": "item-1", "label": "ioc"},
+      {"id": "item-2", "label": "ioa"},
+      {"id": "item-3", "label": "ttp"}
+    ]
+  }
+}
