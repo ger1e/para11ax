@@ -2,6 +2,8 @@
 
 # Provider Independence, Evidence Promotion, and Investigation Graph Design
 
+> **Historical design record.** This document records the approved design snapshot from development and is not the current architecture. See `docs/ARCHITECTURE.md` for the authoritative current architecture.
+
 **Status:** Approved design
 
 **Date:** 2026-09-13
