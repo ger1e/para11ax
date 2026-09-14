@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 
-import { INTELLIGENCE_PROVIDER_MANIFEST } from '../src/providers/intelligence-manifest.js';
+import {
+  INTELLIGENCE_PROVIDER_MANIFEST,
+  validateIntelligenceProviderPolicy,
+} from '../src/providers/intelligence-manifest.js';
 import { ALL_PROVIDERS } from '../src/providers/index.js';
 
 const REMOVED_PROVIDERS = Object.freeze([
@@ -79,4 +82,20 @@ test('intelligence design and implementation plans contain no paid-only provider
   ].map(path => readFileSync(new URL(path, import.meta.url), 'utf8')).join('\n');
 
   for (const term of PAID_ONLY_PLAN_TERMS) assert.equal(docs.includes(term), false, term);
+});
+
+test('paid-only sensitive execution vocabulary is rejected by capability policy', () => {
+  const base = { ...INTELLIGENCE_PROVIDER_MANIFEST['team-cymru'] };
+  assert.throws(
+    () => validateIntelligenceProviderPolicy('fixture', { ...base, mode: 'sensitive' }),
+    /mode/,
+  );
+  assert.throws(
+    () => validateIntelligenceProviderPolicy('fixture', {
+      ...base,
+      fanoutEligible: false,
+      authorization: 'sensitive_subject',
+    }),
+    /authorization/,
+  );
 });
