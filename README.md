@@ -148,7 +148,7 @@ Complete contracts: [`docs/MCP.md`](docs/MCP.md), [`docs/API.md`](docs/API.md), 
 
 <sub><strong>03 // INTELLIGENCE FABRIC v2</strong></sub>
 
-The executable registry currently contains **54 active provider capabilities spanning 50 upstream services**. The established canonical enrichment fabric remains **39 upstream APIs and feeds**. Sibling and intelligence-only capabilities are explicit and non-fanout by default.
+The executable registry currently contains **54 active provider capabilities spanning 50 upstream services**. The established canonical enrichment fabric remains 39 upstream APIs and feeds. Sibling and intelligence-only capabilities are explicit and non-fanout by default.
 
 Representative secondary capabilities include:
 
@@ -219,7 +219,7 @@ para11ax report compile <snapshot.json> --out <dir>
 
 <sub>[BRAND](docs/BRAND.md) · [MCP](docs/MCP.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) · [END-TO-END](docs/END-TO-END-EXAMPLE.md) · [EVIDENCE](docs/EVIDENCE-SCHEMA.md) · [PROVIDERS](docs/PROVIDERS.md) · [API](docs/API.md) · [SHELL](docs/SHELL.md) · [DOMAIN INVESTIGATION](docs/DOMAIN-INVESTIGATION.md) · [IDENTITY OSINT](docs/IDENTITY-OSINT.md) · [GOOGLE DORKING](docs/GOOGLE-DORKING.md) · [MISSION](docs/ANALYST-MISSION-PACK.md) · [SHODAN SHELL](docs/SHODAN-SHELL.md) · [GREYNOISE SWARM](docs/GREYNOISE-SWARM.md) · [THREAT MODEL](docs/THREAT-MODEL.md) · [SECURITY CONTROLS](docs/SECURITY-CONTROLS.md) · [OPERATIONS](docs/OPERATIONS.md) · [QA](docs/QA-REPORT.md) · [PUBLIC RELEASE](docs/PUBLIC-RELEASE-CHECKLIST.md) · [MANIFEST](release-manifest.json)</sub>
 
-<p align="center"><img src="assets/brand/para11ax-readme-footer-v2.svg" alt="PARA11AX operating principles — Per Aspera Ad Astra" width="100%"></p>
+<p align="center"><img src="assets/brand/para11ax-readme-footer-v2.svg" alt="PARA11AX operating principles — Per Aspera AD ASTRA" width="100%"></p>
 
 <p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
 
