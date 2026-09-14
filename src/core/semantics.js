@@ -20,21 +20,15 @@ const NETWORK_CONTEXT_KINDS = new Set([
 ]);
 
 const INTELLIGENCE_KINDS = new Set([
-  'credential_exposure',
-  'infostealer_exposure',
-  'passive_dns_history',
-  'domain_ownership_history',
   'malware_configuration',
   'malware_similarity',
   'supply_chain',
-  'anonymization_infrastructure',
   'web_archive_observation',
   'secret_exposure',
   'crypto_abuse',
   'legal_entity_context',
   'tls_malware_infrastructure',
   'exploit_maturity',
-  'underground_mention',
   'defensive_knowledge',
 ]);
 

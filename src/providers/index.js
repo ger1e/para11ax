@@ -46,13 +46,6 @@ import { d3fendProvider as rawD3fendProvider } from './d3fend.js';
 import { chainabuseProvider as rawChainabuseProvider } from './chainabuse.js';
 import { gitguardianHmslProvider as rawGitguardianHmslProvider } from './gitguardian-hmsl.js';
 import { shadowserverProvider as rawShadowserverProvider } from './shadowserver.js';
-import { hibpProvider as rawHibpProvider } from './hibp.js';
-import { hudsonRockProvider as rawHudsonRockProvider } from './hudson-rock.js';
-import { spyCloudProvider as rawSpyCloudProvider } from './spycloud.js';
-import { dnsdbProvider as rawDnsdbProvider } from './dnsdb.js';
-import { validinProvider as rawValidinProvider } from './validin.js';
-import { spurProvider as rawSpurProvider } from './spur.js';
-import { netifyProvider as rawNetifyProvider } from './netify.js';
 import { teamCymruProvider as rawTeamCymruProvider } from './team-cymru.js';
 import { withProviderMetadata } from './metadata.js';
 
@@ -109,13 +102,6 @@ export const d3fendProvider = withProviderMetadata(rawD3fendProvider);
 export const chainabuseProvider = withProviderMetadata(rawChainabuseProvider);
 export const gitguardianHmslProvider = withProviderMetadata(rawGitguardianHmslProvider);
 export const shadowserverProvider = withProviderMetadata(rawShadowserverProvider);
-export const hibpProvider = withProviderMetadata(rawHibpProvider);
-export const hudsonRockProvider = withProviderMetadata(rawHudsonRockProvider);
-export const spyCloudProvider = withProviderMetadata(rawSpyCloudProvider);
-export const dnsdbProvider = withProviderMetadata(rawDnsdbProvider);
-export const validinProvider = withProviderMetadata(rawValidinProvider);
-export const spurProvider = withProviderMetadata(rawSpurProvider);
-export const netifyProvider = withProviderMetadata(rawNetifyProvider);
 export const teamCymruProvider = withProviderMetadata(rawTeamCymruProvider);
 
 export const ALL_PROVIDERS = Object.freeze([
@@ -128,7 +114,5 @@ export const ALL_PROVIDERS = Object.freeze([
   circlVulnerabilityProvider, nvdProvider, osvProvider, attackTaxiiProvider,
   tweetfeedProvider, ransomlookProvider, ransomwareLiveProvider, vulncheckProvider, depsDevProvider,
   sslblProvider, yaraifyProvider, mwdbProvider, waybackCdxProvider,
-  d3fendProvider, chainabuseProvider, gitguardianHmslProvider, shadowserverProvider,
-  hibpProvider, hudsonRockProvider, spyCloudProvider,
-  dnsdbProvider, validinProvider, spurProvider, netifyProvider, teamCymruProvider,
+  d3fendProvider, chainabuseProvider, gitguardianHmslProvider, shadowserverProvider, teamCymruProvider,
 ]);

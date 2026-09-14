@@ -36,9 +36,9 @@ const base = {
   retentionClass: 'normal',
 };
 
-const MODES = new Set(['enrich', 'graph', 'search', 'monitor', 'analysis', 'knowledge', 'sensitive']);
+const MODES = new Set(['enrich', 'graph', 'search', 'monitor', 'analysis', 'knowledge']);
 const SENSITIVITY = new Set(['public', 'owned_asset', 'pii', 'credential', 'secret', 'sample']);
-const AUTHORIZATION = new Set(['none', 'tenant', 'verified_domain', 'owned_network', 'explicit_case', 'explicit_action', 'sensitive_subject']);
+const AUTHORIZATION = new Set(['none', 'tenant', 'verified_domain', 'owned_network', 'explicit_case', 'explicit_action']);
 const RETENTION = new Set(['normal', 'restricted', 'ephemeral', 'no_store']);
 
 test('accepts validated intelligence capability policy', () => {
@@ -50,12 +50,12 @@ test('accepts validated intelligence capability policy', () => {
   assert.equal(policy.retentionClass, 'normal');
 });
 
-test('rejects sensitive capability with automatic fanout', () => {
+test('rejects privileged capability with automatic fanout', () => {
   assert.throws(() => validateIntelligenceProviderPolicy('fixture', {
     ...base,
-    mode: 'sensitive',
-    sensitivity: 'pii',
-    authorization: 'explicit_case',
+    mode: 'monitor',
+    sensitivity: 'owned_asset',
+    authorization: 'owned_network',
     fanoutEligible: true,
   }), /fanout/i);
 });
