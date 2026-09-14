@@ -21,10 +21,22 @@ function validHttpUrl(value) {
   }
 }
 
+function isExportableEvidence(item) {
+  return item?.policy?.distribution !== 'internal_only';
+}
+
+function internalOnlyProviders(evidence) {
+  return new Set((Array.isArray(evidence) ? evidence : [])
+    .filter(item => !isExportableEvidence(item))
+    .map(item => item?.provider)
+    .filter(value => typeof value === 'string' && value));
+}
+
 function externalReferences(evidence) {
   const seen = new Set();
   const output = [];
   for (const item of Array.isArray(evidence) ? evidence : []) {
+    if (!isExportableEvidence(item)) continue;
     for (const value of Array.isArray(item?.references) ? item.references : []) {
       const url = validHttpUrl(value);
       if (!url) continue;
@@ -119,7 +131,7 @@ function primaryObject(enrichment, now, uuid) {
 
 function attackObject(enrichment) {
   const evidence = (Array.isArray(enrichment.evidence) ? enrichment.evidence : [])
-    .find(item => item?.observation?.kind === 'attack_knowledge' && item?.observation?.attributes?.stixId);
+    .find(item => isExportableEvidence(item) && item?.observation?.kind === 'attack_knowledge' && item?.observation?.attributes?.stixId);
   if (!evidence) return null;
   const a = evidence.observation.attributes ?? {};
   const type = String(a.stixType ?? '');
@@ -152,9 +164,11 @@ function attackObject(enrichment) {
 }
 
 function relationshipObjects(enrichment, now, uuid) {
+  const blockedProviders = internalOnlyProviders(enrichment.evidence);
   const seen = new Set();
   const output = [];
   for (const rel of Array.isArray(enrichment.relationships) ? enrichment.relationships : []) {
+    if (typeof rel?.provider === 'string' && blockedProviders.has(rel.provider)) continue;
     const targetType = rel?.targetType;
     const target = typeof rel?.target === 'string' ? rel.target.trim() : '';
     let type = null;

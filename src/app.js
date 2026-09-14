@@ -3,6 +3,11 @@ import { requireGatewayAuth } from './core/auth.js';
 import { securityHeaders } from './core/http.js';
 import { renderHttpError } from './core/error-surface.js';
 import { classifyIndicator } from './core/validate.js';
+import { classifyIntelligenceIndicator } from './core/intelligence-observables.js';
+import { createTrustedAuthorizationContext } from './core/authorization-context.js';
+import { runIntelligenceMode } from './core/intelligence-operation.js';
+import { runIntelligencePivots } from './core/intelligence-orchestrator.js';
+import { runUserScannerScan } from './user-scanner.js';
 import { TtlCache } from './core/cache.js';
 import { CircuitBreaker } from './core/circuit-breaker.js';
 import { createTelemetry } from './core/telemetry.js';
@@ -27,6 +32,20 @@ const BATCH_PROVIDER_CALL_LIMIT = 200;
 const BATCH_INDICATOR_CONCURRENCY = 3;
 const STIX_OBJECT_LIMIT = 100;
 const PROVIDER_NAME_RE = /^[a-z0-9-]{1,64}$/;
+const INTELLIGENCE_OPERATION_MODES = Object.freeze({
+  pivot: 'graph',
+  search: 'search',
+  identity: 'sensitive',
+  asset: 'monitor',
+  'supply-chain': 'graph',
+  malware: 'analysis',
+  knowledge: 'knowledge',
+});
+const USERNAME_INTELLIGENCE_POLICY = Object.freeze({
+  mode: 'search',
+  fanoutEligible: false,
+  retentionClass: 'no_store',
+});
 
 function response(status, body, extraHeaders = {}) {
   return { status, headers: { ...securityHeaders(), ...extraHeaders }, body };
@@ -199,6 +218,7 @@ export function createApp({
       return response(200, {
         gatewayVersion, schemaVersion: EVIDENCE_SCHEMA_VERSION,
         types: Object.keys(WORKFLOWS), profiles: [...PROFILE_NAMES],
+        intelligenceOperations: Object.keys(INTELLIGENCE_OPERATION_MODES),
         limits: {
           requestBodyBytes: MAX_BODY_BYTES, batchBodyBytes: MAX_BATCH_BODY_BYTES, requestDeadlineMs: REQUEST_DEADLINE_MS,
           providerConcurrency: PROVIDER_CONCURRENCY_MAX, batchInputs: BATCH_INPUT_LIMIT,
@@ -246,6 +266,61 @@ export function createApp({
       catch (error) {
         if (error?.message === 'unsupported_indicator_type') return renderHttpError(request, 400, 'unsupported_indicator_type');
         return internalHandlerError(request, 'enrich');
+      }
+    },
+
+    async handleIntelligence(request) {
+      const gate = requestGate(request, env); if (gate) return gate;
+      let body;
+      try { body = parseBody(request); }
+      catch (error) { return renderHttpError(request, error.status ?? 400, error.status === 413 ? 'payload_too_large' : 'invalid_request'); }
+      const allowed = new Set(['operation', 'indicator', 'type', 'profile']);
+      if (Object.keys(body).some(key => !allowed.has(key))) return renderHttpError(request, 400, 'unsupported_request_field');
+      const operation = typeof body.operation === 'string' ? body.operation : '';
+      const mode = INTELLIGENCE_OPERATION_MODES[operation];
+      if (!mode) return renderHttpError(request, 400, 'unsupported_intelligence_operation');
+      let classified;
+      try { classified = classifyIntelligenceIndicator(body.indicator); }
+      catch { return renderHttpError(request, 400, 'invalid_indicator'); }
+      if (body.type !== undefined && body.type !== classified.type) return renderHttpError(request, 400, 'indicator_type_mismatch');
+      const profile = body.profile ?? 'standard';
+      if (!PROFILE_NAMES.includes(profile)) return renderHttpError(request, 400, 'invalid_profile');
+      if (operation === 'search' && classified.type === 'username') {
+        const scan = await runUserScannerScan({ scanType: 'username', target: classified.value }, {
+          env,
+          fetchImpl,
+          nowMs,
+          workloadToken: headerValue(request.headers, 'x-vercel-oidc-token'),
+        });
+        if (!scan || scan.status < 200 || scan.status >= 300) return scan;
+        return response(200, {
+          operation,
+          mode,
+          subject: Object.freeze({ ...classified }),
+          policy: USERNAME_INTELLIGENCE_POLICY,
+          scanner: scan.body,
+        }, { 'cache-control': 'no-store' });
+      }
+      const authz = createTrustedAuthorizationContext({ requestedMode: mode });
+      const requestId = randomUUID();
+      try {
+        if (operation === 'pivot') {
+          const baseline = await enrichClassified(classified, profile);
+          const intelligence = await runIntelligencePivots({
+            baseline, registry, authz, cache, now, nowMs, requestId, telemetry: events,
+            context: { fetchImpl, env },
+          });
+          return response(200, {
+            operation, mode, subject: Object.freeze({ ...classified }), baseline, intelligence,
+          });
+        }
+        return response(200, await runIntelligenceMode({
+          operation, mode, subject: classified, registry, authz, env, cache, now, nowMs, requestId,
+          telemetry: events, context: { fetchImpl, env },
+        }));
+      } catch (error) {
+        if (error?.message === 'unsupported_indicator_type') return renderHttpError(request, 400, 'unsupported_indicator_type');
+        return internalHandlerError(request, 'intelligence');
       }
     },
 

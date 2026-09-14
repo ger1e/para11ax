@@ -1,4 +1,5 @@
 import { sha256Hex } from './sha256.js';
+import { classifyIntelligenceIndicator } from './intelligence-observables.js';
 
 export const EVIDENCE_GRAPH_SCHEMA_VERSION = '1.0';
 
@@ -13,7 +14,10 @@ const LIMITS = Object.freeze({
 
 const FINGERPRINT = /^[0-9a-f]{64}$/i;
 const ATTACK_ID = /^T\d{4}(?:\.\d{3})?$/i;
-const OBSERVABLE_TYPES = new Set(['ip', 'domain', 'url', 'hash', 'cve', 'asn', 'cidr', 'certificate']);
+const OBSERVABLE_TYPES = new Set([
+  'ip', 'domain', 'url', 'hash', 'cve', 'asn', 'cidr', 'certificate',
+  'email', 'package', 'tls-fingerprint', 'crypto-address', 'secret-fingerprint', 'legal-entity', 'username',
+]);
 const RELATION_TYPE_MAP = Object.freeze({ hostname: 'domain', nameserver: 'domain', mx: 'domain' });
 
 const fail = code => { throw new Error(code); };
@@ -38,13 +42,14 @@ function deepFreeze(value, seen = new Set()) {
 }
 
 function normalizedText(value) {
-  return typeof value === 'string' && value.length > 0 ? value : null;
+  if (typeof value !== 'string' || value.length < 1 || /[\u0000-\u001f<>]/.test(value)) return null;
+  return value;
 }
 
 function canonicalObservableValue(type, value) {
   const normalizedType = String(type ?? '').toLowerCase();
   const text = String(value ?? '').trim();
-  if (normalizedType === 'hash' || normalizedType === 'domain') return text.toLowerCase();
+  if (normalizedType === 'hash' || normalizedType === 'domain' || normalizedType === 'tls-fingerprint') return text.toLowerCase();
   if (normalizedType === 'cve' || normalizedType === 'asn') return text.toUpperCase();
   return text;
 }
@@ -59,6 +64,16 @@ function observableNode(type, value) {
     observableType: normalizedType,
     value: normalizedValue,
   };
+}
+
+function validatedObservableNode(type, value) {
+  if (typeof value !== 'string' || /[\u0000-\u001f<>]/.test(value)) return null;
+  try {
+    const classified = classifyIntelligenceIndicator(value.trim());
+    return classified.type === type ? observableNode(classified.type, classified.value) : null;
+  } catch {
+    return null;
+  }
 }
 
 function actorNode(name) {
@@ -101,9 +116,11 @@ export function buildEvidenceGraph({
   relationships = [],
   correlation = {},
   decision = {},
+  maxRelationships = LIMITS.edges,
 } = {}) {
   if (!Array.isArray(evidence) || evidence.length > LIMITS.evidence) fail('evidence_graph_evidence_limit');
   if (!Array.isArray(relationships)) fail('evidence_graph_relationships_invalid');
+  if (!Number.isSafeInteger(maxRelationships) || maxRelationships < 1 || maxRelationships > LIMITS.edges) fail('evidence_graph_relationship_limit');
 
   const nodes = new Map();
   const edges = new Map();
@@ -219,7 +236,7 @@ export function buildEvidenceGraph({
   }
 
   function relationTargetNode(targetType, target) {
-    if (OBSERVABLE_TYPES.has(targetType)) return observableNode(targetType, target);
+    if (OBSERVABLE_TYPES.has(targetType)) return validatedObservableNode(targetType, target);
     if (targetType === 'attack') return attackNode(target);
     if (targetType === 'actor') return normalizedText(target) ? actorNode(String(target)) : null;
     if (targetType === 'malware') return normalizedText(target) ? malwareNode(String(target)) : null;
@@ -227,20 +244,22 @@ export function buildEvidenceGraph({
   }
 
   function resolveExistingSource(source, sourceType = type) {
-    if (source == null || canonicalObservableValue(type, source) === canonicalObservableValue(type, indicator)) return rootId;
+    if (source == null || (sourceType === type && canonicalObservableValue(type, source) === canonicalObservableValue(type, indicator))) return rootId;
     const key = `${sourceType}\u0000${canonicalObservableValue(sourceType, source)}`;
     const candidates = exactValueIndex.get(key) ?? [];
     return candidates.length === 1 ? candidates[0] : null;
   }
 
-  const orderedRelationships = [...relationships].sort((a, b) => stableJson(a).localeCompare(stableJson(b)));
+  const allRelationships = [...relationships].sort((a, b) => stableJson(a).localeCompare(stableJson(b)));
+  const orderedRelationships = allRelationships.slice(0, maxRelationships);
   for (const relation of orderedRelationships) {
     const targetType = relationTargetType(relation);
     const target = relation?.target ?? relation?.value;
     if (!targetType || target == null || target === '') continue;
     const targetNode = relationTargetNode(targetType, target);
     if (!targetNode) continue;
-    const sourceId = resolveExistingSource(relation?.source, type);
+    const sourceType = normalizedText(relation?.sourceType)?.toLowerCase() ?? type;
+    const sourceId = resolveExistingSource(relation?.source, sourceType);
     if (!sourceId) continue;
     const targetId = addNode(targetNode);
     addEdge('related_to', sourceId, targetId, {
@@ -261,7 +280,7 @@ export function buildEvidenceGraph({
       || stableJson(a.data).localeCompare(stableJson(b.data))
       || a.id.localeCompare(b.id)),
     counts: { nodes: nodes.size, edges: edges.size },
-    truncated: false,
+    truncated: allRelationships.length > maxRelationships,
   };
   return deepFreeze(output);
 }

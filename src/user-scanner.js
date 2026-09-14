@@ -195,6 +195,67 @@ async function readWorkerJson(res) {
   return payload;
 }
 
+export async function runUserScannerScan(body, {
+  env = process.env,
+  fetchImpl = fetch,
+  nowMs = () => Date.now(),
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  workloadToken = null,
+} = {}) {
+  let scan;
+  try { scan = validateRequest(body); }
+  catch (error) { return errorResponse(400, error.message); }
+
+  let url;
+  try { url = resolveWorkerUrl(env); }
+  catch { return errorResponse(503, 'user_scanner_misconfigured'); }
+  if (!url) return errorResponse(503, 'user_scanner_unconfigured');
+
+  const workerBody = {
+    scan_type: scan.scanType,
+    target: scan.target,
+    ...(scan.category ? { category: scan.category } : {}),
+    ...(scan.module ? { module: scan.module } : {}),
+    cross_scan: scan.crossScan,
+    no_nsfw: scan.noNsfw,
+  };
+  const headers = { 'Content-Type': 'application/json' };
+  const staticWorkerToken = typeof env.PARA11AX_USER_SCANNER_TOKEN === 'string' ? env.PARA11AX_USER_SCANNER_TOKEN.trim() : '';
+  const trustedWorkloadToken = String(workloadToken ?? env.VERCEL_OIDC_TOKEN ?? '').trim();
+  if (staticWorkerToken) {
+    headers.Authorization = `Bearer ${staticWorkerToken}`;
+  } else if (trustedWorkloadToken) {
+    headers.Authorization = `Bearer ${trustedWorkloadToken}`;
+    headers['x-vercel-trusted-oidc-idp-token'] = trustedWorkloadToken;
+  } else {
+    return errorResponse(503, 'user_scanner_auth_unconfigured');
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(1000, Math.min(120_000, timeoutMs)));
+  const started = nowMs();
+  try {
+    const upstream = await fetchImpl(url, {
+      method: 'POST',
+      headers,
+      redirect: 'error',
+      cache: 'no-store',
+      signal: controller.signal,
+      body: JSON.stringify(workerBody),
+    });
+    if (!upstream.ok) return errorResponse(502, upstream.status === 429 ? 'user_scanner_rate_limited' : 'user_scanner_worker_error');
+    const payload = await readWorkerJson(upstream);
+    return response(200, normalizeWorkerPayload(payload, scan, nowMs() - started));
+  } catch (error) {
+    if (error?.name === 'AbortError') return errorResponse(504, 'user_scanner_timeout');
+    if (error?.message === 'worker_response_too_large') return errorResponse(502, 'user_scanner_response_too_large');
+    if (error?.message === 'invalid_worker_response') return errorResponse(502, 'invalid_user_scanner_worker_response');
+    return errorResponse(502, 'user_scanner_unavailable');
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function createUserScannerHandler({
   env = process.env,
   fetchImpl = fetch,
@@ -211,57 +272,12 @@ export function createUserScannerHandler({
     try { body = parseBody(request); }
     catch (error) { return errorResponse(error.status ?? 400, error.message === 'payload_too_large' ? 'payload_too_large' : 'invalid_request'); }
 
-    let scan;
-    try { scan = validateRequest(body); }
-    catch (error) { return errorResponse(400, error.message); }
-
-    let url;
-    try { url = resolveWorkerUrl(env); }
-    catch { return errorResponse(503, 'user_scanner_misconfigured'); }
-    if (!url) return errorResponse(503, 'user_scanner_unconfigured');
-
-    const workerBody = {
-      scan_type: scan.scanType,
-      target: scan.target,
-      ...(scan.category ? { category: scan.category } : {}),
-      ...(scan.module ? { module: scan.module } : {}),
-      cross_scan: scan.crossScan,
-      no_nsfw: scan.noNsfw,
-    };
-    const headers = { 'Content-Type': 'application/json' };
-    const staticWorkerToken = typeof env.PARA11AX_USER_SCANNER_TOKEN === 'string' ? env.PARA11AX_USER_SCANNER_TOKEN.trim() : '';
-    const workloadToken = String(headerValue(request.headers, 'x-vercel-oidc-token') ?? env.VERCEL_OIDC_TOKEN ?? '').trim();
-    if (staticWorkerToken) {
-      headers.Authorization = `Bearer ${staticWorkerToken}`;
-    } else if (workloadToken) {
-      headers.Authorization = `Bearer ${workloadToken}`;
-      headers['x-vercel-trusted-oidc-idp-token'] = workloadToken;
-    } else {
-      return errorResponse(503, 'user_scanner_auth_unconfigured');
-    }
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.max(1000, Math.min(120_000, timeoutMs)));
-    const started = nowMs();
-    try {
-      const upstream = await fetchImpl(url, {
-        method: 'POST',
-        headers,
-        redirect: 'error',
-        cache: 'no-store',
-        signal: controller.signal,
-        body: JSON.stringify(workerBody),
-      });
-      if (!upstream.ok) return errorResponse(502, upstream.status === 429 ? 'user_scanner_rate_limited' : 'user_scanner_worker_error');
-      const payload = await readWorkerJson(upstream);
-      return response(200, normalizeWorkerPayload(payload, scan, nowMs() - started));
-    } catch (error) {
-      if (error?.name === 'AbortError') return errorResponse(504, 'user_scanner_timeout');
-      if (error?.message === 'worker_response_too_large') return errorResponse(502, 'user_scanner_response_too_large');
-      if (error?.message === 'invalid_worker_response') return errorResponse(502, 'invalid_user_scanner_worker_response');
-      return errorResponse(502, 'user_scanner_unavailable');
-    } finally {
-      clearTimeout(timer);
-    }
+    return runUserScannerScan(body, {
+      env,
+      fetchImpl,
+      nowMs,
+      timeoutMs,
+      workloadToken: headerValue(request.headers, 'x-vercel-oidc-token'),
+    });
   };
 }

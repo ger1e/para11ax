@@ -18,6 +18,17 @@ function fingerprint(value) {
   return createHash('sha256').update(JSON.stringify(canonicalize(value))).digest('hex');
 }
 
+function evidencePolicy(meta) {
+  const fields = ['mode', 'sensitivity', 'retentionClass', 'distribution'];
+  if (!fields.some(field => meta[field] !== undefined)) return null;
+  return Object.freeze({
+    mode: typeof meta.mode === 'string' ? meta.mode : 'enrich',
+    sensitivity: typeof meta.sensitivity === 'string' ? meta.sensitivity : 'public',
+    retentionClass: typeof meta.retentionClass === 'string' ? meta.retentionClass : 'normal',
+    distribution: typeof meta.distribution === 'string' ? meta.distribution : 'internal',
+  });
+}
+
 export function normalizeEvidence(provider, indicator, type, data = {}, meta = {}) {
   const observation = {
     kind: data.observationType ?? 'enrichment',
@@ -50,6 +61,7 @@ export function normalizeEvidence(provider, indicator, type, data = {}, meta = {
     semanticClass: semantic,
     sourceRole,
   });
+  const policy = evidencePolicy(meta);
 
   return {
     provider,
@@ -67,5 +79,6 @@ export function normalizeEvidence(provider, indicator, type, data = {}, meta = {
       fingerprint: integrityFingerprint,
     },
     semantics,
+    ...(policy ? { policy } : {}),
   };
 }

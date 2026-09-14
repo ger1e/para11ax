@@ -1,33 +1,92 @@
 <!-- PARA11AX-DOC-STANDARD: GER1E/PARA11AX v1 -->
 ### Providers
 
-The executable provider registry is the source of truth for the canonical Evidence v2 enrichment fabric. The active registry contains **39 providers**. `release-manifest.json` records active adapter/parser versions, and `/api/para11ax/meta` exposes static capabilities without credential values or secret configuration state.
+The executable provider registry is the source of truth for the canonical Evidence v2 and Intelligence Fabric provider surface. The current registry contains **54 active provider capabilities spanning 50 upstream services**. The distinction is intentional: VirusTotal, Censys, and urlscan.io each expose bounded sibling capabilities under a shared upstream family, while the original canonical enrichment fabric remains **39 upstream APIs and feeds**. Intelligence-only capabilities do not increase baseline `fast|standard|full` fanout unless they are separately admitted to an enrichment workflow.
+
+`release-manifest.json` records every active adapter/parser version. `config/providers.json` contains the baseline provider policy, while `config/intelligence-providers.json` contains explicit secondary capabilities. `/api/para11ax/meta` exposes static capability metadata without credential values or secret configuration state.
 
 #### Registry contract
 
-Every active Evidence v2 provider declares and is validated for supported indicator/observation types, tier/cost class, timeout/cache policy, response ceiling, exact fixed host(s), allowed methods/protocols, parser version, source URL, credential posture and source semantics. Scheduler-aware providers can additionally expose declarative execution-value metadata; that metadata does not change fixed hosts, credentials or provider admission.
+Every active provider declares and is validated for supported subject/observation types, tier/cost class, timeout/cache policy, response ceiling, exact fixed host(s), allowed methods/protocols, parser version, source URL, credential posture, source semantics, distribution, and active state.
 
-A canonical workflow cannot route to an unregistered provider or a provider that does not support that indicator type. The nine Evidence v2 workflows are `ip`, `domain`, `url`, `hash`, `cve`, `attack`, `asn`, `cidr`, and `certificate`.
+Intelligence Fabric capabilities additionally declare:
+
+- `mode`: `enrich | graph | search | monitor | analysis | knowledge`;
+- `fanoutEligible`: only public, no-auth `enrich` capabilities may be automatic fanout;
+- `sensitivity`: `public | owned_asset | pii | credential | secret | sample`;
+- `authorization`: `none | tenant | verified_domain | owned_network | explicit_case | explicit_action`;
+- `retentionClass`: `normal | restricted | ephemeral | no_store`;
+- optional bounded `maxPages`, `maxRelationships`, and `providerFamily` metadata.
+
+A canonical enrichment workflow cannot route to an unregistered provider or a provider that does not support its indicator type. The nine Evidence v2 enrichment workflows remain `ip`, `domain`, `url`, `hash`, `cve`, `attack`, `asn`, `cidr`, and `certificate`. Secondary subjects such as package PURLs, TLS fingerprints, crypto addresses, email/username targets, privacy-preserving secret fingerprints, and legal-entity IDs are capability-routed inputs, not new automatic baseline workflows.
+
+Capabilities with `retentionClass: "no_store"` bypass the shared Intelligence Fabric cache. Provider failures remain failures. `no_result`, `not_found`, `not_listed`, and `no_association` remain source-scoped absence and never mean safe or benign.
 
 #### Current provider fabric
 
-**Identity / routing / exposure:** IPinfo · RDAP · RIPEstat · Shodan · Censys · Modat Magnify · Cloudflare Radar · Cloudflare DNS · Tor Exit · Spamhaus DROP / ASN-DROP.
+**Canonical enrichment baseline, 39 upstream APIs/feeds:**
 
-**Threat / IOC:** DShield · Feodo Tracker · ThreatMiner · CIRCL MISP OSINT · Botvrij MISP OSINT · GreyNoise · AbuseIPDB · VirusTotal · OTX · ThreatFox · urlscan.io · Webamon · Pulsedive · OpenPhish · URLhaus · TweetFeed.
+- **Identity / routing / exposure:** IPinfo · RDAP · RIPEstat · Shodan · Censys · Modat Magnify · Cloudflare Radar · Cloudflare DNS · Tor Exit · Spamhaus DROP / ASN-DROP.
+- **Threat / IOC:** DShield · Feodo Tracker · ThreatMiner · CIRCL MISP OSINT · Botvrij MISP OSINT · GreyNoise · AbuseIPDB · VirusTotal · OTX · ThreatFox · urlscan.io · Webamon · Pulsedive · OpenPhish · URLhaus · TweetFeed.
+- **File / malware:** CIRCL Hashlookup · MalwareBazaar · Malpedia · Hybrid Analysis.
+- **Vulnerability / ATT&CK:** CISA KEV · CISA ADP SSVC · FIRST EPSS · CIRCL Vulnerability-Lookup · NVD · OSV · MITRE ATT&CK TAXII.
+- **Ransomware:** RansomLook · Ransomware.live API-PRO.
 
-**File / malware:** CIRCL Hashlookup · MalwareBazaar · Malpedia · Hybrid Analysis.
+**Explicit Intelligence Fabric additions and sibling capabilities:**
 
-**Vulnerability / ATT&CK:** CISA KEV · CISA ADP SSVC · FIRST EPSS · CIRCL Vulnerability-Lookup · NVD · OSV · MITRE ATT&CK TAXII.
+- **Graph / infrastructure:** `virustotal-graph`, `urlscan-graph`, `censys-history`, Team Cymru IP-to-ASN/network identity, Internet Archive Wayback CDX.
+- **Search:** `censys-search` with PARA11AX-generated bounded CenQL.
+- **Exploit / supply chain:** VulnCheck exploit context and deps.dev package/dependency graph.
+- **TLS / malware:** abuse.ch SSLBL JA3 context, abuse.ch YARAify malware similarity, CERT Polska MWDB malware configuration.
+- **Defensive knowledge:** MITRE D3FEND ATT&CK-to-defensive-technique context.
+- **Crypto abuse:** Chainabuse address-report context.
+- **Secret exposure:** GitGuardian Has My Secret Leaked using only `hmsl-sha256:` privacy-preserving fingerprints; explicit case authorization and `no_store` retention.
+- **Owned-asset monitoring:** Shadowserver Reports API, subject-bound to server-owned CIDR/domain scope and excluded from ordinary fanout.
 
-**Ransomware:** RansomLook · Ransomware.live API-PRO.
+The active release manifest also includes the free **Team Cymru** network-identity capability. It is graph-only and non-fanout, so ordinary IP enrichment remains unchanged.
+
+#### Execution modes and admission
+
+Baseline `enrich` is phase one and remains the only automatic fanout mode. Secondary modes are explicit:
+
+- `graph` — bounded relationships/context for an already-canonical subject;
+- `search` — bounded registered search, never caller-selected raw upstream query routing unless the adapter contract explicitly accepts a constrained query generated by PARA11AX;
+- `monitor` — server-authorized owned-asset observations;
+- `analysis` — bounded malware/sample analysis context without automatic submission/rescan behavior;
+- `knowledge` — deterministic reference/defensive knowledge.
+
+The direct Intelligence Fabric executor selects only adapters matching the canonical subject type and exact requested mode, then applies provider configuration state and central authorization before deterministic value ranking. At most **four** direct providers execute for one normalized operation.
+
+Public callers cannot supply trusted authorization context, ownership flags, verified-domain lists, provider URLs, arbitrary methods, credentials, or raw mode overrides. Server-owned deployment scope is configured separately.
+
+#### Configuration variables
+
+Real values never belong in the repository. `.env.example` is the canonical key inventory; production values belong in deployment secret/configuration storage.
+
+Intelligence Fabric additions currently use:
+
+```text
+PARA11AX_OWNED_CIDRS=          # trusted deployment-owned CIDR list
+PARA11AX_VERIFIED_DOMAINS=     # trusted deployment verified-domain list
+ABUSECH_API_KEY=               # YARAify where configured
+VULNCHECK_API_TOKEN=
+MWDB_API_TOKEN=
+CHAINABUSE_API_KEY=
+SHADOWSERVER_API_KEY=
+SHADOWSERVER_API_SECRET=
+CENSYS_PAT=
+CENSYS_ORG_ID=                 # non-secret org scope for Censys history
+```
+
+No credential is required by deps.dev, SSLBL JA3 feed access, Wayback CDX, MITRE D3FEND, Team Cymru, or the current GitGuardian HMSL fingerprint endpoint adapter. Credential presence means only **configured-unverified** until an authorized live request succeeds; it does not prove entitlement, upstream health, or production correctness.
 
 #### Provider Value Scheduler v1.0
 
-Provider selection/admission and execution order are different concerns. Fixed workflow/profile rules decide which providers are admitted. **Provider Value Scheduler v1.0** deterministically orders those admitted adapters.
+Provider selection/admission and execution order are different concerns. Fixed workflow/profile rules decide which baseline providers are admitted. **Provider Value Scheduler v1.0** deterministically orders those already-admitted adapters.
 
-Scheduler descriptors are static, type-aware metadata. The policy comparator uses authority, semantic uniqueness, direct threat value, pivot value, latency class and cost class, then existing tier/workflow order for deterministic fallback. It does not learn from prior requests or suppress sources based on evidence already returned.
+Scheduler descriptors are static, type-aware metadata. The comparator uses authority, semantic uniqueness, direct threat value, pivot value, latency class and cost class, then existing tier/workflow order for deterministic fallback. It does not learn from prior requests or suppress sources based on evidence already returned.
 
-Current **24-provider IP workflow** keeps the same membership and the existing **48-call ceiling** (maximum two attempts/provider), maximum concurrency 4 and 20-second request deadline.
+The current **24-provider IP workflow** keeps its established membership and **48-call ceiling** (maximum two attempts/provider), maximum concurrency 4, and 20-second request deadline. Secondary graph/search/monitor/analysis/knowledge capabilities are not silently inserted into that workflow.
 
 IP execution order v1:
 
@@ -60,106 +119,106 @@ rdap
 
 Scheduling invariants:
 
-- every admitted provider remains scheduled;
+- every admitted baseline provider remains scheduled;
 - no evidence-dependent omission;
 - missing/malformed scheduler metadata falls back deterministically;
 - scheduling cannot broaden `safeFetch` egress;
-- public capability metadata can describe scheduler policy/descriptors but never credentials, arbitrary runtime rank inputs or threat conclusions;
-- scheduler ordering is not a maliciousness score.
+- public metadata can describe scheduler policy/descriptors but never credentials, arbitrary runtime rank inputs, or threat conclusions;
+- scheduling is not a maliciousness score.
 
 #### Source semantics
 
-Provider observations preserve their own meaning. Examples:
+Provider observations preserve their own meaning. Important examples:
 
 - RDAP: registration context.
-- RIPEstat: routing context.
+- RIPEstat / Team Cymru: routing and network-identity context.
 - Shodan/Censys/Modat: service/infrastructure exposure context.
 - DShield: scanner activity.
-- GreyNoise: provider-specific internet-noise/scanner/threat context from the fixed v3 IP lookup; dataset provenance is claimed only when the upstream response explicitly supplies applicable workspace labels.
+- GreyNoise: provider-specific internet-noise/scanner/threat context.
+- Shadowserver: owned-network exposure/reporting context, not open-world reputation.
 - Spamhaus DROP/ASN-DROP: netblock/ASN listing context.
 - Tor exit: Tor infrastructure context.
 - CISA KEV: known exploited status.
-- CISA ADP SSVC: CISA Stakeholder-Specific Vulnerability Categorization context from the CVE record's CISA ADP container; upstream `Exploitation`, `Automatable`, and `Technical Impact` decisions remain separate axes and are not collapsed into a score.
+- CISA ADP SSVC: CISA Stakeholder-Specific Vulnerability Categorization context; upstream decisions remain separate axes.
 - EPSS: exploitation probability.
 - NVD/CIRCL/OSV: vulnerability metadata.
-- MITRE ATT&CK TAXII: knowledge/mapping context.
-- reputation/malware services: provider-specific threat observations.
-- RansomLook/ransomware.live: victim-claim/reporting context rather than compromise proof.
+- VulnCheck: exploit-presence/maturity context; it does not replace KEV, EPSS, or CVSS.
+- deps.dev: package identity and dependency relationships; dependency presence is not maliciousness.
+- MITRE ATT&CK TAXII: offensive knowledge/mapping context.
+- MITRE D3FEND: defensive-technique knowledge linked to ATT&CK technique context.
+- VirusTotal point enrichment: provider-specific reputation, malware association, and certificate context.
+- VirusTotal graph: bounded explicit relationships; relationship presence is context, not a new reputation vote.
+- Censys search/history: bounded exposure/certificate/history context, not reputation evidence.
+- urlscan.io graph: bounded web-scan relationships from one search page plus one selected result.
+- SSLBL JA3: provider-specific TLS malware-infrastructure listing context.
+- YARAify: malware similarity/match context.
+- MWDB: bounded malware configuration/context; no sample submission is performed by this capability.
+- Wayback CDX: historical web observation context.
+- Chainabuse: reported crypto-address abuse context, not wallet ownership or criminal attribution proof.
+- GitGuardian HMSL: privacy-preserving secret-exposure check on a one-way fingerprint; raw secrets are rejected before egress.
+- RansomLook/ransomware.live: victim claim/reporting context rather than compromise proof.
 
-These classes are not interchangeable. A service exposure, Tor exit, scanner hit, registration record, certificate record, community IOC report, ransomware claim or ATT&CK technique is not automatically a malware-reputation vote.
+These classes are not interchangeable. Infrastructure, registration, scanner activity, a certificate, a dependency, a defensive mapping, a secret fingerprint hit, a crypto-abuse report, or a ransomware claim cannot silently become a generic malware-reputation vote.
 
-#### Provider capability coverage and Intelligence Kernel
+#### Bounded sibling capabilities
 
-For the IP reference path, approved provider capability/source-role metadata can be projected into request coverage so **Intelligence Kernel v1.0** can distinguish redundant capability loss from materially unique capability loss. Failure/skip state remains coverage only; it is not converted into negative threat evidence.
+**VirusTotal** has point enrichment plus `virustotal-graph`. Graph expansion follows only hard-coded relationship classes, uses bounded first-page requests, validates returned target types, and caps normalized relationships.
 
-The Kernel consumes normalized evidence/coverage after provider execution. It cannot call a provider, change scheduler ordering, expand the provider registry or change an adapter's semantic class. Evidence v2 remains authoritative.
+**Censys** has point enrichment, `censys-search`, and `censys-history`. PARA11AX generates the bounded search query from the canonical subject; caller-supplied raw CenQL is not accepted. Search/history pagination is not followed beyond the configured bound, and certificate history requires configured organization scope.
 
-#### Shodan: two distinct surfaces
+**urlscan.io** has point enrichment plus `urlscan-graph`. The graph adapter fetches one bounded search page, selects one valid result UUID, and fetches exactly one result document. Markup-bearing values and malformed pivots are rejected rather than sanitized into fabricated observables.
 
-Shodan appears in PARA11AX in two deliberately separate ways.
+#### Sensitive and owned-context capabilities
 
-1. **Evidence v2 provider adapter** — Shodan is one of the 39 fixed providers used where the canonical workflow/profile allows it. Its observations enter the normal provider parser/evidence/correlation path with exposure semantics and can support deterministic derived context without becoming a reputation vote by themselves.
-2. **Native analyst-shell utility** — `POST /api/para11ax/shodan` implements explicit bounded operator lookups for `shodan host`, `search`, `count`, `stats`, `domain`, and `info`.
+`gitguardian-hmsl` accepts only an explicit `hmsl-sha256:<64-hex>` fingerprint. Raw-secret-shaped input is rejected before upstream egress. Its policy is `sensitivity: secret`, `authorization: explicit_case`, `retentionClass: no_store`, and `distribution: internal_only`.
 
-The shell utility does **not** add a 40th provider, does not change the provider registry/scheduler, and does not automatically promote its output into Evidence v2 or Intelligence Kernel input.
+`shadowserver` is `mode: monitor`, `sensitivity: owned_asset`, `authorization: owned_network`, `retentionClass: restricted`, and `distribution: internal_only`. The subject itself must match server-controlled owned CIDR/domain scope before execution. A caller cannot self-assert ownership.
 
-Both surfaces use server-side `SHODAN_API_KEY`; the browser never receives that key. The shell route contacts only `https://api.shodan.io`, rejects arbitrary destinations/options, caps returned data, removes large raw service/banner bodies, keeps search first-page only, and disables `shodan download`.
+Shareable STIX projection excludes `internal_only` evidence references and also suppresses actor/malware relationship objects whose explicit provider provenance maps to internal-only evidence. This closes the relationship side channel as well as the reference side channel.
 
-Credit handling is explicit on the shell route: host/count/stats/info are no-query-credit operations; domain consumes a query credit; search may consume a query credit. See `SHODAN-SHELL.md`.
+#### Shodan and GreyNoise operator surfaces
 
-#### GreyNoise: canonical provider plus Project Swarm operator surface
+Shodan and GreyNoise each have a canonical Evidence v2 provider role and a separate explicit operator utility. The native Shodan shell and GreyNoise Project Swarm utilities do not add provider capabilities to baseline scheduling and do not automatically promote their output into Evidence v2 or Intelligence Kernel input.
 
-GreyNoise also appears in two distinct ways without increasing the 39-provider count.
+Both utilities use server-side credentials, fixed upstream origins, strict operation schemas, response ceilings, and explicit error/entitlement semantics. Successful read results may be captured as Investigation Workspace operator context; that capture remains contextual material rather than provider evidence.
 
-1. **Evidence v2 provider adapter** — canonical IP enrichment uses authenticated GreyNoise v3 IP Lookup at the fixed GreyNoise API origin. The default workspace-label request is `greynoise,community,personal`, optionally overridden by `GREYNOISE_WORKSPACE_LABELS`. Returned tags, CVEs and scanned ports can become normalized provider observations; PARA11AX only asserts dataset/workspace provenance when the upstream response explicitly supplies matching label information.
-2. **GreyNoise Project Swarm operator utility** — `POST /api/para11ax/swarm` implements bounded Web-only session `search`, `get`, allowlisted `unique`, allowlisted `timeseries`, and explicit single-session `export` operations.
+#### Certificate and network semantics
 
-The Swarm utility is not a 40th provider, is not scheduled by Provider Value Scheduler v1.0, and does not automatically promote session/pivot/export output into Evidence v2 or Intelligence Kernel input. Successful `search`, `get`, `unique`, and `timeseries` results can be explicitly captured as Investigation Workspace operator context; PCAP/raw export remains an explicit browser download outside automatic capture.
+Certificate lookup remains explicit: `cert-sha256:<64-hex>` prevents a certificate fingerprint from stealing a bare SHA-256 from the file-hash workflow. Certificate subject/issuer names, reuse, and infrastructure proximity are investigative context rather than automatic reputation or attribution.
 
-Both GreyNoise surfaces use server-side `GREYNOISE_API_KEY`; the browser never receives it. Swarm egress is fixed to `https://api.greynoise.io`, redirects are refused, search/pivot ranges and fields are bounded, JSON and individual binary export are capped at 4 MiB, bulk session export is omitted, and `scope=demo` export is rejected before egress.
+ASN/CIDR baseline support remains narrow and fixed-source: RDAP autnum/network registration, RIPEstat AS/Prefix Overview, and Spamhaus ASN-DROP / IPv4/IPv6 DROP. Team Cymru is an explicit graph-mode network-identity capability and does not widen canonical IP fanout.
 
-`scope=workspace` session reads depend on the applicable Sensors entitlement; `scope=demo` reads depend on the applicable Swarm entitlement. Repository implementation/configuration cannot prove either account entitlement. See `GREYNOISE-SWARM.md`.
-
-#### Certificate semantics
-
-Certificate lookup is explicit and contextual. The canonical classifier requires `cert-sha256:<64-hex>` so a certificate fingerprint cannot silently steal a bare SHA-256 from the file-hash workflow. Certificate subject/issuer names, reuse, infrastructure proximity, or mere presence are investigative context rather than reputation or attribution proof.
-
-#### Public feed hardening
-
-Public feed parsers reject malformed content rather than manufacture `not_listed` results. MISP feed hash-cache hits are verified against exact event attributes; deleted attributes are excluded; composite attribute types compare only the corresponding component; event fetches are bounded.
-
-ATT&CK TAXII uses fixed MITRE collection IDs and server-side type filtering. Relationship expansion remains omitted where collection-wide retrieval would violate boundedness.
-
-#### Network indicator support
-
-ASN/CIDR support is deliberately narrow and fixed-source: RDAP autnum/network registration, RIPEstat AS/Prefix Overview, and Spamhaus ASN-DROP / IPv4/IPv6 DROP. No active scanning is performed by the Evidence v2 provider fabric.
-
-The Shodan analyst-shell surface performs only documented Shodan API lookups; it does not expose on-demand scan submission or arbitrary scanning. GreyNoise Swarm exposes only stored/session observation search/detail/pivots and explicit bounded export; it is not an arbitrary active scanner.
+No Evidence v2 or Intelligence Fabric adapter introduced here submits active scans, malware samples, secrets, KQL, or tickets.
 
 #### State model
 
-A provider can be:
+A provider capability can be:
 
 - **Implemented** — adapter exists and repository tests pass.
-- **Configured** — required runtime secret is present; inspect authenticated health/status/probes.
-- **Production-verified** — an authorized smoke operation succeeded against the exact deployed source SHA.
-- **Unavailable/gap** — omitted, unconfigured, or failed its source/boundedness gate.
+- **Configured** — required runtime credential/configuration is present; this is not a live-health claim.
+- **Selected** — type/mode/configuration/authorization policy admitted it for this normalized operation.
+- **Executed** — PARA11AX attempted the adapter for the operation.
+- **Denied** — central authorization rejected it before execution.
+- **Unavailable** — inactive, missing, or unconfigured for that operation.
+- **Production-verified** — an authorized live operation succeeded against the exact deployed source SHA.
 
-Implemented does not imply configured, and configured does not imply production-verified. For GreyNoise Swarm, account entitlement is an additional upstream state and must not be inferred from the presence of `GREYNOISE_API_KEY`.
+Implemented does not imply configured. Configured does not imply entitlement, health, or production verification. An upstream failure is not converted into absence; an absence result is not converted into benignness.
 
-#### Intentionally omitted
+#### Intentionally omitted / constrained
 
-- SecurityTrails stale/paid assumptions.
-- Deprecated SSLBL C2 path.
-- TLS/JA3 indicator class without a suitable fixed bounded source.
-- Unbounded ATT&CK relationship download.
-- Ransomware-wide unbounded enumeration in per-indicator enrichment.
-- Modat bulk export/broad history in normal enrichment.
-- Shodan arbitrary paging, bulk `download`, caller-selected URLs, and on-demand scan submission through the analyst shell.
-- GreyNoise arbitrary session fields, caller-selected destinations/methods, demo export, bulk `/v3/sessions/export`, and automatic packet/payload promotion into Evidence v2.
+- paid-only provider expansion as an implementation target;
+- raw-secret submission to secret-exposure services;
+- arbitrary owned-network claims from callers;
+- unbounded ATT&CK/D3FEND relationship retrieval;
+- arbitrary provider paging or caller-selected next links;
+- malware sample submission/rescan paths in explicit analysis capabilities;
+- ransomware-wide unbounded enumeration in per-indicator enrichment;
+- Modat bulk export/broad history in normal enrichment;
+- Shodan arbitrary paging, bulk `download`, caller-selected URLs, or scan submission through the analyst shell;
+- GreyNoise arbitrary session fields/destinations/methods, bulk export, or automatic packet/payload promotion into Evidence v2;
 - LLM/adaptive provider scheduling or evidence-dependent source suppression.
 
-Run `node scripts/generate-release-manifest.mjs --check` to detect registry/parser-version drift. Documentation-contract tests separately detect drift in externally documented workflow/provider/scheduler/operator facts.
+Run `node scripts/generate-release-manifest.mjs --check` to detect registry/parser-version drift. Repository contract tests separately detect fixed-egress, manifest, MCP, secret-safety, and baseline-workflow regressions.
 
 ---
 

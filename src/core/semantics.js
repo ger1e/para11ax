@@ -19,6 +19,19 @@ const NETWORK_CONTEXT_KINDS = new Set([
   'dns_resolution',
 ]);
 
+const INTELLIGENCE_KINDS = new Set([
+  'malware_configuration',
+  'malware_similarity',
+  'supply_chain',
+  'web_archive_observation',
+  'secret_exposure',
+  'crypto_abuse',
+  'legal_entity_context',
+  'tls_malware_infrastructure',
+  'exploit_maturity',
+  'defensive_knowledge',
+]);
+
 const SEMANTIC_ALIASES = new Map([
   ['reported_abuse', 'abuse_reports'],
   ['abuse_reports', 'abuse_reports'],
@@ -46,6 +59,7 @@ export function semanticClass(kind) {
   const value = typeof kind === 'string' && kind ? kind : 'unknown';
   if (REPUTATION_KINDS.has(value)) return 'reputation';
   if (NETWORK_CONTEXT_KINDS.has(value)) return 'network_context';
+  if (INTELLIGENCE_KINDS.has(value)) return value;
   if (value === 'known_exploited') return 'exploitation';
   if (value === 'exploit_probability') return 'exploit_probability';
   if (value === 'vulnerability_metadata' || value === 'vulnerability_catalog' || value === 'open_source_vulnerability') return 'vulnerability_metadata';
