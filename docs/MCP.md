@@ -7,13 +7,13 @@ PARA11AX exposes its functional analyst surface through one authenticated remote
 https://para11ax.vercel.app/mcp
 ```
 
-The MCP endpoint is a control plane over existing PARA11AX domain logic. It does **not** create a second implementation of enrichment, User Scanner, Shodan, GreyNoise Swarm, Mission Workspace, Investigation Workspace, cases, reports, or registered commands. Each MCP tool delegates into the same bounded validators/handlers used by the REST, Web, and CLI surfaces.
+The MCP endpoint is a control plane over existing PARA11AX domain logic. It does **not** create a second implementation of enrichment, Intelligence Fabric execution, User Scanner, Shodan, GreyNoise Swarm, Mission Workspace, Domain Investigation, Investigation Workspace, cases, reports, or registered commands. Each MCP tool delegates into the same bounded validators/handlers used by the REST, Web, and CLI surfaces.
 
 The transport implements the stateless `2026-07-28` profile and retains a bounded `2025-06-18` initialize compatibility response. Repository, deployment, live-credential, and ChatGPT-connection proof remain separate states tracked in [`OPERATIONS.md`](OPERATIONS.md).
 
 #### Authentication and transport
 
-Protocol discovery is public so ChatGPT can initialize and inspect the 13 tool descriptors before account linking. Public methods are limited to `server/discover`, `initialize`, `notifications/initialized`, `ping`, and `tools/list`; they execute no PARA11AX capability. Every tool declares:
+Protocol discovery is public so ChatGPT can initialize and inspect the 15 tool descriptors before account linking. Public methods are limited to `server/discover`, `initialize`, `notifications/initialized`, `ping`, and `tools/list`; they execute no PARA11AX capability. Every tool declares:
 
 ```json
 {"type":"oauth2","scopes":["para11ax:use"]}
@@ -51,7 +51,7 @@ Mcp-Name: <tool name>   # required for tools/call
 
 `Mcp-Method` must match the JSON-RPC method. For `tools/call`, `Mcp-Name` must match `params.name`. Mismatches fail closed with a protocol error. Successful modern responses use `resultType: "complete"`; discovery/list responses publish bounded private cache hints.
 
-The endpoint is stateless. Mission, investigation, and analyst-case state is returned to the client and must be supplied on the next related call. No hidden cross-user workflow state is persisted by `/mcp`.
+The endpoint is stateless. Mission, Domain Investigation, investigation, and analyst-case state is returned to the client and must be supplied on the next related call. No hidden cross-user workflow state is persisted by `/mcp`.
 
 #### Discovery
 
@@ -71,6 +71,7 @@ server/discover
 | --- | --- | --- |
 | `para11ax_capabilities` | MCP catalog, registered safe commands, authenticated gateway health/status/meta | read-only |
 | `para11ax_enrich` | Evidence v2 single-observable enrichment | read-only external lookup |
+| `para11ax_intelligence` | normalized explicit Intelligence Fabric operation (`pivot`, `search`, `identity`, `asset`, `supply-chain`, `malware`, `knowledge`) | read-only policy-governed lookup; no raw provider/authz routing |
 | `para11ax_batch` | bounded 1..20 observable batch enrichment | read-only external lookup |
 | `para11ax_provider` | one registered provider through the provider gateway | read-only external lookup |
 | `para11ax_shodan` | bounded Shodan operator surface | read-only external lookup; some operations can consume query credits |
@@ -78,12 +79,15 @@ server/discover
 | `para11ax_user_scan` | isolated email/username OSINT scanner | active OSINT / open-world lookup |
 | `para11ax_stix` | deterministic STIX 2.1 generation from PARA11AX enrichment | read-only projection |
 | `para11ax_mission` | profile/context/relevance/hunt/KQL/result/ServiceNow mission workflow | explicit client-carried state mutation |
+| `para11ax_domain_investigation` | passive domain investigation plus bounded explicit operator-context imports/report/STIX/handoff | explicit client-carried state mutation |
 | `para11ax_investigation` | Investigation Workspace v2 create/status/mutate/report/import/export | explicit client-carried state mutation |
 | `para11ax_case` | portable analyst case create/note/pin/capture/graph/diff/export | explicit client-carried state mutation |
 | `para11ax_report` | deterministic report render/quality/manifest projections | read-only projection |
 | `para11ax_command` | exact registered-command fallback for server-safe commands | policy-dependent registered operation |
 
 This is **functional parity**, not UI mirroring. Terminal theme/audio, volatile login UI, focus/history controls, local download buttons, and other browser cosmetics are not remote analyst capabilities and are not modeled as MCP tools.
+
+`para11ax_intelligence` is deliberately narrower than a raw provider RPC. Its schema contains only `operation`, `indicator`, optional asserted `type`, and optional baseline `profile`. It does not expose trust flags, case IDs, verified-domain/owned-network claims, provider names, provider URLs, arbitrary paths, raw mode values, or caller-selected destinations. Secondary capabilities remain non-fanout and are admitted only when their registered type, mode, configuration, and central authorization policy match the canonical subject.
 
 #### High-value examples
 
@@ -123,6 +127,30 @@ Evidence enrichment:
 }
 ```
 
+Explicit Intelligence Fabric knowledge lookup:
+
+```json
+{
+  "name": "para11ax_intelligence",
+  "arguments": {
+    "operation": "knowledge",
+    "indicator": "T1059"
+  }
+}
+```
+
+Explicit graph pivot:
+
+```json
+{
+  "name": "para11ax_intelligence",
+  "arguments": {
+    "operation": "pivot",
+    "indicator": "8.8.8.8"
+  }
+}
+```
+
 Mission state round trip:
 
 ```text
@@ -133,7 +161,7 @@ Mission state round trip:
 5. continue relevance -> hunt_build -> kql_validate -> result_analyze -> servicenow/export
 ```
 
-Investigations and cases follow the same explicit state-in/state-out model. This makes serverless invocations reproducible and prevents later calls from depending on hidden process memory.
+Domain investigations, investigations, and cases follow the same explicit state-in/state-out model. This makes serverless invocations reproducible and prevents later calls from depending on hidden process memory.
 
 #### User Scanner + dorking OSINT route
 
@@ -168,15 +196,18 @@ The MCP endpoint does not expose:
 - environment-secret values;
 - credential persistence;
 - provider host/method/credential overrides;
+- caller-supplied Intelligence Fabric trust/ownership/authorization claims;
 - automatic KQL execution;
 - automatic ServiceNow submission;
 - automatic Evidence v2 promotion of User Scanner/Shodan/Swarm operator context.
 
-Provider and OSINT work continues through existing PARA11AX validators, fixed-host policies, timeouts, response limits, circuit breakers, provenance, and gateway authentication. Local-admin/filesystem commands remain unreachable over MCP even when a similarly named local CLI operation exists.
+Provider and OSINT work continues through existing PARA11AX validators, fixed-host policies, timeouts, response limits, circuit breakers, provenance, and gateway authentication. Intelligence Fabric direct execution additionally enforces exact registered mode/type matching, central authorization, a maximum of four direct providers, and retention/distribution policy. Local-admin/filesystem commands remain unreachable over MCP even when a similarly named local CLI operation exists.
 
 #### Error and cache semantics
 
 Protocol errors use JSON-RPC errors. Tool execution failures are returned as MCP tool results with `isError: true` and a bounded safe message. Provider-specific errors remain normalized by the underlying PARA11AX handler. The existing REST catch-all remains fail closed and is not used as an MCP dispatcher.
+
+Capabilities declared `retentionClass: "no_store"` bypass shared Intelligence Fabric cache reads and writes. A provider `no_result` remains source-scoped absence and never means safe or benign.
 
 `GET /mcp` is expected to return `405 Method Not Allowed` with `Allow: POST`. The live route is `Cache-Control: no-store` and uses the same hardened response-header posture as the REST gateway.
 
@@ -191,13 +222,14 @@ Do not collapse these claims:
 - **credential-capability-proven** — an authenticated tool call actually succeeds for the relevant configured provider/worker/entitlement;
 - **ChatGPT-connected** — the MCP server has been installed/configured as a ChatGPT plugin/connector and authentication succeeds from that client.
 
-A live `/mcp` endpoint does not by itself prove that every credentialed provider, User Scanner worker, GreyNoise entitlement, or third-party MCP client is configured.
+A live `/mcp` endpoint does not by itself prove that every credentialed provider, User Scanner worker, GreyNoise entitlement, owned-network authorization scope, or third-party MCP client is configured.
 
 #### Related documentation
 
 - [`README.md`](../README.md) — product/operator overview.
 - [`API.md`](API.md) — REST + MCP transport inventory.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — trust boundaries and delegation model.
+- [`PROVIDERS.md`](PROVIDERS.md) — provider/capability policy and status semantics.
 - [`IDENTITY-OSINT.md`](IDENTITY-OSINT.md) — User Scanner/entity-resolution workflow.
 - [`GOOGLE-DORKING.md`](GOOGLE-DORKING.md) — defensive indexed-discovery playbook.
 - [`OPERATIONS.md`](OPERATIONS.md) — deployment/acceptance proof states.
