@@ -44,7 +44,7 @@ function scopeList(value) {
 }
 
 function serverAuthorizationContext(authz, env, mode) {
-  if (authz?.trusted !== true) return authz;
+  if (authz?.trusted !== true || mode === 'sensitive') return authz;
   const ownedCidrs = [...new Set([...(authz.ownedCidrs ?? []), ...scopeList(env?.PARA11AX_OWNED_CIDRS)])];
   const verifiedDomains = [...new Set([...(authz.verifiedDomains ?? []), ...scopeList(env?.PARA11AX_VERIFIED_DOMAINS)])];
   return createTrustedAuthorizationContext({

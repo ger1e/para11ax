@@ -40,6 +40,24 @@ function ownedSubjectAllowed(authz, subject) {
   return result(false, 'owned_scope_unsupported');
 }
 
+function sensitiveSubjectAllowed(authz, subject) {
+  if (!subject || typeof subject.type !== 'string' || typeof subject.value !== 'string') {
+    return result(false, 'sensitive_subject_required');
+  }
+  if (subject.type === 'domain') {
+    if (!Array.isArray(authz?.verifiedDomains) || authz.verifiedDomains.length === 0) {
+      return result(false, 'verified_domain_required');
+    }
+    const value = subject.value.toLowerCase();
+    return authz.verifiedDomains.some(domain => domainWithinScope(value, domain))
+      ? result(true, 'allowed') : result(false, 'verified_domain_scope_mismatch');
+  }
+  if (subject.type === 'email') {
+    return authz?.caseId ? result(true, 'allowed') : result(false, 'explicit_case_required');
+  }
+  return result(false, 'sensitive_subject_unsupported');
+}
+
 export function authorizeCapability({ adapter, requestedMode, authz, subject = null } = {}) {
   if (!adapter || typeof adapter !== 'object') return result(false, 'invalid_adapter');
   if (typeof adapter.mode !== 'string' || typeof requestedMode !== 'string' || requestedMode !== adapter.mode) {
@@ -54,6 +72,7 @@ export function authorizeCapability({ adapter, requestedMode, authz, subject = n
     if (authorization === 'owned_network') return result(false, 'owned_network_required');
     if (authorization === 'explicit_case') return result(false, 'explicit_case_required');
     if (authorization === 'explicit_action') return result(false, 'explicit_action_required');
+    if (authorization === 'sensitive_subject') return result(false, 'trusted_context_required');
     return result(false, 'trusted_context_required');
   }
 
@@ -78,6 +97,9 @@ export function authorizeCapability({ adapter, requestedMode, authz, subject = n
   }
   if (authorization === 'explicit_action') {
     return authz?.explicitAnalysis === true ? result(true, 'allowed') : result(false, 'explicit_action_required');
+  }
+  if (authorization === 'sensitive_subject') {
+    return sensitiveSubjectAllowed(authz, subject);
   }
   return result(false, 'unknown_authorization');
 }
