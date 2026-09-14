@@ -2,6 +2,8 @@
 
 # Provider Independence, Evidence Promotion, and Evidence Graph Implementation Plan
 
+> **Historical design record.** This document records the implementation plan at the time of development and is not the current architecture. See `docs/ARCHITECTURE.md` for the authoritative current architecture.
+
 > **For Gergő:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Prevent false provider quorum, add analyst-controlled promotion of operator findings, and project both into the existing deterministic Evidence Graph without creating a second authority model.
@@ -115,7 +117,7 @@ node --test test/domain-investigation.test.js test/provider-independence.test.js
 
 ```bash
 git add src/core/domain-investigation.js test/domain-investigation.test.js
-git commit -m "feat: enforce source-family recommendation quorum"
+ git commit -m "feat: enforce source-family recommendation quorum"
 ```
 
 ## Task 3: Add deterministic evidence-promotion core
