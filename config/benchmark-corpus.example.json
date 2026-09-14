@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "gateway": {
+    "baseUrl": "http://127.0.0.1:3000",
+    "tokenEnv": "PARA11AX_TOKEN"
+  },
+  "thresholds": {
+    "baseline": {
+      "minUniqueFacts": 1,
+      "minMaterialUniqueObservationsPerCall": 0.1,
+      "maxLatencyP95Ms": 1500,
+      "maxErrorRate": 0.1
+    },
+    "graph": {
+      "minUniqueGraphEdges": 4,
+      "minMaterialUniqueObservationsPerCall": 0.1,
+      "maxLatencyP95Ms": 6000,
+      "maxErrorRate": 0.2
+    }
+  },
+  "providers": [
+    {
+      "name": "example-baseline",
+      "observations": [
+        { "latencyMs": 110, "status": "observed", "uniqueFacts": 2, "uniqueGraphEdges": 0, "decisionChanging": true, "materialUniqueObservations": 1 },
+        { "latencyMs": 180, "status": "observed", "uniqueFacts": 1, "uniqueGraphEdges": 0, "decisionChanging": false, "materialUniqueObservations": 1 },
+        { "latencyMs": 230, "status": "no_result", "uniqueFacts": 0, "uniqueGraphEdges": 0, "decisionChanging": false, "materialUniqueObservations": 0 }
+      ],
+      "cases": [
+        {
+          "indicator": "203.0.113.10",
+          "type": "ip",
+          "repeats": 3,
+          "decisionChanging": false
+        }
+      ],
+      "baselineEvidenceFingerprints": [],
+      "baselineGraphEdges": []
+    },
+    {
+      "name": "example-graph",
+      "observations": [
+        { "latencyMs": 2100, "status": "observed", "uniqueFacts": 0, "uniqueGraphEdges": 3, "decisionChanging": true, "materialUniqueObservations": 2 },
+        { "latencyMs": 3100, "status": "observed", "uniqueFacts": 0, "uniqueGraphEdges": 3, "decisionChanging": false, "materialUniqueObservations": 2 }
+      ],
+      "cases": [
+        {
+          "indicator": "example.com",
+          "type": "domain",
+          "repeats": 2,
+          "decisionChanging": true
+        }
+      ],
+      "baselineEvidenceFingerprints": [],
+      "baselineGraphEdges": []
+    }
+  ]
+}
