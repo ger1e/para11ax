@@ -188,7 +188,7 @@ test('supply-chain and defensive-knowledge lanes execute real adapters through t
   assert.equal(supply.status, 200);
   assert.deepEqual(supply.body.providers.executed, ['deps-dev']);
   assert.equal(supply.body.evidence[0].observation.kind, 'supply_chain');
-  assert.equal(supply.body.relationships[0].type, 'direct_dependency');
+  assert.equal(supply.body.relationships[0].relationship, 'direct_dependency');
 
   const knowledge = await app.handleIntelligence(request({ operation: 'knowledge', indicator: 'T1059' }));
   assert.equal(knowledge.status, 200);
@@ -237,11 +237,19 @@ test('MCP intelligence and investigation/report surfaces remain compatible', asy
 
   const created = mcpStructured(await handler(mcpRequest('para11ax_investigation', { operation: 'create', title: 'Fabric E2E' }, 11)));
   assert.equal(created.investigation.title, 'Fabric E2E');
-  const quality = mcpStructured(await handler(mcpRequest('para11ax_report', {
-    kind: 'investigation', operation: 'quality', investigation: created.investigation,
+  const status = mcpStructured(await handler(mcpRequest('para11ax_investigation', {
+    operation: 'status', investigation: created.investigation,
   }, 12)));
-  assert.equal(quality.ok, true);
-  assert.equal(typeof quality.report, 'object');
+  assert.equal(typeof status.status, 'object');
+
+  const reportApp = createApp({ env, adapters: [seedDnsProvider()], now: () => NOW, nowMs: () => 4_100 });
+  const snapshotResponse = await reportApp.handleEnrich(request({ indicator: 'example.com', profile: 'standard' }));
+  assert.equal(snapshotResponse.status, 200);
+  const quality = mcpStructured(await handler(mcpRequest('para11ax_report', {
+    kind: 'enrichment', operation: 'quality', snapshot: snapshotResponse.body,
+  }, 13)));
+  assert.equal(quality.quality.ok, true);
+  assert.equal(quality.quality.evidenceCount, 1);
 });
 
 test('shareable STIX excludes relationships originating from internal-only evidence', () => {
