@@ -38,7 +38,7 @@ const base = {
 
 const MODES = new Set(['enrich', 'graph', 'search', 'monitor', 'analysis', 'knowledge', 'sensitive']);
 const SENSITIVITY = new Set(['public', 'owned_asset', 'pii', 'credential', 'secret', 'sample']);
-const AUTHORIZATION = new Set(['none', 'tenant', 'verified_domain', 'owned_network', 'explicit_case', 'explicit_action']);
+const AUTHORIZATION = new Set(['none', 'tenant', 'verified_domain', 'owned_network', 'explicit_case', 'explicit_action', 'sensitive_subject']);
 const RETENTION = new Set(['normal', 'restricted', 'ephemeral', 'no_store']);
 
 test('accepts validated intelligence capability policy', () => {

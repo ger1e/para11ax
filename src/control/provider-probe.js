@@ -4,6 +4,7 @@ import { runProvider } from '../core/provider-runner.js';
 export const PROBE_SAMPLE_BY_TYPE = Object.freeze({
   ip: '8.8.8.8',
   domain: 'example.com',
+  email: 'nobody@example.com',
   url: 'https://example.com/',
   hash: '275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f',
   certificate: 'cert-sha256:275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f',
