@@ -49,6 +49,11 @@ import { shadowserverProvider as rawShadowserverProvider } from './shadowserver.
 import { hibpProvider as rawHibpProvider } from './hibp.js';
 import { hudsonRockProvider as rawHudsonRockProvider } from './hudson-rock.js';
 import { spyCloudProvider as rawSpyCloudProvider } from './spycloud.js';
+import { dnsdbProvider as rawDnsdbProvider } from './dnsdb.js';
+import { validinProvider as rawValidinProvider } from './validin.js';
+import { spurProvider as rawSpurProvider } from './spur.js';
+import { netifyProvider as rawNetifyProvider } from './netify.js';
+import { teamCymruProvider as rawTeamCymruProvider } from './team-cymru.js';
 import { withProviderMetadata } from './metadata.js';
 
 export const ipinfoProvider = withProviderMetadata(rawIpinfoProvider);
@@ -107,6 +112,11 @@ export const shadowserverProvider = withProviderMetadata(rawShadowserverProvider
 export const hibpProvider = withProviderMetadata(rawHibpProvider);
 export const hudsonRockProvider = withProviderMetadata(rawHudsonRockProvider);
 export const spyCloudProvider = withProviderMetadata(rawSpyCloudProvider);
+export const dnsdbProvider = withProviderMetadata(rawDnsdbProvider);
+export const validinProvider = withProviderMetadata(rawValidinProvider);
+export const spurProvider = withProviderMetadata(rawSpurProvider);
+export const netifyProvider = withProviderMetadata(rawNetifyProvider);
+export const teamCymruProvider = withProviderMetadata(rawTeamCymruProvider);
 
 export const ALL_PROVIDERS = Object.freeze([
   ipinfoProvider, rdapProvider, ripestatProvider, dshieldProvider, spamhausDropProvider, torExitProvider,
@@ -120,4 +130,5 @@ export const ALL_PROVIDERS = Object.freeze([
   sslblProvider, yaraifyProvider, mwdbProvider, waybackCdxProvider,
   d3fendProvider, chainabuseProvider, gitguardianHmslProvider, shadowserverProvider,
   hibpProvider, hudsonRockProvider, spyCloudProvider,
+  dnsdbProvider, validinProvider, spurProvider, netifyProvider, teamCymruProvider,
 ]);
