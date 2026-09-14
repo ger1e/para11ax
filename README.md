@@ -26,297 +26,194 @@
 </sub></p>
 
 > [!IMPORTANT]
-> Personal research / lab surface. Do not send commercial-client, internal-enterprise, restricted, or otherwise sensitive data without explicit authorization and suitable data handling. User Scanner is active OSINT; Shodan operator commands can consume account query credits; GreyNoise Project Swarm can expose sensor/demo session metadata, bounded Workspace Diff results, and explicit workspace packet/raw exports according to account entitlement. The MCP endpoint can remotely invoke these existing bounded capabilities, so the same authorization and data-handling rules apply to MCP clients. Use these operator surfaces only for authorized defensive research.
+> Personal research / lab surface. Do not send commercial-client, internal-enterprise, restricted, secret, or otherwise sensitive data without explicit authorization and suitable handling. User Scanner is active OSINT; Shodan commands can consume account credits; GreyNoise Swarm can expose session metadata and explicit packet/raw exports; owned-asset and secret-context Intelligence Fabric capabilities have additional authorization/retention controls. Use these surfaces only for authorized defensive research.
 
 <sub><strong>01 // SYSTEM PROFILE</strong></sub>
 
-PARA11AX is a bounded, read-only CTI enrichment/correlation core with deterministic analysis and isolated analyst utilities. Canonical observables enter fixed Evidence v2 workflows. Profile admission stays separate from execution priority: the **Provider Value Scheduler v1.0** deterministically orders admitted providers without evidence-dependent source suppression. The IP reference path then projects **Intelligence Kernel v1.0** derived context over normalized evidence and correlation before Decision Support, Guidance and the analyst report consume it.
+PARA11AX is a bounded, provenance-first CTI enrichment/correlation core with deterministic analysis and isolated analyst operations. Canonical observables enter fixed **Evidence v2** workflows. Profile admission remains separate from execution priority: **Provider Value Scheduler v1.0** orders already-admitted baseline providers without evidence-dependent suppression. The IP reference path then projects **Intelligence Kernel v1.0** derived context over normalized evidence and correlation.
 
-**MCP control plane** exposes the functional analyst surface through `POST https://para11ax.vercel.app/mcp`. ChatGPT links with OAuth 2.1 authorization-code + PKCE; existing trusted clients can retain the direct gateway bearer. The stateless MCP surface covers capabilities, enrichment/batch/provider work, User Scanner, Shodan, GreyNoise Swarm, STIX, Mission Workspace, Domain Investigation, Investigation Workspace, portable cases, deterministic reports, and registered server-safe commands. Browser cosmetics, arbitrary shell/fetch/filesystem access and local-admin operations remain outside MCP.
+**Intelligence Fabric v2** extends the same fixed-egress provider registry with explicit secondary capabilities for graph pivots, search, owned-asset monitoring, malware/context analysis, defensive knowledge, package supply-chain context, TLS/malware context, crypto-abuse context, historical web context, and privacy-preserving secret-exposure checks. These capabilities never widen `fast|standard|full` baseline enrichment automatically. Exact type/mode admission, central authorization, response/relationship bounds, retention, and distribution policy remain mandatory.
 
-**Mission Workspace v1** adds a portable, deterministic analyst loop across Web, CLI, and explicit MCP state handles: explicit client profile → relevance → hunt package → conservative KQL validation → bounded result analysis → ServiceNow-ready projection. It adds no model call, secret access, query execution or ticket submission. Web/CLI remain local/volatile as documented; MCP state is client-carried and stateless server-side.
+**MCP control plane** exposes the functional analyst surface through `POST https://para11ax.vercel.app/mcp`. ChatGPT links with OAuth 2.1 authorization-code + PKCE; trusted clients can retain the direct gateway bearer. The current stateless MCP catalog contains **15 grouped tools**, including dedicated normalized `para11ax_intelligence` and `para11ax_domain_investigation` surfaces. Browser cosmetics, arbitrary shell/fetch/filesystem access, and local-admin operations remain outside MCP.
 
-The Kernel does not fetch, mutate or manufacture evidence. Raw **Evidence v2 remains authoritative**. Kernel output is derived context: evidence strength, source diversity, corroboration independence, contradiction severity, temporal relevance, explicit one-hop pivots, threat context, hunt relevance, coverage impact and analyst priority. Every important conclusion remains traceable to evidence fingerprints/providers or an explicit deterministic rule.
+**Mission Workspace v1** and **Investigation Workspace v2** provide deterministic client-relevance, hunt, KQL-validation, result-analysis, reporting, and ServiceNow-ready projections. KQL is never executed automatically and ServiceNow output is never submitted automatically. Browser state stays local; MCP state is explicit state-in/state-out.
+
+The Intelligence Kernel does not fetch, mutate, or manufacture evidence. Raw **Evidence v2 remains authoritative**. Kernel output is derived context. The Intelligence Fabric is different: it governs explicit secondary provider execution under policy.
 
 <sub><strong>STATE</strong> — OPERATIONAL CORE<br/>
-<strong>INPUTS</strong> — `ip` · `domain` · `url` · `hash` · `cve` · `attack` · `asn` · `cidr` · `certificate` (`cert-sha256:&lt;64-hex&gt;`)<br/>
-<strong>MCP</strong> — `/mcp` · stateless `2026-07-28` profile · 14 grouped tools · OAuth 2.1/PKCE or gateway bearer · registered-only execution<br/>
-<strong>SCHEDULER</strong> — Provider Value Scheduler v1.0 · deterministic static ordering · profile admission stays separate<br/>
-<strong>IP REFERENCE</strong> — 24-provider IP workflow · 48-call ceiling · max 4 active · max 2 attempts/provider · 20 s request deadline<br/>
-<strong>INTELLIGENCE</strong> — Intelligence Kernel v1.0 on IP · deterministic derived context · no LLM · no synthetic threat score<br/>
-<strong>IDENTITY OSINT</strong> — defensive exact-identifier dorks → `user-scanner email|username &lt;target&gt;` → corroboration; aliases `osint` / `identity`<br/>
+<strong>BASELINE INPUTS</strong> — `ip` · `domain` · `url` · `hash` · `cve` · `attack` · `asn` · `cidr` · `certificate` (`cert-sha256:&lt;64-hex&gt;`)<br/>
+<strong>EXTENDED SUBJECTS</strong> — `pkg:` PURL · `ja3:` / `jarm:` / `ja4:` · `btc:` / `eth:` · email · `user:` · `hmsl-sha256:` · `entity:`; capability-routed, not new baseline workflows<br/>
+<strong>MCP</strong> — `/mcp` · stateless `2026-07-28` profile · 15 grouped tools · OAuth 2.1/PKCE or gateway bearer<br/>
+<strong>INTELLIGENCE FABRIC</strong> — `enrich | graph | search | monitor | analysis | knowledge` · max 4 direct providers · privileged/secondary capabilities never fan out automatically · `no_store` bypasses shared cache<br/>
+<strong>SCHEDULER</strong> — Provider Value Scheduler v1.0 · deterministic static ordering · profile admission remains separate<br/>
+<strong>IP REFERENCE</strong> — 24-provider baseline IP workflow · 48-call ceiling · max 4 active · max 2 attempts/provider · 20 s deadline<br/>
+<strong>INTELLIGENCE KERNEL</strong> — IP reference policy · deterministic derived context · no LLM · no synthetic universal threat score<br/>
+<strong>IDENTITY OSINT</strong> — defensive exact-identifier discovery + isolated User Scanner; operator context, not identity proof<br/>
 <strong>SHODAN OPS</strong> — `shodan host|search|count|stats|domain|info` · fixed upstream · server-side key · explicit credit impact<br/>
-<strong>GREYNOISE SWARM</strong> — `swarm search|get|unique|timeseries|diff|export` · fixed upstream · server-side key · bounded session/pivot/workspace-diff/export surface<br/>
+<strong>GREYNOISE SWARM</strong> — `swarm search|get|unique|timeseries|diff|export` · fixed upstream · bounded session/pivot/export surface<br/>
 <strong>MISSION</strong> — deterministic workspace · relevance · hunt · KQL validation · result analysis · ServiceNow projection<br/>
-<strong>DOMAIN INVESTIGATION</strong> — passive Evidence v2 · bounded operator-context imports · deterministic IOC guidance · report/STIX/handoff · no hosted active scanning<br/>
-<strong>PROFILES</strong> — `fast` · `standard` · `full`; callers cannot select arbitrary Evidence v2 providers<br/>
-<strong>OUTPUT</strong> — Evidence v2 · `intelligence` · Decision Support · Evidence Graph v1.0 · Guidance v1.0 · JSON · batch · STIX 2.1 · deterministic reports<br/>
-<strong>LOCAL</strong> — browser-local cases · snapshots/diffs · exact typed cross-case index · case graph · `.para11ax` bundles; no server-side browser-case persistence<br/>
+<strong>DOMAIN INVESTIGATION</strong> — passive Evidence v2 · bounded operator-context imports · report/STIX/handoff · no hosted active scanning<br/>
+<strong>OUTPUT</strong> — Evidence v2 · Intelligence Fabric envelopes · Intelligence Kernel context · Decision Support · Evidence Graph v1.0 · Guidance v1.0 · JSON · batch · STIX 2.1 · deterministic reports<br/>
 <strong>IDENTITY</strong> — repository/package/CLI `para11ax` · bearer `PARA11AX_TOKEN` · REST `/api/para11ax/*` · MCP `/mcp`</sub>
 
-<sub><strong>02 // REQUEST PATH</strong></sub>
+<sub><strong>02 // REQUEST PATHS</strong></sub>
 
 <p align="center"><img src="assets/brand/para11ax-readme-architecture-v6.svg" alt="PARA11AX bounded request path through deterministic provider scheduling, fixed egress, Evidence v2 and Intelligence Kernel v1.0" width="100%"></p>
 
-Canonical passive flow:
+Canonical baseline flow:
 
 ```text
 caller
   -> auth
-  -> classifier
+  -> canonical Evidence v2 classifier
   -> fixed profile admission
-  -> Value Scheduler v1.0
+  -> Provider Value Scheduler v1.0
   -> safeFetch / fixed egress
   -> provider parser
   -> bounded cache
   -> Evidence v2
   -> typed correlation
   -> Intelligence Kernel v1.0
-  -> Decision Support
-  -> Evidence Graph v1.0
-  -> Guidance v1.0
-  -> analyst report
-  -> JSON / batch / STIX 2.1
+  -> Decision Support / Evidence Graph / Guidance
+  -> report / STIX
 ```
 
-Remote MCP flow:
+Explicit Intelligence Fabric flow:
+
+```text
+caller
+  -> auth
+  -> extended canonical subject classifier
+  -> normalized operation -> fixed mode
+  -> exact type + mode registry selection
+  -> configuration + central authorization
+  -> deterministic ranking (max 4)
+  -> same fixed-egress provider runner
+  -> policy-bearing normalized evidence / operator result
+  -> selected / executed / denied / unavailable / failures
+```
+
+`safeFetch` remains the hard egress boundary. Caller input never chooses arbitrary provider hosts, methods, credentials, redirects, or raw provider routing. Secondary capabilities do not participate in baseline fanout merely because they are registered.
+
+The current baseline IP workflow retains its **24-provider membership** and **48-call ceiling**. Evidence never changes which already-admitted baseline source is allowed to run.
+
+MCP remains a remote control plane over existing capabilities, not another evidence source:
 
 ```text
 MCP client
   -> POST /mcp
-  -> public protocol/tool discovery with per-tool OAuth metadata
-  -> scoped OAuth access token or existing gateway bearer
-  -> MCP routing-header validation / tools.call
-  -> existing PARA11AX handler or registered safe command
+  -> public discovery
+  -> OAuth/bearer auth
+  -> MCP header/body agreement
+  -> existing PARA11AX handler / safe registered command
   -> same validators / fixed destinations / semantic boundaries
-  -> structured MCP result
+  -> structured result
 ```
-
-`safeFetch` remains the hard egress boundary for the passive provider core. The scheduler changes attempt order only; it does not add a provider, host, method, credential, dependency or network path. Every admitted provider remains scheduled under the existing bounded deadline/retry policy. Missing or malformed scheduler descriptors fail back deterministically instead of blocking enrichment.
-
-The current 24-provider IP workflow keeps its **48-call ceiling** (24 providers × maximum two attempts). Provider execution priority is static and inspectable; evidence never changes which admitted source is allowed to run.
-
-Three specialist operator paths remain intentionally separate from automatic Evidence v2 and Intelligence Kernel reasoning:
-
-- User Scanner: authenticated route to the server-configured isolated Python worker.
-- Shodan shell: authenticated route to a bounded server-side Shodan command handler using only `https://api.shodan.io` and `SHODAN_API_KEY`.
-- GreyNoise Project Swarm: authenticated route to fixed `https://api.greynoise.io` session search/detail/pivots, Workspace Diff, and explicit single-session exports using server-side `GREYNOISE_API_KEY`.
-
-MCP is the remote **control plane over those capabilities**, not a fourth evidence source. It invokes the same underlying bounded handlers and preserves the same authority labels. None of these operator paths silently replaces, mutates or promotes output into the current Evidence v2 result or top-level `intelligence` projection. Compatible Swarm read results, including Workspace Diff, Shodan results and User Scanner results may be explicitly captured as Investigation Workspace operator context; that explicit contextual capture is still not Evidence v2. Swarm binary export remains explicit export material only.
 
 <details>
 <summary><strong>Remote/API surface</strong></summary>
 
-- `POST /mcp` — public metadata discovery plus authenticated stateless tool execution; current profile `2026-07-28`; functional analyst-tool parity without host shell/local-admin/filesystem escape.
-- `GET /.well-known/oauth-protected-resource` and `GET /.well-known/oauth-authorization-server` — MCP OAuth discovery metadata.
-- `GET|POST /oauth/authorize` and `POST /oauth/token` — ChatGPT CIMD + authorization-code/PKCE linking flow.
-- `GET /api/para11ax/meta` — public static capabilities and hard limits.
+- `POST /mcp` — public metadata discovery plus authenticated stateless tool execution.
+- `GET /.well-known/oauth-protected-resource*` / `GET /.well-known/oauth-authorization-server` — OAuth discovery.
+- `GET|POST /oauth/authorize` / `POST /oauth/token` — ChatGPT authorization-code + PKCE flow.
+- `GET /api/para11ax/meta` — public static capability/hard-limit metadata.
 - `GET /api/para11ax/health` — bearer-protected readiness.
 - `GET /api/para11ax/status` — bearer-protected aggregate runtime state.
-- `POST /api/para11ax/enrich` — one indicator, fixed workflow/profile only.
-- `POST /api/para11ax/batch` — 1–20 indicators; max 3 active indicators / 200 calls.
-- `POST /api/para11ax/stix` — enrich then export STIX 2.1; max 100 objects.
-- `POST /api/para11ax/user-scanner` — bounded email/username active OSINT through the configured worker.
-- `POST /api/para11ax/shodan` — bounded native Shodan operator commands; authenticated; fixed upstream; separate result envelope.
-- `POST /api/para11ax/swarm` — bounded GreyNoise Swarm session search/detail/pivots, Workspace Diff, and explicit single-session binary export.
-- `POST /api/para11ax/provider` — one authenticated, registered provider against one validated indicator; fixed adapter policy only.
-- Unknown `/api/para11ax/*` — controlled fail-closed API 404.
+- `POST /api/para11ax/enrich` — one baseline indicator, fixed workflow/profile.
+- `POST /api/para11ax/intelligence` — one normalized explicit Intelligence Fabric operation.
+- `POST /api/para11ax/batch` — bounded baseline batch.
+- `POST /api/para11ax/stix` — enrich then bounded STIX 2.1 export.
+- `POST /api/para11ax/user-scanner` — bounded email/username active OSINT.
+- `POST /api/para11ax/shodan` — bounded native Shodan operator commands.
+- `POST /api/para11ax/swarm` — bounded GreyNoise Swarm operations.
+- `POST /api/para11ax/provider` — one registered baseline-compatible provider through the legacy direct-provider route.
+- `POST /api/para11ax/self-test` — signed production-verification path.
+- Unknown `/api/para11ax/*` — controlled fail-closed 404.
 
-MCP User Scanner example:
-
-```json
-{"name":"para11ax_user_scan","arguments":{"scanType":"username","target":"example_handle"}}
-```
-
-MCP enrichment example:
+MCP Intelligence Fabric example:
 
 ```json
-{"name":"para11ax_enrich","arguments":{"indicator":"203.0.113.10","profile":"standard"}}
+{"name":"para11ax_intelligence","arguments":{"operation":"knowledge","indicator":"T1059"}}
 ```
 
-REST Evidence v2 example:
+REST Intelligence Fabric example:
 
 ```json
-{"indicator":"203.0.113.10","profile":"standard"}
+{"operation":"supply-chain","indicator":"pkg:npm/react@18.2.0"}
 ```
 
-Shodan request example:
-
-```json
-{"command":"stats","query":"product:nginx","facets":"country:20,org:10"}
-```
-
-Swarm request example:
-
-```json
-{"command":"diff","query":"classification:malicious","sourceWorkspace":"personal","targetWorkspace":"greynoise","mode":"source-only","size":10}
-```
-
-Complete contracts: [`docs/MCP.md`](docs/MCP.md), [`docs/API.md`](docs/API.md), [`docs/SHELL.md`](docs/SHELL.md), [`docs/DOMAIN-INVESTIGATION.md`](docs/DOMAIN-INVESTIGATION.md), [`docs/IDENTITY-OSINT.md`](docs/IDENTITY-OSINT.md), [`docs/GOOGLE-DORKING.md`](docs/GOOGLE-DORKING.md), [`docs/SHODAN-SHELL.md`](docs/SHODAN-SHELL.md), and [`docs/GREYNOISE-SWARM.md`](docs/GREYNOISE-SWARM.md).
+Complete contracts: [`docs/MCP.md`](docs/MCP.md), [`docs/API.md`](docs/API.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), and [`docs/PROVIDERS.md`](docs/PROVIDERS.md).
 
 </details>
 
-<sub><strong>INTELLIGENCE KERNEL v1.0</strong></sub>
+<sub><strong>03 // INTELLIGENCE FABRIC v2</strong></sub>
 
-**Intelligence Kernel v1.0** is a pure deterministic analysis layer. The current reference policy is IP-first; other observable types retain their established correlation/decision behavior until migrated under explicit type policies.
+The executable registry currently contains **54 active provider capabilities spanning 50 upstream services**. The established canonical enrichment fabric remains **39 upstream APIs and feeds**. Sibling and intelligence-only capabilities are explicit and non-fanout by default.
 
-<sub><strong>EVIDENCE STRENGTH</strong> — `none | weak | moderate | strong`; based on directness, freshness, source diversity, independent corroboration and contradiction pressure<br/>
-<strong>SOURCE DIVERSITY</strong> — providers · source roles · semantic classes · independent vs duplicate capability<br/>
-<strong>CONTRADICTIONS</strong> — explicit semantic conflict and severity; never silently resolved<br/>
-<strong>TEMPORAL</strong> — observation first/last seen · current/aging/stale/unknown · retrieval time is not observation time<br/>
-<strong>RELATIONSHIPS</strong> — explicit relationship value · bounded one-hop pivots · stable identities · provenance retained<br/>
-<strong>THREAT CONTEXT</strong> — direct evidence separated from scanner/noise, exposure, infrastructure and reported claims<br/>
-<strong>HUNT RELEVANCE</strong> — telemetry/hunt viability from existing evidence; no environment-readiness fabrication<br/>
-<strong>COVERAGE IMPACT</strong> — duplicate-capability loss separated from materially unique capability loss<br/>
-<strong>ANALYST PRIORITY</strong> — `immediate | investigate | monitor | contextual | insufficient` with rule-backed reasons</sub>
+Representative secondary capabilities include:
 
-No LLM, adaptive model, runtime learning or universal maliciousness score participates in this path. Kernel failure is isolated: usable Evidence v2 still survives and the missing derived projection becomes an explicit limitation rather than an enrichment failure.
+- VirusTotal graph, urlscan result graph, Censys search/history;
+- VulnCheck exploit context and deps.dev package dependency context;
+- abuse.ch SSLBL JA3 context, YARAify similarity, CERT Polska MWDB configuration context;
+- Internet Archive Wayback CDX historical web context;
+- MITRE D3FEND defensive-technique knowledge;
+- Chainabuse crypto-address abuse reports;
+- Team Cymru IP-to-ASN/network identity;
+- Shadowserver owned-asset reports under server-owned scope;
+- GitGuardian HMSL privacy-preserving secret-fingerprint checks.
 
-<sub><strong>03 // ANALYST SURFACE</strong></sub>
+Capability admission remains explicit. Public callers cannot supply trusted ownership/verification/case/tenant claims. Server-owned scopes such as `PARA11AX_OWNED_CIDRS` and `PARA11AX_VERIFIED_DOMAINS` are deployment configuration, not request fields.
 
-**ANALYST SURFACE** — [https://para11ax.vercel.app/app/](https://para11ax.vercel.app/app/)  
-**REMOTE MCP** — `https://para11ax.vercel.app/mcp`
+A provider can be implemented, configured, selected, executed, denied, unavailable, or production-verified. Those states are intentionally different. A configured credential does not prove entitlement or upstream health. An upstream failure is not a negative finding; `no_result` is not safe.
 
-The terminal keeps the gateway bearer in volatile memory only, exposes the shared bounded command fabric documented in [`docs/SHELL.md`](docs/SHELL.md), and preserves the API semantic model. The IndexedDB-backed case workspace is browser-local; active-case state and gateway authentication remain runtime-only. MCP accepts resource-bound scoped OAuth access tokens from the ChatGPT link flow while preserving the direct gateway bearer for existing clients. It carries mission/Domain Investigation/investigation/case state explicitly in requests and responses and does not borrow browser IndexedDB or hidden server sessions.
+Future automatic-workflow admission is measured by the offline **Provider Value Benchmark / Admission Gate**, which evaluates uniqueness, material graph yield, reliability, latency, and decision-changing value from recorded/local corpora. Benchmark output does not mutate routing automatically.
 
-Mission Workspace examples:
+<sub><strong>04 // SEMANTIC FIREWALL</strong></sub>
 
-```text
-mission new
-mission profile set '{"id":"lab","name":"Lab","technologies":["fortinet"],"telemetry":["DeviceNetworkEvents"]}'
-mission context set '{"technologies":["fortinet"],"requiredTelemetry":["DeviceNetworkEvents"],"observedExploitation":true}'
-mission relevance
-mission hunt build '<bounded-hunt-json>'
-mission kql validate 'DeviceNetworkEvents | where Timestamp > ago(24h) | project Timestamp, DeviceName'
-mission result analyze
-mission servicenow
-mission export | download
-```
+<p align="center"><img src="assets/brand/para11ax-readme-semantics-v5.svg" alt="PARA11AX semantic firewall separating authoritative evidence from deterministic derived context and unsupported inference" width="100%"></p>
 
-The browser mission state is memory-only and cleared by `disconnect` or `reboot`. The CLI can use exact `--file <path>` or `--stdin` transports and keeps state only within the current process/pipeline. MCP returns the workspace to the client and requires that explicit workspace on subsequent stateful calls. KQL is never executed and ServiceNow output is never submitted automatically. See [`docs/ANALYST-MISSION-PACK.md`](docs/ANALYST-MISSION-PACK.md) and [`docs/MCP.md`](docs/MCP.md).
+**OBSERVED ≠ INFERRED ≠ CONTEXTUAL.** The authority of an object does not increase because it passed through MCP, a report, a graph, or a prettier UI.
 
-Identity OSINT examples:
+<sub><strong>DERIVED CONTEXT ≠ EVIDENCE</strong> — Intelligence Kernel output never becomes new Evidence v2<br/>
+<strong>OPERATOR CONTEXT ≠ EVIDENCE</strong> — User Scanner, Shodan, GreyNoise Swarm, and authorized imports remain contextual unless an independent evidence workflow observes the same fact<br/>
+<strong>CAPABILITY EXECUTION ≠ BASELINE FANOUT</strong> — graph/search/monitor/analysis/knowledge providers never silently join `fast|standard|full`<br/>
+<strong>ABSENCE ≠ BENIGN</strong> — `no_result`, `not_listed`, `not_found`, and `no_association` remain source-scoped absence<br/>
+<strong>FAILURE ≠ NEGATIVE EVIDENCE</strong> — timeout, 429, 5xx, auth/entitlement, parser, and schema failures remain failures<br/>
+<strong>INFRASTRUCTURE ≠ ATTRIBUTION</strong> — hosting, ASN, DNS, certificates, network identity, exposure, or malware proximity do not manufacture actor attribution<br/>
+<strong>IDENTITY HIT ≠ IDENTITY PROOF</strong> — username/email/platform matches do not prove same-person identity or compromise<br/>
+<strong>CRYPTO REPORT ≠ OWNERSHIP PROOF</strong> — reported address abuse does not prove wallet ownership or actor identity<br/>
+<strong>SECRET FINGERPRINT ≠ RAW SECRET</strong> — HMSL accepts a privacy-preserving fingerprint; raw-secret-shaped input is rejected before egress<br/>
+<strong>KEV ≠ EPSS ≠ CVSS</strong> — observed exploitation, probability, and severity remain separate axes</sub>
 
-```text
-# passive indexed discovery first where useful
-"example_handle" site:github.com
-"analyst@example.com"
+**No universal maliciousness score. No universal identity score. No LLM inference layer in the deterministic evidence path.**
 
-# then structured scanner expansion
-user-scanner username example_handle
-user-scanner email analyst@example.com
-osint username example_handle --module github
-identity username example_handle --category dev --cross-scan
+<sub><strong>05 // EXPORT & DISTRIBUTION</strong></sub>
 
-# remote MCP equivalent
-para11ax_user_scan { scanType: "username", target: "example_handle" }
-```
+Evidence carries distribution/retention policy through normalization. `no_store` capabilities bypass shared Intelligence Fabric cache. `internal_only` evidence is excluded from shareable STIX references, and actor/malware relationship objects are also suppressed when their explicit provider provenance maps to internal-only evidence. Restricted source context therefore cannot leak merely through a relationship edge.
 
-Treat every search/scanner hit as a lead until corroborated. Full workflow: [`docs/IDENTITY-OSINT.md`](docs/IDENTITY-OSINT.md) and [`docs/GOOGLE-DORKING.md`](docs/GOOGLE-DORKING.md).
+Kernel-derived conclusions do not become new STIX evidence or attribution facts. Swarm packet/raw exports remain explicit export material only. Investigation operator context stays operator context.
 
-Native Shodan commands:
+<sub><strong>06 // SECURITY & VERIFICATION</strong></sub>
 
-```text
-shodan host 8.8.8.8
-shodan search product:"FortiGate" country:HU
-shodan count port:443 country:HU
-shodan stats product:nginx --facets country:20,org:10
-shodan domain example.com
-shodan info
-```
+<sub><strong>AUTH</strong> — OAuth 2.1/PKCE or gateway bearer protects MCP execution; bearer protects private REST surfaces<br/>
+<strong>EGRESS</strong> — exact declared provider hosts/methods/protocols; secondary capabilities use the same fixed-egress boundary<br/>
+<strong>AUTHORIZATION</strong> — trusted scopes are server-owned; public callers cannot self-assert owned network/domain/case/tenant authority<br/>
+<strong>SECRETS</strong> — provider/worker credentials remain server-side; MCP/REST never expose environment-secret values<br/>
+<strong>RETENTION</strong> — `no_store` bypasses shared cache; internal-only distribution stays enforced at export boundaries<br/>
+<strong>STATE</strong> — browser workspace remains local; MCP workflow state is explicit, not hidden server persistence<br/>
+<strong>CI</strong> — protected `main` requires Tooling smoke; CodeQL runs alongside it<br/>
+<strong>DEPLOY</strong> — repository/CI proof and production-deployment proof are separate states</sub>
 
-Shodan behavior is deliberately bounded. `host`, `count`, `stats` and `info` are classified as no-query-credit operations by PARA11AX; `domain` consumes a query credit; `search` is first-page only and may consume a query credit. Search/service output is capped and large raw banners are removed. `shodan download`, arbitrary paging, caller-selected URLs and arbitrary Shodan operations are disabled.
-
-GreyNoise Project Swarm commands:
-
-```text
-swarm search --from 2026-09-05T00:00:00Z --to 2026-09-06T00:00:00Z --scope workspace --query "classification:malicious"
-swarm get <session-id> --scope workspace
-swarm unique --from 2026-09-05T00:00:00Z --to 2026-09-06T00:00:00Z --field source.ip --include-counts
-swarm timeseries --from 2026-09-05T00:00:00Z --to 2026-09-06T00:00:00Z --field classification --size 20 --interval 1h
-swarm diff --query "classification:malicious" --source personal --target greynoise --mode source-only
-swarm export <session-id> pcap
-```
-
-Swarm session search/pivot data is bounded to explicit time ranges, vetted pivot fields and fixed GreyNoise session endpoints. Workspace Diff is fixed to `/v3/workspaces/diff`, accepts only `personal|community|greynoise` aliases, and caps result size/pagination input. Session `scope=workspace` and `scope=demo`, plus Workspace Diff access, depend on the corresponding upstream GreyNoise entitlement; demo export is rejected before egress. JSON results and individual exports are capped at 4 MiB. See [`docs/GREYNOISE-SWARM.md`](docs/GREYNOISE-SWARM.md).
-
-<sub><strong>PROMPT</strong> — `analyst@para11ax:~$`<br/>
-<strong>MCP</strong> — 14 grouped remote tools over existing handlers · explicit stateless workflow state · registered-only command fallback<br/>
-<strong>WORKSPACE</strong> — local cases · pins · snapshots · semantic diffs · exact sightings · case graph<br/>
-<strong>ACTIVE OSINT</strong> — exact-identifier dorking + User Scanner email/username enumeration, separate from Evidence v2<br/>
-<strong>SHODAN</strong> — bounded infrastructure/exposure operator lookups, separate from Evidence v2<br/>
-<strong>GREYNOISE SWARM</strong> — bounded session search/detail/pivots/workspace diff/export; read results are explicit operator context, not automatic Evidence v2<br/>
-<strong>BOUNDARY</strong> — not a general-purpose shell, arbitrary network client, filesystem bridge or local-admin plane</sub>
-
-<details>
-<summary><strong>Operator CLI</strong></summary>
+Representative operator CLI:
 
 ```text
 para11ax doctor
 para11ax providers list
 para11ax providers env-template
 para11ax providers probe --all
-para11ax maltego check
 para11ax release verify
-para11ax report compile <snapshot.json> --out <dir> [--preset <name>]
-para11ax report diff <before.json> <after.json>
-para11ax mission import --file mission.json '|' mission show
+para11ax report compile <snapshot.json> --out <dir>
 ```
-
-</details>
-
-<sub><strong>04 // SEMANTIC FIREWALL</strong></sub>
-
-<p align="center"><img src="assets/brand/para11ax-readme-semantics-v5.svg" alt="PARA11AX semantic firewall separating authoritative evidence from deterministic derived context and unsupported inference" width="100%"></p>
-
-**OBSERVED ≠ INFERRED ≠ CONTEXTUAL.** These states remain explicit across evidence, deterministic derived context and infrastructure/knowledge surfaces regardless of whether the caller is Web, CLI, REST or MCP.
-
-<sub><strong>DERIVED CONTEXT ≠ EVIDENCE</strong> — Intelligence Kernel output never becomes a new Evidence v2 observation<br/>
-<strong>OPERATOR CONTEXT ≠ EVIDENCE</strong> — Domain Investigation imports, Shodan, User Scanner and GreyNoise Swarm read results remain contextual unless an explicit Evidence-v2 workflow independently observes the same fact<br/>
-<strong>ABSENCE ≠ BENIGN</strong> — `not_listed`, `not_found`, `no_result` and `no_association` remain source-scoped absence semantics<br/>
-<strong>CONTEXT ≠ REPUTATION</strong> — routing, registration, Tor, scanners, Shodan exposure, GreyNoise session activity, Workspace Diff, certificates and ATT&CK cannot vote an IOC malicious<br/>
-<strong>IDENTITY HIT ≠ IDENTITY PROOF</strong> — matching usernames or registration signals do not prove same-person identity, ownership or compromise<br/>
-<strong>CLAIMS ≠ COMPROMISE PROOF</strong> — community and ransomware reporting remain claim/report evidence<br/>
-<strong>INFRASTRUCTURE ≠ ATTRIBUTION</strong> — hosting, ASN, DNS, Shodan services, GreyNoise session metadata, Workspace Diff, certificates and malware proximity do not manufacture actor attribution<br/>
-<strong>KEV ≠ EPSS ≠ CVSS</strong> — exploitation status, probability and severity remain separate axes<br/>
-<strong>FAILURE ≠ NEGATIVE EVIDENCE</strong> — timeout, 429, 5xx, parser/module failure and circuit-open states remain explicit coverage failures</sub>
-
-**No universal maliciousness score. No universal identity score. No LLM inference layer.** Full evidence semantics: [`docs/EVIDENCE-SCHEMA.md`](docs/EVIDENCE-SCHEMA.md).
-
-<sub><strong>05 // PROVIDER FABRIC</strong></sub>
-
-PARA11AX has **39 configured sources** (upstream APIs and feeds) in the canonical Evidence v2 provider fabric. Shodan and GreyNoise are fixed providers for canonical enrichment; their specialist operator routes are distinct explicit surfaces and do not increase the provider count. MCP is a control plane over existing capabilities and is not an additional provider.
-
-<details>
-<summary><strong>39 upstream APIs and feeds</strong></summary>
-
-**Identity / routing / exposure:** IPinfo · RDAP · RIPEstat · Shodan · Censys · Modat Magnify · Cloudflare Radar · Cloudflare DNS · Tor Exit · Spamhaus DROP / ASN-DROP.
-
-**Threat / IOC:** DShield · Feodo Tracker · ThreatMiner · CIRCL MISP OSINT · Botvrij MISP OSINT · GreyNoise · AbuseIPDB · VirusTotal · OTX · ThreatFox · urlscan.io · Webamon · Pulsedive · OpenPhish · URLhaus · TweetFeed.
-
-**File / malware:** CIRCL Hashlookup · MalwareBazaar · Malpedia · Hybrid Analysis.
-
-**Vulnerability / ATT&CK:** CISA KEV · CISA ADP SSVC · FIRST EPSS · CIRCL Vulnerability-Lookup · NVD · OSV · MITRE ATT&CK TAXII.
-
-**Ransomware:** RansomLook · Ransomware.live API-PRO.
-
-</details>
-
-[`config/providers.json`](config/providers.json) is the machine-readable Evidence v2 provider policy. Scheduler descriptors are declarative execution metadata; they do not change provider admission, credentials, fixed hosts or evidence semantics. GreyNoise canonical IP enrichment can use configured Project Swarm workspace labels through the v3 IP lookup, while session enumeration/pivots/Workspace Diff/export stay on the separate authenticated Swarm operator route.
-
-<sub><strong>06 // SECURITY & VERIFICATION</strong></sub>
-
-<sub><strong>AUTH</strong> — OAuth 2.1/PKCE or the existing bearer protects MCP tool execution; the bearer protects private REST surfaces; MCP discovery and `/api/para11ax/meta` are intentionally public<br/>
-<strong>MCP ROUTING</strong> — modern `Mcp-Method` must match JSON-RPC method; `Mcp-Name` must match `tools/call` name; mismatch fails closed<br/>
-<strong>EGRESS</strong> — exact declared provider hosts; Kernel/Scheduler add no new egress; Shodan shell uses exact `https://api.shodan.io`; Swarm uses exact `https://api.greynoise.io`; User Scanner uses its configured worker only<br/>
-<strong>SECRETS</strong> — `SHODAN_API_KEY`, `GREYNOISE_API_KEY` and all provider/worker credentials remain server-side; MCP does not expose environment-secret values<br/>
-<strong>STATE</strong> — operator utilities do not silently mutate Evidence v2 or Intelligence Kernel state; MCP mission/Domain Investigation/investigation/case state is explicit state-in/state-out, not hidden server persistence<br/>
-<strong>CI</strong> — protected `main` requires Tooling smoke; CodeQL runs alongside it<br/>
-<strong>DEPLOY</strong> — repository/CI proof and production deployment proof remain separate; see Operations/QA for exact current state</sub>
-
-<sub><strong>INVESTIGATION WORKSPACE V2</strong> — one deterministic lifecycle connects scope, pinned observables, Evidence v2 capture, explicit operator-context capture, relevance, hunt construction, conservative KQL validation, bounded result import, explicit analyst disposition, reporting, and ServiceNow-ready projection. Browser persistence is local; MCP uses explicit portable state. Start with `investigation new "title"`, inspect with `investigation status`, or use `para11ax_investigation` remotely.</sub>
-
-<sub>Evidence v2 remains authoritative. Shodan/User Scanner/GreyNoise Swarm read captures are operator context, Swarm packet/raw exports are explicit exports, imported rows are result-analysis input, and disposition is analyst judgment. No-results is not benign; stale dependencies block report and ticket projection.</sub>
 
 <sub><strong>07 // DEEP DOCS</strong></sub>
 
