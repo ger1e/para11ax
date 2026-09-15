@@ -39,13 +39,13 @@ function classify(rec, independence, hasAnalystAttestation) {
       reasons: ['Independent direct provider quorum exists, but explicit negative evidence requires analyst review before blocking.'],
     };
   }
-  if (knownGroups >= 1 && (contextSources.length > 0 || hasOperatorContext || hasAnalystAttestation)) {
+  if (knownGroups >= 1 && (hasOperatorContext || hasAnalystAttestation)) {
     return {
       disposition: 'BLOCK_CANDIDATE',
       ruleId: contradictions.length ? 'DI-CANDIDATE-CONTRADICTION' : 'DI-CANDIDATE-DIRECT-CONTEXT',
       reasons: contradictions.length
-        ? ['A known direct malicious provider family exists with corroborating context, but contradiction pressure requires analyst review.']
-        : ['One known direct malicious provider family is corroborated by contextual, operator, or approved analyst evidence; human approval remains required.'],
+        ? ['A known direct malicious provider family exists with explicit non-provider corroboration, but contradiction pressure requires analyst review.']
+        : ['One known direct malicious provider family is corroborated by operator context or approved analyst evidence; human approval remains required.'],
     };
   }
   if (directSources.length > 0) {
