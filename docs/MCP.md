@@ -56,7 +56,7 @@ server/discover
   -> tools/call
 ```
 
-`tools/list` returns all 14 tools with schemas and annotations. The catalog is the authoritative remote capability inventory. Bounded operator tools advertise bounded schemas as well as enforcing runtime validation. In particular, `para11ax_swarm` and `para11ax_user_scan` use `additionalProperties: false`; supported enums, fields and numeric/string limits are explicit. This prevents the tool model from advertising a looser contract than the server actually accepts.
+`tools/list` returns all 14 tools with schemas and annotations. The catalog is the authoritative remote capability inventory. Bounded operator tools advertise bounded schemas as well as enforcing runtime validation. In particular, `para11ax_swarm` and `para11ax_user_scan` use `additionalProperties: false`; supported enums, fields and numeric/string limits are explicit. The grouped Domain Investigation schema explicitly advertises its action enum plus client-carried `artifact`, import `records`, build `enrichment`, and promotion `decision` inputs.
 
 Schema metadata is not the security boundary by itself. Runtime validators remain authoritative and reject unsupported command/field combinations, oversize input and invalid ranges even if a client ignores JSON Schema.
 
@@ -73,7 +73,7 @@ Schema metadata is not the security boundary by itself. Runtime validators remai
 | `para11ax_user_scan` | isolated email/username OSINT scanner | active open-world OSINT |
 | `para11ax_stix` | deterministic STIX object projection from enrichment | read-only projection |
 | `para11ax_mission` | mission profile/context/relevance/hunt/KQL/result/ServiceNow workflow | explicit client-carried state |
-| `para11ax_domain_investigation` | build/import/show/report/STIX/handoff for suspicious-domain investigation | explicit client-carried state; no scanner/provider execution |
+| `para11ax_domain_investigation` | build/import/promotion lifecycle/show/report/STIX/handoff/Evidence Graph for suspicious-domain investigation | explicit client-carried state; no scanner/provider execution; graph is projection-only |
 | `para11ax_investigation` | Investigation Workspace create/status/mutate/report/import/export | explicit client-carried state |
 | `para11ax_case` | portable analyst case operations | explicit client-carried state |
 | `para11ax_report` | deterministic report render/quality/manifest | read-only projection |
@@ -113,13 +113,25 @@ Swarm is operator context, not another Evidence v2 provider. Workspace/demo capa
 
 `para11ax_domain_investigation` exposes these exact actions:
 
-`build` · `surface_import` · `vulnerability_import` · `show` · `report` · `stix` · `handoff`
+`build` · `surface_import` · `vulnerability_import` · `show` · `report` · `stix` · `handoff` · `promotion_candidates` · `promote` · `reject_promotion` · `revoke_promotion` · `graph`
 
-`build` accepts a canonical domain Evidence v2 enrichment. Import actions accept a previously returned Domain Investigation artifact plus bounded scalar-only records. The server stores no hidden Domain Investigation state: build/import transitions return the full client-carried artifact, while `show`, report, STIX and handoff return bounded public projections.
+`build` accepts a canonical domain Evidence v2 enrichment. Import actions accept a previously returned Domain Investigation artifact plus bounded scalar-only records. `promotion_candidates` derives bounded zero-authority candidates from eligible imported operator artifacts and returns the updated client-carried artifact. `promote`, `reject_promotion`, and `revoke_promotion` require an explicit bounded `decision` object and append deterministic lifecycle events through the shared core. `graph` returns the derived authority/provenance Evidence Graph and never becomes authority state.
 
-The Domain Investigation body allowance is raised only on this exact authenticated grouped-tool path so a valid client-carried artifact or import can cross the ordinary 128 KiB MCP ceiling. Unauthenticated requests remain behind the public ceiling, and unrelated tools do not inherit the larger allowance.
+The server stores no hidden Domain Investigation state. Build/import/promotion transitions return the full client-carried artifact needed for the next state transition; `show`, report, STIX, handoff, and graph return bounded projections. Failed promotion decisions return an error without mutating any server session because no such session exists; the caller retains its prior artifact.
 
-Imported discovery/vulnerability records are `operator_context`, not Evidence v2. The tool never performs active scanning, provider execution or arbitrary egress. Full authority and recommendation semantics are documented in [`DOMAIN-INVESTIGATION.md`](DOMAIN-INVESTIGATION.md).
+The Domain Investigation body allowance is raised only on this exact authenticated grouped-tool path so a valid client-carried artifact or import can cross the ordinary 128 KiB MCP ceiling. Promotion decisions receive an additional small byte bound before the shared promotion validator applies its field-level limits. A huge decision cannot exploit the larger artifact allowance. Unauthenticated requests remain behind the public ceiling, and unrelated tools do not inherit the larger allowance.
+
+Authority semantics remain fail-closed:
+
+- provider names are provenance labels, not independence votes;
+- only known `quorumEligible` provider independence groups can contribute to `BLOCK` quorum;
+- missing/unknown provider lineage remains non-quorum;
+- imported operator context and analyst attestations never increment provider-family quorum;
+- analyst attestations are explicit corroborating authority created only by approval events;
+- the Evidence Graph is a derived explanation/provenance projection, not an authority input;
+- hosted Domain Investigation execution remains passive and performs no scanning or arbitrary fetch.
+
+Full authority and recommendation semantics are documented in [`DOMAIN-INVESTIGATION.md`](DOMAIN-INVESTIGATION.md).
 
 ## State round trips
 
@@ -141,7 +153,11 @@ Domain Investigation example:
 3. para11ax_domain_investigation { action: "surface_import", artifact: <returned>, records: [...] }
 4. retain returned artifact
 5. optionally vulnerability_import
-6. call show / report / stix / handoff with the current artifact
+6. para11ax_domain_investigation { action: "promotion_candidates", artifact: <returned> }
+7. retain returned artifact and review zero-authority candidates
+8. optionally call promote / reject_promotion with { artifact, decision }
+9. retain every returned state-transition artifact; revoke_promotion uses an explicit attestation decision
+10. call show / report / stix / handoff / graph with the current artifact
 ```
 
 Investigations and cases follow the same state-in/state-out pattern. KQL is validated/projected, not executed. ServiceNow-ready output is projected, not submitted automatically.
@@ -165,6 +181,10 @@ MCP does not expose:
 - automatic KQL execution;
 - automatic ServiceNow submission;
 - automatic Evidence v2 promotion of User Scanner/Shodan/Swarm context;
+- automatic operator-context promotion inside Domain Investigation;
+- provider-family quorum from unknown lineage or provider-name counting;
+- analyst-attestation substitution for provider-family votes;
+- Evidence Graph feedback into authority decisions;
 - hosted active surface discovery or vulnerability scanning through Domain Investigation.
 
 Provider and OSINT work continues through existing fixed-host policies, timeouts, response limits, provenance, parser semantics and gateway authentication.

@@ -82,7 +82,9 @@ test('MCP discovers Domain Investigation as one grouped stateless tool', async (
   assert.ok(tool, 'missing para11ax_domain_investigation');
   assert.deepEqual(tool.inputSchema.properties.action.enum, [
     'build', 'surface_import', 'vulnerability_import', 'show', 'report', 'stix', 'handoff',
+    'promotion_candidates', 'promote', 'reject_promotion', 'revoke_promotion', 'graph',
   ]);
+  assert.ok(tool.inputSchema.properties.decision, 'promotion decisions must be explicit client-carried input');
   assert.equal(tool.annotations.readOnlyHint, false);
 });
 
@@ -104,7 +106,12 @@ test('Domain Investigation MCP carries explicit artifact state while public proj
 
   const surface = await call(handle, 'surface_import', {
     artifact,
-    records: [{ host: 'cdn.suspicious.example', ip: '203.0.113.7', source: 'authorized-local-scan' }],
+    records: [{
+      host: 'cdn.suspicious.example',
+      ip: '203.0.113.7',
+      source: 'authorized-local-scan',
+      reference: 'https://scanner.invalid/run/surface-1',
+    }],
   });
   assert.equal(surface.body.result.isError, false);
   const withSurface = surface.body.result.structuredContent.artifact;
@@ -130,6 +137,106 @@ test('Domain Investigation MCP carries explicit artifact state while public proj
   const handoff = await call(handle, 'handoff', { artifact: complete });
   assert.equal(handoff.body.result.isError, false);
   assert.match(handoff.body.result.structuredContent.handoff.schemaVersion, /handoff/i);
+});
+
+test('Domain Investigation MCP promotion lifecycle is stateless, explicit and graph projection-only', async () => {
+  const handle = handler();
+  const built = await call(handle, 'build', { enrichment: enrichment() });
+  let artifact = built.body.result.structuredContent.artifact;
+
+  const surface = await call(handle, 'surface_import', {
+    artifact,
+    records: [{
+      host: 'suspicious.example',
+      ip: '203.0.113.7',
+      source: 'authorized-local-scan',
+      reference: 'https://scanner.invalid/run/surface-1',
+    }],
+  });
+  artifact = surface.body.result.structuredContent.artifact;
+
+  const candidates = await call(handle, 'promotion_candidates', { artifact });
+  assert.equal(candidates.status, 200);
+  assert.equal(candidates.body.result.isError, false, JSON.stringify(candidates.body));
+  assert.equal(candidates.body.result.structuredContent.candidates.length, 1);
+  assert.equal(candidates.body.result.structuredContent.candidates[0].authority, undefined);
+  artifact = candidates.body.result.structuredContent.artifact;
+  const candidateId = candidates.body.result.structuredContent.candidates[0].id;
+
+  const invalid = await call(handle, 'promote', {
+    artifact,
+    decision: {
+      candidateId: 'missing',
+      at: '2026-09-13T16:31:00.000Z',
+      actorLabel: 'analyst:g',
+      reason: 'Invalid candidate must not mutate client-carried state.',
+    },
+  });
+  assert.equal(invalid.status, 200);
+  assert.equal(invalid.body.result.isError, true);
+
+  const unchanged = await call(handle, 'show', { artifact });
+  assert.equal(unchanged.body.result.isError, false);
+  assert.equal(unchanged.body.result.structuredContent.result.promotion.events.length, 0);
+
+  const promoted = await call(handle, 'promote', {
+    artifact,
+    decision: {
+      candidateId,
+      at: '2026-09-13T16:32:00.000Z',
+      actorLabel: 'analyst:g',
+      reason: 'Validated against authorized investigation context.',
+    },
+  });
+  assert.equal(promoted.body.result.isError, false, JSON.stringify(promoted.body));
+  artifact = promoted.body.result.structuredContent.artifact;
+  assert.equal(promoted.body.result.structuredContent.result._authoritative, undefined);
+  assert.equal(promoted.body.result.structuredContent.result.promotion.events.at(-1).type, 'approved');
+  assert.equal(promoted.body.result.structuredContent.result.promotion.effectiveAttestations.length, 1);
+  const attestationId = promoted.body.result.structuredContent.result.promotion.effectiveAttestations[0].id;
+
+  const graph = await call(handle, 'graph', { artifact });
+  assert.equal(graph.body.result.isError, false, JSON.stringify(graph.body));
+  assert.ok(graph.body.result.structuredContent.graph.nodes.some(node => node.type === 'promotion_candidate'));
+  assert.ok(graph.body.result.structuredContent.graph.nodes.some(node => node.type === 'promoted_evidence'));
+  assert.ok(graph.body.result.structuredContent.graph.edges.some(edge => edge.type === 'promoted_from'));
+  assert.equal(graph.body.result.structuredContent.artifact, undefined, 'derived graph must not become state authority');
+
+  const revoked = await call(handle, 'revoke_promotion', {
+    artifact,
+    decision: {
+      attestationId,
+      at: '2026-09-13T16:33:00.000Z',
+      actorLabel: 'analyst:g',
+      reason: 'Later validation disproved the finding.',
+    },
+  });
+  assert.equal(revoked.body.result.isError, false, JSON.stringify(revoked.body));
+  assert.equal(revoked.body.result.structuredContent.result.promotion.events.at(-1).type, 'revoked');
+  assert.equal(revoked.body.result.structuredContent.result.promotion.effectiveAttestations.length, 0);
+
+  const freshBuilt = await call(handle, 'build', { enrichment: enrichment() });
+  const freshSurface = await call(handle, 'surface_import', {
+    artifact: freshBuilt.body.result.structuredContent.artifact,
+    records: [{
+      host: 'suspicious.example',
+      source: 'authorized-local-scan',
+      reference: 'https://scanner.invalid/run/surface-2',
+    }],
+  });
+  const freshCandidates = await call(handle, 'promotion_candidates', { artifact: freshSurface.body.result.structuredContent.artifact });
+  const rejected = await call(handle, 'reject_promotion', {
+    artifact: freshCandidates.body.result.structuredContent.artifact,
+    decision: {
+      candidateId: freshCandidates.body.result.structuredContent.candidates[0].id,
+      at: '2026-09-13T16:34:00.000Z',
+      actorLabel: 'analyst:g',
+      reason: 'Insufficient basis for analyst attestation.',
+    },
+  });
+  assert.equal(rejected.body.result.isError, false, JSON.stringify(rejected.body));
+  assert.equal(rejected.body.result.structuredContent.result.promotion.events.at(-1).type, 'rejected');
+  assert.equal(rejected.body.result.structuredContent.result.promotion.effectiveAttestations.length, 0);
 });
 
 test('Domain Investigation MCP has no hidden server session', async () => {
@@ -162,4 +269,24 @@ test('authenticated Domain Investigation imports may exceed 128 KiB while unauth
   const denied = await handle(request('para11ax_domain_investigation', { action: 'surface_import', artifact, records }, { authenticated: false }));
   assert.equal(denied.status, 413);
   assert.equal(denied.body.error?.message, 'Payload too large');
+});
+
+test('promotion MCP actions do not widen the public 128 KiB body ceiling', async () => {
+  const handle = handler();
+  const built = await call(handle, 'build', { enrichment: enrichment() });
+  const artifact = built.body.result.structuredContent.artifact;
+  const oversized = request('para11ax_domain_investigation', {
+    action: 'promote',
+    artifact,
+    decision: {
+      candidateId: 'PC-BOUNDED',
+      at: NOW,
+      actorLabel: 'analyst:g',
+      reason: 'x'.repeat(140 * 1024),
+    },
+  });
+  assert.ok(Buffer.byteLength(JSON.stringify(oversized.body), 'utf8') > 128 * 1024);
+  const response = await handle(oversized);
+  assert.equal(response.status, 413);
+  assert.equal(response.body.error?.message, 'Payload too large');
 });

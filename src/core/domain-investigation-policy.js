@@ -1,0 +1,115 @@
+import {
+  DEFAULT_PROVIDER_INDEPENDENCE_REGISTRY,
+  createProviderIndependenceRegistry,
+  summarizeProviderIndependence,
+} from './provider-independence.js';
+
+function deepFreeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value)) deepFreeze(child);
+  return Object.freeze(value);
+}
+
+function normalizeRegistry(value) {
+  if (value === undefined || value === null) return DEFAULT_PROVIDER_INDEPENDENCE_REGISTRY;
+  if (Array.isArray(value)) return createProviderIndependenceRegistry(value);
+  if (value?.version === 'provider-independence-v1.0' && Array.isArray(value.entries)) return value;
+  throw new TypeError('provider independence registry must be a v1 registry or registry entry array');
+}
+
+function classify(rec, independence, hasAnalystAttestation) {
+  const knownGroups = independence.quorumEligibleGroupCount;
+  const contradictions = Array.isArray(rec.contradictions) ? rec.contradictions : [];
+  const contextSources = Array.isArray(rec.contextSources) ? rec.contextSources : [];
+  const authority = Array.isArray(rec.authority) ? rec.authority : [];
+  const hasOperatorContext = authority.includes('operator_context');
+  const directSources = Array.isArray(rec.directSources) ? rec.directSources : [];
+
+  if (knownGroups >= 2 && contradictions.length === 0) {
+    return {
+      disposition: 'BLOCK',
+      ruleId: 'DI-BLOCK-2-DIRECT',
+      reasons: ['At least two known independent provider families directly support the exact IOC with no material contradiction.'],
+    };
+  }
+  if (knownGroups >= 2 && contradictions.length > 0) {
+    return {
+      disposition: 'BLOCK_CANDIDATE',
+      ruleId: 'DI-CANDIDATE-CONTRADICTION',
+      reasons: ['Independent direct provider quorum exists, but explicit negative evidence requires analyst review before blocking.'],
+    };
+  }
+  if (knownGroups >= 1 && (hasOperatorContext || hasAnalystAttestation)) {
+    return {
+      disposition: 'BLOCK_CANDIDATE',
+      ruleId: contradictions.length ? 'DI-CANDIDATE-CONTRADICTION' : 'DI-CANDIDATE-DIRECT-CONTEXT',
+      reasons: contradictions.length
+        ? ['A known direct malicious provider family exists with explicit non-provider corroboration, but contradiction pressure requires analyst review.']
+        : ['One known direct malicious provider family is corroborated by operator context or approved analyst evidence; human approval remains required.'],
+    };
+  }
+  if (directSources.length > 0) {
+    return {
+      disposition: 'MONITOR',
+      ruleId: knownGroups === 1 ? 'DI-MONITOR-ONE-INDEPENDENT-GROUP' : 'DI-MONITOR-UNKNOWN-LINEAGE',
+      reasons: [knownGroups === 1
+        ? 'Only one known independent direct malicious provider family supports this IOC.'
+        : 'Direct malicious evidence is present, but its provider lineage is unknown or non-quorum-eligible.'],
+    };
+  }
+  if (contextSources.length > 0 || hasOperatorContext || hasAnalystAttestation) {
+    return {
+      disposition: 'MONITOR',
+      ruleId: 'DI-MONITOR-CONTEXT',
+      reasons: ['Only contextual, operator, or approved analyst evidence is present; it does not satisfy direct provider-family quorum.'],
+    };
+  }
+  return {
+    disposition: rec.disposition === 'MONITOR' ? 'MONITOR' : 'DO_NOT_BLOCK',
+    ruleId: rec.disposition === 'MONITOR' ? rec.ruleId : 'DI-NO-DIRECT-EVIDENCE',
+    reasons: rec.disposition === 'MONITOR'
+      ? rec.reasons
+      : ['No direct malicious Evidence v2 source supports blocking this IOC.'],
+  };
+}
+
+export function applyProviderIndependencePolicy(artifact, registryInput, effectiveAttestations = []) {
+  if (!artifact || typeof artifact !== 'object' || !Array.isArray(artifact.recommendations)) {
+    throw new TypeError('Domain Investigation artifact with recommendations is required');
+  }
+  const registry = normalizeRegistry(registryInput);
+  if (!Array.isArray(effectiveAttestations)) throw new TypeError('effectiveAttestations must be an array');
+  const recommendations = artifact.recommendations.map((rec) => {
+    const directSources = Array.isArray(rec.directSources) ? rec.directSources : [];
+    const independence = summarizeProviderIndependence(directSources, registry);
+    const matchingAttestations = effectiveAttestations.filter(attestation =>
+      attestation?.authorityClass === 'analyst_attestation'
+      && attestation?.observable?.type === rec.type
+      && attestation?.observable?.value === rec.value);
+    const decision = classify(rec, independence, matchingAttestations.length > 0);
+    const authority = [...new Set([...(Array.isArray(rec.authority) ? rec.authority : []), ...(matchingAttestations.length ? ['analyst_promoted'] : [])])].sort();
+    return {
+      ...rec,
+      disposition: decision.disposition,
+      ruleId: decision.ruleId,
+      reasons: decision.reasons,
+      authority,
+      analystAttestations: matchingAttestations.map(item => item.id).sort(),
+      independence: {
+        registryVersion: independence.registryVersion,
+        rawProviderCount: independence.rawProviderCount,
+        quorumEligibleGroupCount: independence.quorumEligibleGroupCount,
+        quorumGroups: independence.quorumGroups,
+        unknownProviders: independence.unknownProviders,
+      },
+    };
+  });
+  return deepFreeze({
+    ...artifact,
+    recommendations,
+    _authoritative: {
+      ...(artifact._authoritative ?? {}),
+      providerIndependenceRegistry: registry,
+    },
+  });
+}
