@@ -3,6 +3,9 @@ import {
   createDomainInvestigation,
   importDomainSurface,
   importDomainVulnerabilities,
+  initializeDomainPromotionFromImports,
+  applyDomainPromotionEvent,
+  buildDomainInvestigationGraph,
 } from './domain-investigation.js';
 import { toDomainInvestigationStix } from '../export/domain-investigation-stix.js';
 
@@ -14,11 +17,18 @@ export const DOMAIN_INVESTIGATION_HANDLERS = Object.freeze([
   'domain-investigation-report',
   'domain-investigation-stix',
   'domain-investigation-handoff',
+  'domain-investigation-promotion-candidates',
+  'domain-investigation-promote',
+  'domain-investigation-reject-promotion',
+  'domain-investigation-revoke-promotion',
+  'domain-investigation-graph',
   'domain-investigation-clear',
 ]);
 
 const typedRecord = value => Object.freeze({ type: 'record', value });
+const typedRecords = value => Object.freeze({ type: 'records', value });
 const typedText = value => Object.freeze({ type: 'text', value: String(value ?? '') });
+const typedGraph = value => Object.freeze({ type: 'graph', value });
 
 function parseJson(content, label) {
   try { return JSON.parse(content); }
@@ -33,6 +43,13 @@ function publicProjection(artifact) {
 
 function noArgs(args, usage) {
   if (args.length) throw shellError('INVALID_ARGUMENT', `usage: ${usage}`);
+}
+
+function inlineJson(args, label, usage) {
+  if (!Array.isArray(args) || args.length === 0 || String(args[0]).startsWith('--')) {
+    throw shellError('INVALID_ARGUMENT', `usage: ${usage}`);
+  }
+  return parseJson(args.join(' '), label);
 }
 
 async function contentFor(args, kind, loadContent) {
@@ -106,6 +123,33 @@ export async function executeDomainInvestigationCommand({
     if (handler === 'domain-investigation-handoff') {
       noArgs(args, 'domain-investigation handoff');
       return Object.freeze({ output: typedRecord(current.handoff), artifact: current });
+    }
+    if (handler === 'domain-investigation-promotion-candidates') {
+      noArgs(args, 'domain-investigation promotion-candidates');
+      const next = initializeDomainPromotionFromImports(current);
+      return Object.freeze({ output: typedRecords(next.promotion?.candidates ?? []), artifact: next });
+    }
+    if (handler === 'domain-investigation-promote') {
+      const decision = inlineJson(args, 'promotion approval', 'domain-investigation promote <approval-json>');
+      const initialized = initializeDomainPromotionFromImports(current);
+      const next = applyDomainPromotionEvent(initialized, { ...decision, type: 'approved' });
+      return Object.freeze({ output: typedRecord(publicProjection(next)), artifact: next });
+    }
+    if (handler === 'domain-investigation-reject-promotion') {
+      const decision = inlineJson(args, 'promotion rejection', 'domain-investigation reject-promotion <decision-json>');
+      const initialized = initializeDomainPromotionFromImports(current);
+      const next = applyDomainPromotionEvent(initialized, { ...decision, type: 'rejected' });
+      return Object.freeze({ output: typedRecord(publicProjection(next)), artifact: next });
+    }
+    if (handler === 'domain-investigation-revoke-promotion') {
+      const decision = inlineJson(args, 'promotion revocation', 'domain-investigation revoke-promotion <decision-json>');
+      const initialized = initializeDomainPromotionFromImports(current);
+      const next = applyDomainPromotionEvent(initialized, { ...decision, type: 'revoked' });
+      return Object.freeze({ output: typedRecord(publicProjection(next)), artifact: next });
+    }
+    if (handler === 'domain-investigation-graph') {
+      noArgs(args, 'domain-investigation graph');
+      return Object.freeze({ output: typedGraph(buildDomainInvestigationGraph(current)), artifact: current });
     }
     throw new TypeError('unsupported Domain Investigation handler');
   } catch (error) {
