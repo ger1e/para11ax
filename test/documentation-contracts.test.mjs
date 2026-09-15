@@ -7,6 +7,7 @@ import { ALL_PROVIDERS } from '../src/providers/index.js';
 import { EVIDENCE_SCHEMA_VERSION } from '../src/core/version.js';
 import { EVIDENCE_GRAPH_SCHEMA_VERSION } from '../src/core/evidence-graph.js';
 import { GUIDANCE_SCHEMA_VERSION } from '../src/core/guidance.js';
+import { MCP_TOOLS } from '../src/mcp/server.js';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const workflows = Object.keys(WORKFLOWS).sort();
@@ -77,6 +78,18 @@ test('API docs cover canonical public and protected route names', () => {
   ]) {
     assert.ok(api.includes(`/api/para11ax/${route}`), `API docs missing ${route}`);
   }
+});
+
+test('operations MCP acceptance stays synchronized with the canonical tool registry and ChatGPT refresh runbook', () => {
+  const operations = read('docs/OPERATIONS.md');
+  assert.ok(
+    operations.includes(`${MCP_TOOLS.length} tools in tools/list`),
+    `OPERATIONS MCP tool count drifted: expected ${MCP_TOOLS.length}`,
+  );
+  requireTokens(operations, [
+    'refresh/re-register the ChatGPT custom app/plugin action schema',
+    'ChatGPT action/tool list matches the live MCP catalog',
+  ], 'ChatGPT MCP schema refresh runbook');
 });
 
 test('authoritative docs expose the current GreyNoise Swarm operator contract', () => {
