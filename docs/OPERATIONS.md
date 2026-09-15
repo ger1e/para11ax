@@ -59,7 +59,7 @@ For MCP, verify at least:
 ```text
 GET /mcp -> 405 + Allow: POST
 initialize/server discovery
-13 tools in tools/list
+14 tools in tools/list
 auth challenge for unauthenticated protected call
 authenticated para11ax_capabilities call
 sequential protected calls without namespace/session collapse
@@ -67,6 +67,19 @@ selected enrichment/batch/provider surface
 mission/investigation/case/report lifecycle smoke
 registered-command boundary
 ```
+
+### ChatGPT MCP schema refresh
+
+Whenever the MCP tool inventory, tool names, or input schemas change, deploy the accepted server first, then refresh/re-register the ChatGPT custom app/plugin action schema. A healthy live `tools/list` proves the server catalog only; it does not prove that an already-loaded ChatGPT typed schema has refreshed.
+
+Before closing the change:
+
+- verify the deployed MCP `tools/list` against the accepted source SHA;
+- refresh/re-register the ChatGPT action schema after the deployment is live;
+- verify the ChatGPT action/tool list matches the live MCP catalog by tool name and count;
+- exercise each newly added or changed typed action from a fresh ChatGPT session.
+
+If the live MCP catalog is correct but ChatGPT exposes a stale subset, treat that as client/connector registration or cache drift first. Do not rewrite healthy server behavior merely to make an old client schema agree with it.
 
 A successful OAuth `POST /oauth/token` proves token issuance only. If a client then produces no `/mcp` request, debug the client/session binding before changing PARA11AX auth code.
 
