@@ -10,6 +10,8 @@ import {
   applyPromotionEvent,
   deriveEffectiveAttestations,
 } from './evidence-promotion.js';
+import { summarizeProviderIndependence } from './provider-independence.js';
+import { buildEvidenceGraph } from './evidence-graph.js';
 
 function optionsObject(options) {
   if (options === undefined || options === null) return {};
@@ -37,6 +39,13 @@ function registryFromArtifact(artifact) {
 
 function promotionFromArtifact(artifact) {
   return artifact?._authoritative?.promotionState ?? null;
+}
+
+function validateDomainArtifact(artifact) {
+  if (!artifact || artifact.schemaVersion !== DOMAIN_INVESTIGATION_SCHEMA_VERSION || !artifact._authoritative?.enrichment) {
+    throw new TypeError('valid Domain Investigation artifact is required');
+  }
+  return artifact;
 }
 
 function buildAuthorityAudit(artifact, effectiveAttestations, promotionState) {
@@ -155,6 +164,44 @@ function applyAuthorityState(artifact, registry, promotionState) {
   return applyAuthorityAudit(policyApplied, effectiveAttestations, promotionState);
 }
 
+function importedObservable(record, kind) {
+  if (kind === 'surface') {
+    if (record?.url) return { type: 'url', value: record.url };
+    if (record?.host) return { type: 'domain', value: record.host };
+    if (record?.ip) return { type: 'ip', value: record.ip };
+    return null;
+  }
+  if (record?.cve) return { type: 'cve', value: record.cve };
+  if (record?.url) return { type: 'url', value: record.url };
+  if (record?.host) return { type: 'domain', value: record.host };
+  return null;
+}
+
+function operatorArtifactsFromImports(artifact) {
+  const capturedAt = artifact?._authoritative?.enrichment?.queriedAt;
+  if (typeof capturedAt !== 'string' || Number.isNaN(Date.parse(capturedAt))) return [];
+  const sources = [
+    ...((Array.isArray(artifact?.imports?.surface) ? artifact.imports.surface : []).map(record => ({ kind: 'surface', record }))),
+    ...((Array.isArray(artifact?.imports?.vulnerabilities) ? artifact.imports.vulnerabilities : []).map(record => ({ kind: 'vulnerability', record }))),
+  ];
+  return sources.flatMap(({ kind, record }) => {
+    const observable = importedObservable(record, kind);
+    if (!observable || typeof record?.reference !== 'string' || !record.reference) return [];
+    const source = typeof record.source === 'string' && record.source ? record.source : `domain-investigation-${kind}-import`;
+    const sourceKind = kind === 'surface' ? 'authorized_surface_finding' : 'authorized_vulnerability_finding';
+    return [{
+      id: record.id,
+      kind: sourceKind,
+      capturedAt: new Date(capturedAt).toISOString(),
+      source,
+      summary: `Imported ${kind} operator finding for ${observable.type}:${observable.value}.`,
+      references: [record.reference],
+      observable,
+      observation: { kind: 'operator_finding', verdict: 'observed' },
+    }];
+  });
+}
+
 export function createDomainInvestigation(enrichment, expectedTarget, options) {
   const normalizedOptions = optionsObject(options);
   const artifact = createLegacyDomainInvestigation(enrichment, expectedTarget);
@@ -179,21 +226,42 @@ export function importDomainVulnerabilities(artifact, input) {
 }
 
 export function initializeDomainPromotion(artifact, operatorArtifacts) {
-  if (!artifact || artifact.schemaVersion !== DOMAIN_INVESTIGATION_SCHEMA_VERSION) {
-    throw new TypeError('valid Domain Investigation artifact is required');
-  }
+  validateDomainArtifact(artifact);
   const promotionState = createPromotionState(operatorArtifacts);
   return applyAuthorityState(artifact, registryFromArtifact(artifact), promotionState);
 }
 
+export function initializeDomainPromotionFromImports(artifact) {
+  validateDomainArtifact(artifact);
+  if (promotionFromArtifact(artifact)) return artifact;
+  return initializeDomainPromotion(artifact, operatorArtifactsFromImports(artifact));
+}
+
 export function applyDomainPromotionEvent(artifact, event) {
-  if (!artifact || artifact.schemaVersion !== DOMAIN_INVESTIGATION_SCHEMA_VERSION) {
-    throw new TypeError('valid Domain Investigation artifact is required');
-  }
+  validateDomainArtifact(artifact);
   const current = promotionFromArtifact(artifact);
   if (!current) throw new TypeError('Domain Investigation promotion state is not initialized');
   const next = applyPromotionEvent(current, event);
   return applyAuthorityState(artifact, registryFromArtifact(artifact), next);
+}
+
+export function buildDomainInvestigationGraph(artifact) {
+  validateDomainArtifact(artifact);
+  const enrichment = artifact._authoritative.enrichment;
+  const evidence = Array.isArray(enrichment.evidence) ? enrichment.evidence : [];
+  const providers = uniqueSorted(evidence.map(item => item?.provider).filter(Boolean));
+  const independence = summarizeProviderIndependence(providers, registryFromArtifact(artifact));
+  return buildEvidenceGraph({
+    indicator: artifact.target.value,
+    type: artifact.target.type,
+    evidence,
+    relationships: Array.isArray(enrichment.relationships) ? enrichment.relationships : [],
+    correlation: enrichment.correlation ?? {},
+    decision: enrichment.decision ?? {},
+    providerIndependence: independence,
+    promotion: artifact.promotion ?? {},
+    recommendations: artifact.recommendations ?? [],
+  });
 }
 
 export { DOMAIN_INVESTIGATION_SCHEMA_VERSION };
