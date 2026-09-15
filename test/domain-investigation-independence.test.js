@@ -66,10 +66,18 @@ test('one known plus one unknown is not two-family quorum', () => {
   assert.equal(rec.disposition, 'MONITOR');
 });
 
-test('one known family plus independent context is BLOCK_CANDIDATE', () => {
+test('one known family plus explicit operator context is BLOCK_CANDIDATE', () => {
   const r = registry([['known', 'family-known']]);
-  const rec = applyProviderIndependencePolicy(artifact(['known'], { contextSources: ['context-feed'] }), r).recommendations[0];
+  const rec = applyProviderIndependencePolicy(artifact(['known'], { authority: ['evidence_v2', 'operator_context'] }), r).recommendations[0];
   assert.equal(rec.disposition, 'BLOCK_CANDIDATE');
+  assert.equal(rec.independence.quorumEligibleGroupCount, 1);
+});
+
+test('provider context alone cannot masquerade as independent BLOCK_CANDIDATE corroboration', () => {
+  const r = registry([['known', 'family-known'], ['context-feed', 'family-known']]);
+  const rec = applyProviderIndependencePolicy(artifact(['known'], { contextSources: ['context-feed'] }), r).recommendations[0];
+  assert.equal(rec.disposition, 'MONITOR');
+  assert.equal(rec.ruleId, 'DI-MONITOR-ONE-INDEPENDENT-GROUP');
   assert.equal(rec.independence.quorumEligibleGroupCount, 1);
 });
 
