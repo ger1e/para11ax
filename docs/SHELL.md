@@ -277,14 +277,23 @@ domain-investigation show
 domain-investigation report
 domain-investigation stix
 domain-investigation handoff
+domain-investigation promotion-candidates
+domain-investigation promote <approval-json>
+domain-investigation reject-promotion <decision-json>
+domain-investigation revoke-promotion <decision-json>
+domain-investigation graph
 domain-investigation clear
 ```
 
 `build` requires canonical domain Evidence v2. Surface and vulnerability imports are scalar-only operator context, capped at 500 records and 2 MiB per imported set. They replace their corresponding imported set atomically and never become Evidence v2 by implication.
 
-Web and CLI route through the same pure command adapter. Browser state is memory-only and is cleared by disconnect/reboot. CLI state exists only inside the current process/pipeline. `show` returns a sanitized public projection without `_authoritative`; report/STIX/handoff are deterministic bounded projections; `clear` drops the volatile artifact.
+`promotion-candidates` derives bounded zero-authority candidates from eligible imported operator artifacts. `promote`, `reject-promotion`, and `revoke-promotion` require explicit inline JSON decisions and append deterministic lifecycle events atomically. An approved candidate becomes separate `analyst_promoted` / `analyst_attestation` authority; it never becomes an Evidence v2 provider vote and never increments provider-family quorum. Invalid decisions leave the volatile artifact unchanged.
 
-All Domain Investigation descriptors declare `egressClass: none`, no auth requirement at the local shell layer, and no provider/scanner capability. Authorized active discovery or vulnerability scanning must be performed separately outside this workflow and imported explicitly afterward. Full semantics are documented in [DOMAIN-INVESTIGATION.md](DOMAIN-INVESTIGATION.md).
+Provider names are provenance labels, not independence votes. Only known `quorumEligible` provider independence groups can contribute to a `BLOCK` quorum; missing/unknown lineage remains non-quorum. `graph` projects the current provider-independence, promotion, recommendation, and provenance state into the existing deterministic Evidence Graph. That graph is explanatory output only and never feeds authority back into the workflow.
+
+Web and CLI route through the same pure command adapter. Browser state is memory-only and is cleared by disconnect/reboot. CLI state exists only inside the current process/pipeline. `show` returns a sanitized public projection without `_authoritative`; report/STIX/handoff/graph are deterministic bounded projections; `clear` drops the volatile artifact.
+
+All Domain Investigation descriptors declare `egressClass: none`, no auth requirement at the local shell layer, and no provider/scanner capability. Hosted execution remains passive. Authorized active discovery or vulnerability scanning must be performed separately outside this workflow and imported explicitly afterward. Full semantics are documented in [DOMAIN-INVESTIGATION.md](DOMAIN-INVESTIGATION.md).
 
 ## Result and evidence
 
@@ -447,6 +456,9 @@ The unified command fabric deliberately rejects host-shell semantics before comm
 - browser credential persistence or credential reflection in errors/history/output.
 - generic filesystem primitives or browser filesystem writes.
 - hosted active discovery/scanning through Domain Investigation.
+- automatic promotion of Domain Investigation operator context.
+- treating provider names or unknown lineage as independent quorum.
+- treating analyst attestations or graph edges as provider-family authority.
 
 There is no arbitrary OS shell escape hatch. Export and download behavior is represented by explicit registered commands instead of redirects.
 
@@ -498,6 +510,9 @@ Domain Investigation from previously produced Evidence v2:
 domain-investigation build --file domain-enrichment.json
 domain-investigation surface-import --file authorized-surface.json
 domain-investigation vulnerability-import --file authorized-vulnerabilities.json
+domain-investigation promotion-candidates
+domain-investigation promote '{"candidateId":"PC-...","at":"2026-09-15T17:00:00.000Z","actorLabel":"analyst:g","reason":"Validated against authorized investigation context."}'
+domain-investigation graph
 domain-investigation report
 domain-investigation handoff
 ```
