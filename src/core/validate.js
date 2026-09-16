@@ -1,6 +1,4 @@
-import net from 'node:net';
-import { domainToASCII } from 'node:url';
-import { parseCanonicalCidr } from './network.js';
+import { parseCanonicalCidr, parseIp } from './network.js';
 
 const MAX_INDICATOR_LENGTH = 4096;
 const CVE_RE = /^CVE-\d{4}-\d{4,}$/i;
@@ -12,9 +10,11 @@ const MAX_ASN = 4_294_967_295n;
 
 function validDomain(value) {
   const raw = String(value).toLowerCase();
-  if (!raw.includes('.')) return null;
-  const ascii = domainToASCII(raw);
-  if (!ascii || ascii.length > 253 || !ascii.includes('.') || net.isIP(ascii)) return null;
+  if (!raw.includes('.') || /[\s/?#@:\[\]\\%]/.test(raw)) return null;
+  let parsed;
+  try { parsed = new URL(`http://${raw}`); } catch { return null; }
+  const ascii = parsed.hostname.toLowerCase();
+  if (!ascii || ascii.length > 253 || !ascii.includes('.') || parseIp(ascii)) return null;
   const labels = ascii.split('.');
   if (labels.some(label => !label || label.length > 63 || !/^[a-z0-9-]+$/i.test(label) || label.startsWith('-') || label.endsWith('-'))) return null;
   return ascii;
@@ -23,9 +23,13 @@ function validDomain(value) {
 function validUrl(value) {
   let parsed; try { parsed = new URL(value); } catch { return null; }
   if (!['http:', 'https:'].includes(parsed.protocol)) return null;
-  const host = validDomain(parsed.hostname) ?? (net.isIP(parsed.hostname) ? parsed.hostname : null);
-  if (!host || parsed.username || parsed.password) return null;
-  parsed.hostname = host; parsed.hash = '';
+  const rawHost = parsed.hostname;
+  const ipHost = rawHost.startsWith('[') && rawHost.endsWith(']') ? rawHost.slice(1, -1) : rawHost;
+  const domain = validDomain(rawHost);
+  if (!domain && !parseIp(ipHost)) return null;
+  if (parsed.username || parsed.password) return null;
+  if (domain) parsed.hostname = domain;
+  parsed.hash = '';
   return parsed.toString();
 }
 
@@ -42,7 +46,7 @@ export function classifyIndicator(input) {
   if (typeof input !== 'string') throw new TypeError('indicator must be a string');
   if (input.length > MAX_INDICATOR_LENGTH) throw new RangeError('indicator too long');
   const value = input.trim(); if (!value) throw new TypeError('indicator is required');
-  if (net.isIP(value)) return { value, type: 'ip' };
+  if (parseIp(value)) return { value, type: 'ip' };
   const cidr = parseCanonicalCidr(value); if (cidr) return { value: cidr.cidr, type: 'cidr' };
   const asn = validAsn(value); if (asn) return { value: asn, type: 'asn' };
   if (/^AS/i.test(value)) throw new TypeError('unsupported indicator');

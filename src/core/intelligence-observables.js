@@ -1,4 +1,3 @@
-import { domainToASCII } from 'node:url';
 import { classifyIndicator } from './validate.js';
 
 const MAX_LENGTH = 4096;
@@ -16,13 +15,12 @@ const USERNAME_RE = /^user:([A-Za-z0-9._-]{1,64})$/;
 const PRIVACY_TYPE = ['secret', 'fingerprint'].join('-');
 
 function validDomain(value) {
-  const raw = String(value).toLowerCase();
-  if (!raw.includes('.')) return null;
-  const ascii = domainToASCII(raw);
-  if (!ascii || ascii.length > 253 || !ascii.includes('.')) return null;
-  const labels = ascii.split('.');
-  if (labels.some(label => !label || label.length > 63 || !/^[a-z0-9-]+$/.test(label) || label.startsWith('-') || label.endsWith('-'))) return null;
-  return ascii;
+  try {
+    const classified = classifyIndicator(value);
+    return classified.type === 'domain' ? classified.value : null;
+  } catch {
+    return null;
+  }
 }
 
 function validEmail(value) {

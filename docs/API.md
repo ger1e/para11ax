@@ -1,100 +1,72 @@
 <!-- PARA11AX-DOC-STANDARD: GER1E/PARA11AX v1 -->
 ### API
 
-All responses are JSON unless a documented human-facing or binary export representation is explicitly negotiated. Production clients should use HTTPS. Protected REST requests use `Authorization: Bearer <PARA11AX_TOKEN>`.
+All responses are JSON unless a documented human-facing error representation is explicitly negotiated. Production clients should use HTTPS. The gateway bearer is `Authorization: Bearer <PARA11AX_TOKEN>`.
 
 PARA11AX has two remote protocol surfaces over the same bounded domain logic:
 
 - REST under `/api/para11ax/*`;
 - OAuth-linked stateless MCP tool execution at `POST /mcp`, with public protocol/tool discovery.
 
-MCP does not duplicate provider, Intelligence Fabric, scanner, mission, Domain Investigation, Investigation Workspace, case, or report implementations. It delegates to existing handlers and preserves their validation, fixed-host egress, evidence semantics, authorization, retention, and side-effect boundaries. See [`MCP.md`](MCP.md).
+The MCP surface does not duplicate provider, scanner, mission, investigation, case, or report implementations. It delegates to the existing PARA11AX handlers/registered command catalog and preserves their input validation, fixed-host egress, evidence semantics, and side-effect boundaries. See [`MCP.md`](MCP.md) for the canonical MCP contract.
 
 #### Canonical Evidence v2 workflows
 
-Baseline Evidence v2 indicator types are `ip`, `domain`, `url`, `hash`, `cve`, `attack`, `asn`, `cidr`, and `certificate`. Certificate input is explicit: `cert-sha256:<64-hex>`. Fixed profiles are `fast`, `standard`, and `full`; callers cannot select arbitrary baseline providers.
+Supported indicator types are `ip`, `domain`, `url`, `hash`, `cve`, `attack`, `asn`, `cidr`, and `certificate`. Certificate input is explicit: `cert-sha256:<64-hex>`. Fixed profiles are `fast`, `standard`, and `full`; callers cannot select arbitrary Evidence v2 providers.
 
-Profile admission and execution priority remain separate. Admitted baseline providers are ordered by **Provider Value Scheduler v1.0**. The current IP workflow retains 24 admitted providers, a 48-call ceiling, maximum concurrency 4, and the 20-second request deadline. Returned evidence never changes which already-admitted baseline source is allowed to run.
+Profile admission and execution priority are separate. Admitted providers are ordered by **Provider Value Scheduler v1.0**. For the current IP reference workflow, 24 admitted providers retain a 48-call ceiling (maximum two attempts per provider), maximum concurrency 4, and the 20-second request deadline. Scheduler ordering does not add or suppress providers based on returned evidence.
 
-#### Intelligence Fabric explicit operations
-
-`POST /api/para11ax/intelligence` is the normalized secondary-capability surface. It accepts only:
-
-```json
-{
-  "operation": "pivot",
-  "indicator": "8.8.8.8",
-  "type": "ip",
-  "profile": "standard"
-}
-```
-
-`type` and `profile` are optional. The only operation names are:
-
-```text
-pivot
-search
-identity
-asset
-supply-chain
-malware
-knowledge
-```
-
-The public schema intentionally exposes no provider name, provider URL, raw upstream query path, mode override, trust flag, case ID, verified-domain list, owned-CIDR list, tenant claim, credential, or fetch option.
-
-The extended classifier can route explicit capability subjects including package PURLs (`pkg:`), TLS fingerprints (`ja3:`, `jarm:`, `ja4:`), crypto addresses (`btc:`, `eth:`), email, `user:` usernames, `hmsl-sha256:` privacy-preserving secret fingerprints, and `entity:` legal-entity IDs. These are not new automatic baseline enrichment workflows.
-
-Secondary execution is exact type + registered mode, configuration-aware, centrally authorized, deterministically ranked, and capped at four direct providers. `no_store` capabilities bypass shared cache reads/writes. `no_result` remains source-scoped absence, never a safety verdict.
-
-`pivot` is the one operation that first obtains compatible baseline enrichment and then expands only explicit normalized relationships through graph-mode providers. This preserves the baseline enrichment envelope while making phase-two provenance visible. Username `search` delegates to the bounded User Scanner path and is returned as internal/no-store scanner context rather than automatic Evidence v2.
-
-Owned-asset `asset` requests fail closed unless the canonical subject is inside trusted server-owned scope. Callers cannot inject ownership scope. `knowledge`, `supply-chain`, and `malware` likewise execute only providers whose declared subject type and mode match the request.
+Email/username User Scanner operations, native Shodan commands, and GreyNoise Project Swarm session/workspace operations are separate analyst utilities. They do not become canonical Evidence v2 workflow types and do not automatically replace or promote into the current Evidence v2 result. The same separation applies when those utilities are invoked through MCP.
 
 #### Route inventory
 
-- `POST /mcp` — public MCP discovery plus OAuth/bearer-protected stateless tool execution; current profile `2026-07-28`; **15 grouped tools**.
+- `POST /mcp` — public MCP discovery plus OAuth/bearer-protected stateless tool execution; current profile `2026-07-28`; 13 grouped tools over existing PARA11AX capabilities.
 - `GET /.well-known/oauth-protected-resource` and `/mcp` suffix variant — OAuth resource metadata.
 - `GET /.well-known/oauth-authorization-server` — OAuth authorization-server metadata.
 - `GET|POST /oauth/authorize` — fixed ChatGPT CIMD consent flow.
 - `POST /oauth/token` — public-client authorization-code exchange with `S256` PKCE.
-- `GET /api/para11ax/meta` — public static capabilities and hard limits.
+- `GET /api/para11ax/meta` — public static capabilities and hard limits, including scheduler policy metadata where applicable.
 - `GET /api/para11ax/health` — bearer-protected readiness; `Cache-Control: no-store`.
 - `GET /api/para11ax/status` — bearer-protected count-only runtime state; `Cache-Control: no-store`.
-- `POST /api/para11ax/enrich` — one canonical baseline indicator.
-- `POST /api/para11ax/intelligence` — one normalized explicit Intelligence Fabric operation.
-- `POST /api/para11ax/batch` — 1–20 baseline indicators; max 3 active indicators / 200 provider calls.
+- `POST /api/para11ax/enrich` — one canonical indicator.
+- `POST /api/para11ax/batch` — 1–20 indicators; max 3 active indicators / 200 provider calls.
 - `POST /api/para11ax/stix` — enrich then export bounded STIX 2.1.
 - `POST /api/para11ax/user-scanner` — isolated bounded email/username active OSINT.
 - `POST /api/para11ax/shodan` — bounded authenticated native Shodan operator commands.
-- `POST /api/para11ax/swarm` — bounded authenticated GreyNoise Project Swarm search/detail/pivots/diff/explicit export.
-- `POST /api/para11ax/provider` — one authenticated registered **baseline-compatible** provider against one canonical Evidence v2 indicator.
-- `POST /api/para11ax/self-test` — signed production self-test path used by deployment verification.
+- `POST /api/para11ax/swarm` — bounded authenticated GreyNoise Project Swarm search, session detail, pivots, Workspace Diff, and explicit single-session export.
+- `POST /api/para11ax/provider` — one authenticated registered provider against one validated indicator.
 
-Unknown `/api/para11ax/*` paths fail closed. `/mcp` is routed explicitly before the REST catch-all.
+Unknown `/api/para11ax/*` paths fail closed. `/mcp` is routed explicitly before the REST catch-all and is never dispatched through an unknown REST path.
 
 #### `POST /mcp`
 
-ChatGPT uses authorization-code + `S256` PKCE to obtain a time-bounded `para11ax:use` access token bound to `https://para11ax.vercel.app/mcp`. Existing trusted clients can continue using the same gateway bearer as protected REST routes.
-
-Modern request headers:
+ChatGPT uses authorization-code + `S256` PKCE to obtain a time-bounded `para11ax:use` access token bound to `https://para11ax.vercel.app/mcp`. Existing trusted MCP clients can continue using the same gateway bearer as protected REST routes:
 
 ```text
-Authorization: Bearer <token>
+Authorization: Bearer <PARA11AX_TOKEN>
 Content-Type: application/json
 MCP-Protocol-Version: 2026-07-28
 Mcp-Method: <json-rpc method>
 Mcp-Name: <tool name>   # tools/call only
 ```
 
-Public discovery methods are `server/discover`, `initialize`, `notifications/initialized`, `ping`, and `tools/list`. They execute no analyst capability. For modern requests, `Mcp-Method` must equal the JSON-RPC body method and `Mcp-Name` must equal `params.name` on `tools/call`.
+`server/discover`, `initialize`, `notifications/initialized`, `ping`, and `tools/list` are intentionally callable before linking and execute no analyst capability. Every tool descriptor declares the OAuth scope. An unauthenticated `tools/call` returns a bounded MCP authentication result with `_meta["mcp/www_authenticate"]`; other protected failures return `401` with `WWW-Authenticate` pointing to the protected-resource metadata.
+
+For the modern stateless profile, `Mcp-Method` must equal the JSON-RPC body method. On `tools/call`, `Mcp-Name` must equal `params.name`. Missing or mismatched routing headers fail closed. Successful modern responses use `resultType: "complete"`; `server/discover` and `tools/list` expose bounded private cache hints.
+
+Canonical discovery:
+
+```text
+server/discover
+  -> tools/list
+  -> tools/call
+```
 
 Current grouped tools:
 
 ```text
 para11ax_capabilities
 para11ax_enrich
-para11ax_intelligence
 para11ax_batch
 para11ax_provider
 para11ax_shodan
@@ -106,10 +78,23 @@ para11ax_investigation
 para11ax_case
 para11ax_report
 para11ax_command
-para11ax_domain_investigation
 ```
 
-Representative intelligence call:
+Representative MCP User Scanner call body:
+
+```json
+{
+  "jsonrpc":"2.0",
+  "id":1,
+  "method":"tools/call",
+  "params":{
+    "name":"para11ax_user_scan",
+    "arguments":{"scanType":"username","target":"example_handle"}
+  }
+}
+```
+
+Representative MCP enrichment call body:
 
 ```json
 {
@@ -117,13 +102,15 @@ Representative intelligence call:
   "id":2,
   "method":"tools/call",
   "params":{
-    "name":"para11ax_intelligence",
-    "arguments":{"operation":"knowledge","indicator":"T1059"}
+    "name":"para11ax_enrich",
+    "arguments":{"indicator":"203.0.113.10","profile":"standard"}
   }
 }
 ```
 
-Stateful logical workflows remain transport-stateless. Mission, Domain Investigation, Investigation Workspace, and case tools return explicit state which the client supplies on subsequent calls. `para11ax_command` is a registered-command fallback, not arbitrary shell execution.
+Stateful logical workflows remain transport-stateless. `para11ax_mission`, `para11ax_investigation`, and `para11ax_case` return explicit state objects which the client supplies on subsequent calls. No hidden per-user server session is required.
+
+`para11ax_command` is a registered-command fallback, not arbitrary shell execution. Commands requiring local-admin/filesystem effects or browser-session-only behavior remain unavailable remotely.
 
 #### `POST /api/para11ax/enrich`
 
@@ -131,9 +118,36 @@ Stateful logical workflows remain transport-stateless. Mission, Domain Investiga
 {"indicator":"203.0.113.10","profile":"standard"}
 ```
 
-Normalized `ok`/`partial` results retain authoritative Evidence v2 and deterministic analytical projections. The IP reference path can include top-level `intelligence` from **Intelligence Kernel v1.0**, followed by kernel-aware decision/guidance. Evidence Graph v1.0 remains an explicit-evidence projection and does not promote Kernel-derived relationships into provider evidence.
+Normalized `ok`/`partial` results retain authoritative Evidence v2 and add deterministic analytical projections. The IP reference path can include top-level `intelligence` from **Intelligence Kernel v1.0**, followed by kernel-aware `decision` and bounded `guidance`; Evidence Graph v1.0 remains an explicit-evidence projection and does not ingest Kernel-derived relationships as evidence.
 
-The Intelligence Kernel is distinct from the Intelligence Fabric API. Kernel output is deterministic derived context over one baseline enrichment; `/intelligence` is the explicit capability-execution surface.
+Representative trimmed IP envelope:
+
+```json
+{
+  "schemaVersion": "2.0",
+  "indicator": "203.0.113.10",
+  "type": "ip",
+  "profile": "standard",
+  "status": "ok",
+  "evidence": [],
+  "relationships": [],
+  "correlation": {},
+  "intelligence": {
+    "schemaVersion": "1.0",
+    "type": "ip",
+    "evidenceStrength": {"level": "moderate"},
+    "analystPriority": {"level": "investigate"},
+    "coverageImpact": {"level": "none"}
+  },
+  "decision": {},
+  "evidenceGraph": {"schemaVersion": "1.0", "nodes": [], "edges": []},
+  "guidance": {"schemaVersion": "1.0"}
+}
+```
+
+`intelligence` is deterministic derived context, not Evidence v2. It may summarize evidence strength, source diversity, corroboration independence, contradiction severity, temporal relevance, explicit one-hop pivots, threat context, hunt relevance, coverage impact, analyst priority, limitations and trace rule IDs. Kernel projection failure is isolated: usable Evidence v2 remains valid and the unavailable projection is surfaced as a limitation rather than converted into an enrichment failure.
+
+Non-IP workflows remain compatible with their established correlation/decision path until an explicit observable policy adopts the Kernel contract. Error envelopes do not manufacture `intelligence`, Evidence Graph or Guidance projections.
 
 #### `POST /api/para11ax/batch`
 
@@ -141,27 +155,27 @@ The Intelligence Kernel is distinct from the Intelligence Fabric API. Kernel out
 {"indicators":["192.0.2.44","evil.example"],"profile":"standard"}
 ```
 
-Limits: 1..20 strings, max 3 active indicators, max 200 baseline provider calls globally, one shared deadline, canonical de-duplication, and no provider override.
+Limits: 1..20 strings, max 3 active indicators, max 200 provider calls globally, one shared deadline, canonical de-duplication, and no provider override.
 
 #### `POST /api/para11ax/stix`
 
-Uses the same single-indicator contract as `/enrich`. The gateway enriches first and maps the bounded result to STIX 2.1; caller-supplied enrichment objects are rejected.
-
-STIX export remains evidence-derived. `internal_only` evidence references are excluded. Actor/malware relationship objects are also suppressed when their explicit provider provenance maps to `internal_only` evidence, preventing restricted source context from leaking through relationship projection. Kernel conclusions do not become new STIX evidence or attribution facts.
+Uses the same single-indicator request contract as `/enrich`. The gateway enriches first and then maps the bounded result to STIX 2.1; caller-supplied enrichment objects are rejected. Intelligence Kernel-derived conclusions do not become new STIX evidence or attribution facts.
 
 #### `POST /api/para11ax/user-scanner`
 
-Separate active-OSINT capability used by the `user-scanner` command and by MCP `para11ax_user_scan`.
+Separate active-OSINT capability used by the `user-scanner` command and `osint` / `identity` aliases, and remotely by `para11ax_user_scan` over MCP.
 
 ```json
-{"scanType":"username","target":"example_handle","crossScan":false,"noNsfw":true}
+{"scanType":"username","target":"kaifcodec","crossScan":false,"noNsfw":true}
 ```
 
-The caller cannot select the worker URL, proxy, concurrency, arbitrary destination, or timeout. Output remains separate from baseline Evidence v2 and Intelligence Kernel reasoning. Scanner hits are leads until corroborated.
+The caller cannot select the worker URL, proxy, concurrency, arbitrary destination or timeout. Output remains separate from Evidence v2 and Intelligence Kernel reasoning. Scanner hits remain identity/account leads until corroborated; see [`IDENTITY-OSINT.md`](IDENTITY-OSINT.md) and [`GOOGLE-DORKING.md`](GOOGLE-DORKING.md).
 
 #### `POST /api/para11ax/shodan`
 
-Bearer required. Approved commands are exactly:
+Bearer required. The browser or MCP wrapper sends a normalized Shodan operator request to the same bounded handler. The gateway reads `SHODAN_API_KEY` server-side and contacts only `https://api.shodan.io`.
+
+Approved shell commands and equivalent request shapes:
 
 ```text
 shodan host <ip>
@@ -172,57 +186,132 @@ shodan domain <domain>
 shodan info
 ```
 
-The server reads `SHODAN_API_KEY` and contacts only `https://api.shodan.io`. Caller-selected URLs/pages/methods/credentials and `shodan download` are disabled. Search is first-page only; large raw banners are removed. Credit impact remains explicit.
+```json
+{"command":"host","target":"8.8.8.8"}
+```
+
+```json
+{"command":"search","query":"product:FortiGate country:HU"}
+```
+
+```json
+{"command":"count","query":"port:443 country:HU"}
+```
+
+```json
+{"command":"stats","query":"product:nginx","facets":"country:20,org:10"}
+```
+
+```json
+{"command":"domain","target":"example.com"}
+```
+
+```json
+{"command":"info"}
+```
+
+Unknown fields and unsupported commands/options are rejected. Caller-selected URLs, pages, methods, credentials and arbitrary Shodan operations are not accepted. `shodan download` is disabled.
+
+Response envelope:
+
+```json
+{
+  "requestId":"<uuid>",
+  "source":"shodan",
+  "command":"stats",
+  "input":{"query":"product:nginx","facets":"country:20,org:10"},
+  "creditImpact":"none",
+  "data":{},
+  "durationMs":42
+}
+```
+
+`creditImpact` is explicit:
+
+- `host` — `none`
+- `count` — `none`
+- `stats` — `none`
+- `info` — `none`
+- `domain` — `consumes_query_credit`
+- `search` — `may_consume_query_credit`
+
+Search is first-page only. Search results and host-service lists are bounded; large raw banners/service bodies are removed before the response reaches the client. Shodan operator output is terminal/operator context and leaves the current Evidence v2 enrichment and `intelligence` projection unchanged.
 
 #### `POST /api/para11ax/swarm`
 
-Bearer required. Approved operations are `search`, `get`, `unique`, `timeseries`, `diff`, and explicit single-session `export`. The server reads `GREYNOISE_API_KEY` and contacts only `https://api.greynoise.io`.
+Bearer required. The browser or MCP wrapper sends only normalized Swarm operations to the same bounded handler. The gateway reads `GREYNOISE_API_KEY` server-side, contacts only `https://api.greynoise.io`, refuses redirects, and does not accept caller-selected URLs, methods, headers, credentials, or arbitrary GreyNoise operations.
 
-Time ranges, query lengths, pagination inputs, pivot fields, workspace aliases, and result sizes are bounded. JSON and individual binary exports are capped at 4 MiB. Bulk session export, arbitrary workspace UUIDs, caller-selected destinations/methods/headers/credentials, and demo export are not exposed. Account entitlement is not inferred from key presence.
+Approved operations and representative request shapes:
 
-Successful read results are operator context and can be explicitly captured by Investigation Workspace without becoming automatic Evidence v2.
+```text
+swarm search --from <ISO-8601> --to <ISO-8601> [--scope workspace|demo] [--query <lucene>] [--page <1..10000>] [--page-size <1..100>]
+swarm get <session-id> [--scope workspace|demo]
+swarm unique --from <ISO-8601> --to <ISO-8601> --field <field> [--scope workspace|demo] [--query <lucene>] [--include-counts]
+swarm timeseries --from <ISO-8601> --to <ISO-8601> [--scope workspace|demo] [--query <lucene>] [--field <field>] [--size <1..100>] [--interval <auto|1s|1m|1h|1d>]
+swarm diff --query <GNQL> [--source personal|community|greynoise] [--target personal|community|greynoise] [--mode source-only|both|all] [--size <1..100>] [--next-token <token>]
+swarm export <session-id> <pcap|raw-source|raw-destination>
+```
+
+```json
+{"command":"search","scope":"workspace","startTime":"2026-09-05T00:00:00Z","endTime":"2026-09-06T00:00:00Z","query":"classification:malicious","page":1,"pageSize":25}
+```
+
+```json
+{"command":"get","scope":"demo","sessionId":"<session-id>"}
+```
+
+```json
+{"command":"unique","scope":"workspace","startTime":"2026-09-05T00:00:00Z","endTime":"2026-09-06T00:00:00Z","field":"source.ip","includeCounts":true}
+```
+
+```json
+{"command":"timeseries","scope":"workspace","startTime":"2026-09-05T00:00:00Z","endTime":"2026-09-06T00:00:00Z","query":"destination.port:443","field":"classification","size":10,"interval":"1h"}
+```
+
+```json
+{"command":"diff","query":"classification:malicious","sourceWorkspace":"personal","targetWorkspace":"greynoise","mode":"source-only","size":10}
+```
+
+```json
+{"command":"export","scope":"workspace","sessionId":"<session-id>","type":"pcap"}
+```
+
+Search/pivot ranges must be valid explicit ISO-8601 intervals with `startTime < endTime`. Session Lucene and Workspace Diff GNQL text are capped at 2,048 printable characters. Search page size is 1..100, page number is 1..10,000, timeseries group size is 1..100, and pivot fields/intervals come from fixed allowlists. Workspace Diff accepts only `personal`, `community`, and `greynoise`, requires different source/target aliases, caps result size at 100, and caps opaque `nextToken` values at 4,096 printable characters. JSON results and each single-session binary export are capped at 4 MiB. Bulk session export and arbitrary workspace UUIDs are not exposed.
+
+`scope=workspace` uses the sensor-backed workspace session dataset and requires the applicable GreyNoise Sensors entitlement. `scope=demo` uses the GreyNoise demo session dataset and requires the applicable Swarm entitlement. Workspace Diff uses its own approved workspace aliases instead of the session `scope` parameter. Demo export is rejected locally before upstream egress. PARA11AX does not infer or advertise a production entitlement merely because a key is configured.
+
+Successful `search`, `get`, `unique`, `timeseries`, and `diff` responses are bounded operator context. They can be explicitly captured with `investigation capture operator`; that capture does not manufacture or modify Evidence v2, provider corroboration, ATT&CK mapping, maliciousness, or analyst disposition. `export` remains an explicit export and does not replace the current operator result.
+
+Full operator contract: [`GREYNOISE-SWARM.md`](GREYNOISE-SWARM.md).
 
 #### `POST /api/para11ax/provider`
 
-Bearer required. This route executes exactly one registered provider through the established **canonical Evidence v2 provider gateway** against a canonical baseline indicator:
+Bearer required. This route executes exactly one named provider already registered in PARA11AX against one validated indicator. It exists for bounded direct-provider shell/MCP operations; it is not a caller-controlled HTTP proxy.
 
 ```json
 {"provider":"rdap","indicator":"203.0.113.10","type":"ip"}
 ```
 
-The body accepts only `provider`, `indicator`, and optional asserted `type`. Caller input cannot set URL, method, credential, timeout, parser, response ceiling, headers, raw body, or fetch implementation. Intelligence-only subjects and secondary capability semantics belong on `/api/para11ax/intelligence`, not this legacy direct-provider route.
+The body accepts only `provider`, `indicator`, and optional `type`. Provider names must identify a registered active adapter that supports the canonical observable type. The route rejects unknown fields, unknown or inactive providers, unsupported types, and providers whose required server-side credential is unavailable.
 
-#### Provider and authorization status semantics
-
-Remote status should be read precisely:
-
-- **implemented** — adapter/code exists;
-- **configured / configured_unverified** — required server configuration is present, not proof of live health;
-- **selected** — type/mode/configuration/authorization policy admitted the capability for an intelligence operation;
-- **executed** — PARA11AX attempted that provider;
-- **denied** — central authorization rejected it before execution;
-- **unavailable** — inactive, missing, or unconfigured;
-- **production-verified** — an authorized live request succeeded against the exact deployed SHA.
-
-Server-owned authorization configuration such as `PARA11AX_OWNED_CIDRS` and `PARA11AX_VERIFIED_DOMAINS` is never accepted from the public request body.
+Callers cannot supply a URL, method, credential, timeout, parser, response-size limit, request headers, raw request body, or fetch implementation. Execution remains inside the provider registry, orchestrator, scheduler, and fixed `safeFetch` egress policy. A direct provider result can update the browser's current result only after the explicit command; it is not silently promoted into an Investigation Workspace evidence snapshot.
 
 #### Common errors
 
-- `400` — invalid request/indicator/profile/batch/intelligence operation, type mismatch, unsupported field, or invalid MCP routing agreement.
+- `400` — invalid request/indicator/profile/batch, invalid MCP routing header/body agreement, invalid Shodan command/target/query/facets, rejected Swarm command/range/query/pivot/diff/export shape, or unsupported provider type.
 - `401 unauthorized`.
 - `404 provider_not_found` for an unknown direct-provider name.
 - `409 provider_inactive` or `provider_unconfigured` for a direct provider that cannot be admitted.
 - `405 method_not_allowed`; `GET /mcp` intentionally returns 405 with `Allow: POST`.
 - `413 payload_too_large`.
 - `415 unsupported_media_type`.
-- User Scanner uses controlled worker errors.
-- Provider rate limits, auth/entitlement errors, timeouts, malformed schemas, and transport failures remain explicit operational failures and are never converted into threat evidence.
+- User Scanner uses controlled `502`/`503`/`504` worker errors.
+- Shodan missing configuration fails closed with controlled `503`; upstream rate limiting is returned explicitly rather than converted into empty/negative evidence.
+- Swarm missing configuration, authentication/entitlement rejection, rate limiting, missing session, malformed/oversized upstream data, timeout, or transport failure remains an explicit operational error and is never converted into threat evidence.
 
 #### Security invariants
 
-Caller input never selects arbitrary provider hosts, Shodan/GreyNoise/worker hosts, methods, secrets, trusted ownership scope, or raw provider-routing fields. Baseline provider egress remains fixed through `safeFetch`. Intelligence Fabric secondary capabilities use the same fixed-egress contract plus exact mode/type admission, central authorization, retention/distribution policy, and bounded direct execution. Provider Value Scheduler v1.0 and Intelligence Kernel v1.0 add no arbitrary egress or LLM path. MCP exposes no host shell, arbitrary fetch/filesystem, local-admin operation, or hidden server-side workflow state.
-
-See [`MCP.md`](MCP.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`PROVIDERS.md`](PROVIDERS.md), [`THREAT-MODEL.md`](THREAT-MODEL.md), and [`SECURITY-CONTROLS.md`](SECURITY-CONTROLS.md).
+Caller input never selects arbitrary provider hosts, Shodan hosts, GreyNoise hosts, worker hosts, methods, provider secrets, `SHODAN_API_KEY`, `GREYNOISE_API_KEY`, or arbitrary adapters. Evidence v2 provider egress remains fixed through `safeFetch`. Provider Value Scheduler v1.0 and Intelligence Kernel v1.0 add no new egress, credential, persistence or dependency surface and use no LLM. User Scanner, Shodan, and GreyNoise Swarm use separate bounded authenticated handlers with server-configured fixed destinations whether invoked by REST, Web, CLI adapters, or MCP. MCP does not expose host shell, arbitrary fetch/filesystem, local-admin operations, or hidden server-side workflow state. See `MCP.md`, `THREAT-MODEL.md`, `SECURITY-CONTROLS.md`, `IDENTITY-OSINT.md`, `SHODAN-SHELL.md`, and `GREYNOISE-SWARM.md`.
 
 ---
 
