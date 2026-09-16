@@ -106,6 +106,9 @@ export const shadowserverProvider = Object.freeze({
       apikey: apiKey,
     };
     const body = JSON.stringify(request);
+    // Shadowserver requires HMAC-SHA256(secret, request body) for API authentication:
+    // https://github.com/The-Shadowserver-Foundation/api_utils/wiki/call_api-Documentation
+    // codeql[js/insufficient-password-hash]
     const hmac2 = createHmac('sha256', secret).update(body).digest('hex');
     const raw = await fetchJson(API_URL, {
       fetchImpl,
