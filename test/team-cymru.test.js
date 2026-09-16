@@ -70,3 +70,14 @@ test('Team Cymru rejects markup-bearing PRE content instead of sanitizing it int
     /provider_schema_invalid/,
   );
 });
+
+test('Team Cymru rejects markup in plain-text fallback payloads too', async () => {
+  await assert.rejects(
+    () => teamCymruProvider.run({ type: 'ip', value: '216.90.108.31' }, {
+      fetchImpl: async () => text(
+        'AS | IP | BGP Prefix | CC | Registry | Allocated | AS Name\n23028 | 216.90.108.31 | 216.90.108.0/24 | US | arin | 1998-09-25 | <b>TEAM-CYMRU</b>',
+      ),
+    }),
+    /provider_schema_invalid/,
+  );
+});
