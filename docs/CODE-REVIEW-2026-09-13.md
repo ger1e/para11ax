@@ -67,6 +67,8 @@ Per-item batch state preserves `ok`, `partial` and `error`. The batch response d
 
 The observed Node `[DEP0169] url.parse()` warning has no app-owned `url.parse(` call and the package carries no runtime dependency tree that explains it. It is classified as Vercel/Node wrapper/runtime-owned unless a future stack trace proves otherwise. Rewriting PARA11AX application code to silence an external warning would be fake remediation.
 
+Follow-up (2026-09-16): Vercel later attributed the cold-start warning to its lazy request-query helper and fixed it in `@vercel/node` 5.7.15 (`f7b5377`). PARA11AX now bypasses that legacy helper by parsing `req.url` directly with WHATWG `URL`; behavioral regression tests fail if a Vercel-facing request reads `req.query`.
+
 ## Security invariants reviewed
 
 - fixed-host/protocol/method egress policies;
