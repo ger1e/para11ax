@@ -79,7 +79,7 @@ server/discover
 | `para11ax_user_scan` | isolated email/username OSINT scanner | active OSINT / open-world lookup |
 | `para11ax_stix` | deterministic STIX 2.1 generation from PARA11AX enrichment | read-only projection |
 | `para11ax_mission` | profile/context/relevance/hunt/KQL/result/ServiceNow mission workflow | explicit client-carried state mutation |
-| `para11ax_domain_investigation` | passive domain investigation plus bounded explicit operator-context imports/report/STIX/handoff | explicit client-carried state mutation |
+| `para11ax_domain_investigation` | passive domain investigation, bounded operator-context imports, explicit promotion lifecycle, authority graph, report/STIX/handoff | explicit client-carried state mutation; graph is projection-only |
 | `para11ax_investigation` | Investigation Workspace v2 create/status/mutate/report/import/export | explicit client-carried state mutation |
 | `para11ax_case` | portable analyst case create/note/pin/capture/graph/diff/export | explicit client-carried state mutation |
 | `para11ax_report` | deterministic report render/quality/manifest projections | read-only projection |
@@ -160,6 +160,31 @@ Mission state round trip:
 4. retain the new returned workspace
 5. continue relevance -> hunt_build -> kql_validate -> result_analyze -> servicenow/export
 ```
+
+#### Domain Investigation MCP lifecycle
+
+`para11ax_domain_investigation` exposes these exact actions:
+
+`build` · `surface_import` · `vulnerability_import` · `show` · `report` · `stix` · `handoff` · `promotion_candidates` · `promote` · `reject_promotion` · `revoke_promotion` · `graph`
+
+`build` accepts canonical domain Evidence v2. Import actions accept the previously returned artifact plus bounded scalar-only operator-context records. `promotion_candidates` deterministically derives bounded zero-authority candidates from eligible imported context. `promote`, `reject_promotion`, and `revoke_promotion` require an explicit bounded `decision` object. `graph` returns the derived authority/provenance Evidence Graph and never becomes source-of-truth state.
+
+The server stores no hidden Domain Investigation session. Build/import/promotion transitions return the complete client-carried artifact required for the next transition. `show`, `report`, `stix`, `handoff`, and `graph` are bounded projections. Promotion decisions are capped at 8 KiB serialized input. The larger authenticated MCP body allowance remains scoped to valid Domain Investigation state transitions and does not widen the global public ceiling.
+
+A typical flow is:
+
+```text
+1. build with canonical domain Evidence v2
+2. retain returned artifact
+3. optionally surface_import / vulnerability_import and retain each returned artifact
+4. promotion_candidates and review zero-authority candidates
+5. optionally promote / reject_promotion with { artifact, decision }
+6. retain each returned transition artifact
+7. optionally revoke_promotion with an explicit attestation decision
+8. show / report / stix / handoff / graph from the current artifact
+```
+
+Provider-family quorum and analyst authority remain separate. Unknown provider lineage does not create an independence vote; analyst attestations may corroborate a recommendation but never increment provider-family quorum. See [`DOMAIN-INVESTIGATION.md`](DOMAIN-INVESTIGATION.md).
 
 Domain investigations, investigations, and cases follow the same explicit state-in/state-out model. This makes serverless invocations reproducible and prevents later calls from depending on hidden process memory.
 
