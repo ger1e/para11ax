@@ -77,11 +77,14 @@ jobs:
             "USER_ERRORS=\(.userScanner.errors // -1) USER_SKIPPED=\(.userScanner.skipped // -1)"
           ' "${response_file}"
 
+          # The live MCP catalog contains 15 tools. Full GA currently exercises the 14
+          # established surfaces, including Domain Investigation; Intelligence Fabric
+          # has dedicated MCP/E2E contract coverage in the repository test suite.
           jq -e '
             .status == "pass" and
             .authorization == "github_oidc" and
             .mcp.authenticated == true and
-            .mcp.toolCount == 14 and
+            .mcp.toolCount == 15 and
             .enrichment.target == "1.1.1.1" and
             .enrichment.profile == "fast" and
             .enrichment.status != "fail" and
