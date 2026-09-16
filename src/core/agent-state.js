@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { isAgentRiskLevel, isAgentTaskClass } from './agent-policy.js';
 import { sha256Hex } from './sha256.js';
 
@@ -208,7 +207,7 @@ export function createAgentState({
   taskClass = 'analysis',
   risk = 'medium',
   now = () => new Date().toISOString(),
-  uuid = () => randomUUID(),
+  uuid = () => crypto.randomUUID(),
 } = {}) {
   const at = timestamp(now(), 'createdAt');
   const base = {
@@ -245,7 +244,7 @@ export function reduceAgentState(current, action, dependencies = {}) {
   if (!action || typeof action !== 'object' || Array.isArray(action) || !ACTIONS.has(action.type)) fail('unsupported action');
   if (valid.revision === Number.MAX_SAFE_INTEGER) fail('revision limit', RangeError);
   const now = dependencies.now ?? (() => new Date().toISOString());
-  const uuid = dependencies.uuid ?? (() => randomUUID());
+  const uuid = dependencies.uuid ?? (() => crypto.randomUUID());
   const at = timestamp(now(), 'updatedAt');
   const next = clone(valid);
   let timelineType = action.type;

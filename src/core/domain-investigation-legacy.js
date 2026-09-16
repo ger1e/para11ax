@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto';
-import { isIP } from 'node:net';
 import { EVIDENCE_SCHEMA_VERSION } from './version.js';
+import { parseIp } from './network.js';
+import { sha256Hex } from './sha256.js';
 
 const SCHEMA_VERSION = 'domain-investigation-v1.0';
 const HANDOFF_SCHEMA_VERSION = 'domain-investigation-handoff-v1.0';
@@ -23,7 +23,7 @@ const VULN_FIELDS = Object.freeze([
 ]);
 
 function utf8Bytes(value) {
-  return Buffer.byteLength(JSON.stringify(value), 'utf8');
+  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
 }
 
 function stable(value) {
@@ -35,7 +35,7 @@ function stable(value) {
 }
 
 function stableHash(prefix, value) {
-  return `${prefix}-${createHash('sha256').update(JSON.stringify(stable(value))).digest('hex').slice(0, 20).toUpperCase()}`;
+  return `${prefix}-${sha256Hex(JSON.stringify(stable(value))).slice(0, 20).toUpperCase()}`;
 }
 
 function deepFreeze(value) {
@@ -127,7 +127,7 @@ function normalizeIocValue(type, raw) {
       return url.toString();
     } catch { return null; }
   }
-  if (type === 'ip') return isIP(value) ? value : null;
+  if (type === 'ip') return parseIp(value) ? value : null;
   if (type === 'hash') return /^[a-f0-9]{32}$|^[a-f0-9]{40}$|^[a-f0-9]{64}$/i.test(value) ? value.toLowerCase() : null;
   if (type === 'asn') {
     const match = value.toUpperCase().match(/^(?:AS)?(\d{1,10})$/);
