@@ -44,6 +44,7 @@ All notable repository changes should be recorded here. This project uses a ligh
 
 ##### Changed
 
+- Restored desktop Analyst UI initialization by removing Node-only `node:crypto`, `node:net`, and unguarded `Buffer` dependencies from the browser-reachable Mission/Domain Investigation graph. Shared IP validation, UTF-8 sizing, SHA-256 identities, and RFC-compatible UUIDv5 STIX identities now use runtime-neutral implementations, with a transitive browser-module regression gate covering the deployed entry point.
 - MCP discovery/catalog still exposes 14 grouped tools; `para11ax_domain_investigation` now includes client-carried `promotion_candidates`, `promote`, `reject_promotion`, `revoke_promotion`, and derived `graph` actions without adding server-side workflow state or globally widening the MCP body limit.
 - Unified Shell now exposes the Domain Investigation promotion lifecycle and graph projection on both Web and CLI through the same volatile no-egress command adapter.
 - Domain Investigation block semantics now require distinct known quorum-eligible provider independence groups. Unknown lineage remains non-quorum, and analyst attestations remain separate corroborating authority rather than provider-family votes.

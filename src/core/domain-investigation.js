@@ -30,7 +30,7 @@ function uniqueSorted(values) {
 }
 
 function utf8Bytes(value) {
-  return Buffer.byteLength(JSON.stringify(value), 'utf8');
+  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
 }
 
 function registryFromArtifact(artifact) {

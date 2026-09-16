@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto';
-import { isIP } from 'node:net';
+import { parseIp } from './network.js';
+import { sha256Hex } from './sha256.js';
 
 const SCHEMA_VERSION = 'evidence-promotion-v1.0';
 const MAX_SOURCES = 256;
@@ -24,7 +24,7 @@ function stable(value) {
 }
 
 function hash(value) {
-  return createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
+  return sha256Hex(JSON.stringify(stable(value)));
 }
 
 function deepFreeze(value) {
@@ -81,7 +81,7 @@ function normalizeObservable(observable) {
     if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new TypeError('invalid URL observable');
     value = parsed.toString();
   } else if (type === 'ip') {
-    if (!isIP(value)) throw new TypeError('invalid IP observable');
+    if (!parseIp(value)) throw new TypeError('invalid IP observable');
   } else if (type === 'hash') {
     if (!/^[a-f0-9]{32}$|^[a-f0-9]{40}$|^[a-f0-9]{64}$/i.test(value)) throw new TypeError('invalid hash observable');
     value = value.toLowerCase();
