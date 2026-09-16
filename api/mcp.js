@@ -1,14 +1,20 @@
 import { createMcpHttpHandler } from '../src/mcp/transport.js';
 import { createMcpOAuthHandlers } from '../src/mcp/oauth.js';
 import { normalizeExternalMcpResponse } from '../src/mcp/external-auth-recovery.js';
+import { requestUrl, singleRequestQueryValue } from '../src/core/http.js';
 
 const handleMcp = createMcpHttpHandler();
 const oauth = createMcpOAuthHandlers();
 
 function requestedRoute(req) {
-  const value = req?.query?._para11ax_mcp_route;
-  if (Array.isArray(value)) return value.length === 1 ? value[0] : '';
-  return typeof value === 'string' ? value : '';
+  const internal = singleRequestQueryValue(req, '_para11ax_mcp_route');
+  if (internal) return internal;
+  const pathname = requestUrl(req)?.pathname;
+  if (pathname === '/.well-known/oauth-protected-resource' || pathname === '/.well-known/oauth-protected-resource/mcp') return 'protected-resource';
+  if (pathname === '/.well-known/oauth-authorization-server') return 'authorization-metadata';
+  if (pathname === '/oauth/authorize') return 'authorize';
+  if (pathname === '/oauth/token') return 'token';
+  return '';
 }
 
 export default async function handler(req, res) {
