@@ -164,9 +164,9 @@ Current operational/project docs are living contracts. Dated `docs/superpowers/p
 
 When executable source-of-truth changes, update the relevant current docs and drift tests in the same PR. Machine-check facts such as provider count, workflows, route inventory and key protocol semantics where practical.
 
-## Runtime-owned warnings
+## Vercel request parsing
 
-The previously observed Node `[DEP0169] url.parse()` warning has no app-owned `url.parse(` call and no application dependency tree explaining it. Treat it as Vercel/Node wrapper/runtime-owned unless a future stack trace attributes it to PARA11AX code. Do not perform random application rewrites to cosmetically erase an external warning.
+The Node `[DEP0169] url.parse()` cold-start warning was traced to the lazy query parser in the Vercel Node request helper used by the deployed runtime. Vercel fixed the upstream helper in `@vercel/node` 5.7.15 (`f7b5377`); PARA11AX also avoids the affected boundary by parsing `req.url` with the WHATWG `URL` API. Do not reintroduce reads of Vercel's `req.query` getter. Repeated query keys remain arrays and single-value control parameters fail closed when duplicated.
 
 ## Release rule
 

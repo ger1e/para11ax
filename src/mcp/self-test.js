@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-import { securityHeaders } from '../core/http.js';
+import { securityHeaders, singleRequestQueryValue } from '../core/http.js';
 import { runFullMcpConformance } from './ga-conformance.js';
 import { verifyGitHubActionsOidc } from './github-actions-oidc.js';
 import { createMcpHttpHandler, MCP_PROTOCOL_VERSION } from './transport.js';
@@ -31,14 +31,7 @@ function headerValue(headers, name) {
 }
 
 function queryValue(request, name) {
-  const direct = request?.query?.[name];
-  if (Array.isArray(direct)) return direct.length === 1 ? String(direct[0]) : null;
-  if (direct !== undefined && direct !== null) return String(direct);
-  try {
-    return new URL(request?.url ?? '', 'https://para11ax.invalid').searchParams.get(name);
-  } catch {
-    return null;
-  }
+  return singleRequestQueryValue(request, name);
 }
 
 function validSignature(token, timestamp, supplied) {

@@ -1,18 +1,12 @@
 import { renderHttpError, writeVercelResponse } from '../../src/app.js';
+import { requestUrl } from '../../src/core/http.js';
 import { createSignedProductionSelfTestHandler } from '../../src/mcp/self-test.js';
 
 const handleSelfTest = createSignedProductionSelfTestHandler();
 
 function requestedPath(req) {
-  const raw = req?.query?.path;
-  if (Array.isArray(raw)) return raw.join('/');
-  if (typeof raw === 'string') return raw;
-  try {
-    const pathname = new URL(req?.url ?? '', 'https://para11ax.invalid').pathname;
-    return pathname.replace(/^\/api\/para11ax\/?/, '');
-  } catch {
-    return '';
-  }
+  const pathname = requestUrl(req)?.pathname;
+  return typeof pathname === 'string' ? pathname.replace(/^\/api\/para11ax\/?/, '') : '';
 }
 
 export default async function handler(req, res) {

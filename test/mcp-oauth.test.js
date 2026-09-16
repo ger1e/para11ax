@@ -45,6 +45,11 @@ function formRequest(body) {
   };
 }
 
+function authorizeRequest(overrides = {}) {
+  const query = new URLSearchParams(authorizeParams(overrides));
+  return { method: 'GET', url: `${MCP_AUTH_ISSUER}/oauth/authorize?${query}` };
+}
+
 function issueAccessToken() {
   const handlers = createMcpOAuthHandlers({ env: { PARA11AX_TOKEN: SECRET }, nowMs: () => NOW_MS });
   const consent = handlers.handleAuthorize(formRequest({ ...authorizeParams(), gateway_token: SECRET }));
@@ -116,7 +121,7 @@ test('Vercel routes every OAuth endpoint through the existing MCP function befor
 
 test('authorization form accepts only the fixed ChatGPT client and never echoes credentials', () => {
   const handlers = createMcpOAuthHandlers({ env: { PARA11AX_TOKEN: SECRET }, nowMs: () => NOW_MS });
-  const page = handlers.handleAuthorize({ method: 'GET', query: authorizeParams() });
+  const page = handlers.handleAuthorize(authorizeRequest());
   assert.equal(page.status, 200);
   assert.match(page.body, /Authorize ChatGPT/);
   assert.match(page.headers['content-security-policy'], /form-action 'self' https:\/\/chatgpt\.com\/connector_platform_oauth_redirect;/);
@@ -126,7 +131,7 @@ test('authorization form accepts only the fixed ChatGPT client and never echoes 
   assert.match(rejected.body, /not accepted/);
   assert.doesNotMatch(rejected.body, /do-not-echo-this/);
 
-  const redirectAttack = handlers.handleAuthorize({ method: 'GET', query: authorizeParams({ redirect_uri: 'https://evil.example/callback' }) });
+  const redirectAttack = handlers.handleAuthorize(authorizeRequest({ redirect_uri: 'https://evil.example/callback' }));
   assert.equal(redirectAttack.status, 400);
   assert.equal(redirectAttack.headers.location, undefined);
 });

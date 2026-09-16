@@ -103,7 +103,7 @@ Production acceptance is a later, separate gate after merge/deploy. It should ad
 
 ## Known external/residual boundaries
 
-The Node `[DEP0169] url.parse()` warning previously observed in production has no app-owned `url.parse(` call and no application dependency tree explaining it; it remains classified as Vercel/Node runtime-wrapper behavior unless a future stack trace proves otherwise.
+The Node `[DEP0169] url.parse()` warning was traced to Vercel's lazy request-query helper and closed in PARA11AX by keeping every Vercel-facing route on WHATWG `URL` parsing. Regression coverage supplies a throwing `req.query` getter to the API, MCP, OAuth and production self-test paths; any future access fails the suite before deployment. Vercel independently fixed the upstream helper in `@vercel/node` 5.7.15 (`f7b5377`).
 
 Cloud/vendor account errors, quotas and entitlements remain upstream/runtime state rather than static-code defects. ChatGPT conversation-local connector disablement can also prevent dispatch before PARA11AX receives a request; production logs are the boundary evidence for distinguishing that from backend authentication failure.
 

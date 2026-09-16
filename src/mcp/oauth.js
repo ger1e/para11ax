@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 import { requireGatewayAuth } from '../core/auth.js';
-import { securityHeaders } from '../core/http.js';
+import { requestQueryValues, securityHeaders } from '../core/http.js';
 
 export const MCP_RESOURCE = 'https://para11ax.vercel.app/mcp';
 export const MCP_AUTH_ISSUER = 'https://para11ax.vercel.app';
@@ -69,12 +69,7 @@ function hasScope(scopeValue, required) {
 }
 
 function queryValues(request) {
-  if (request?.query && typeof request.query === 'object') return request.query;
-  try {
-    return Object.fromEntries(new URL(request?.url ?? '', MCP_AUTH_ISSUER).searchParams.entries());
-  } catch {
-    return {};
-  }
+  return requestQueryValues(request, MCP_AUTH_ISSUER);
 }
 
 function parseFormBody(request) {
