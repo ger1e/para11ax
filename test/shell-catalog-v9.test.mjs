@@ -78,7 +78,7 @@ test('completion is generated from command paths and declarative argument metada
   assert.deepEqual(completeShellInput('view c', { surface: 'web' }), ['correlation','coverage']);
   assert.deepEqual(completeShellInput('user-scanner ', { surface: 'web' }), ['email','username']);
   assert.deepEqual(completeShellInput('provider run ', { surface: 'web', providerNames: ['virustotal','greynoise'] }), ['greynoise','virustotal']);
-  assert.deepEqual(completeShellInput('intel ', { surface: 'web', observableTypes: ['ip','domain'] }), ['asn','certificate','cidr','cve','domain','hash','ip','url']);
+  assert.deepEqual(completeShellInput('intel ', { surface: 'web', observableTypes: ['ip','domain'] }), ['asn','asset','certificate','cidr','cve','domain','hash','identity','ip','knowledge','malware','pivot','search','supply-chain','url']);
 });
 
 test('help discovery functions project the same registry source', () => {

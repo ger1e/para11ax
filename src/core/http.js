@@ -18,9 +18,16 @@ export function requestUrl(request, base = 'https://para11ax.invalid') {
   }
 }
 
+function ownQueryData(request) {
+  if (!request || typeof request !== 'object') return null;
+  const descriptor = Object.getOwnPropertyDescriptor(request, 'query');
+  if (!descriptor || !('value' in descriptor) || !descriptor.value || typeof descriptor.value !== 'object' || Array.isArray(descriptor.value)) return null;
+  return descriptor.value;
+}
+
 export function requestQueryValues(request, base) {
   const parsed = requestUrl(request, base);
-  if (!parsed) return {};
+  if (!parsed) return ownQueryData(request) ?? {};
   const values = Object.create(null);
   for (const [name, value] of parsed.searchParams) {
     const existing = values[name];

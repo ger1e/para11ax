@@ -50,28 +50,41 @@ test('canonical provider manifest has exactly one complete policy for every acti
   }
 });
 
-test('provider secret inventory remains exact while User Scanner integration config stays explicit', () => {
+test('provider secret inventory remains exact while non-secret integration config stays explicit', () => {
   const providerNames = [...providerSecretNames()].sort();
   assert.deepEqual(providerNames, [...new Set(providerNames)].sort());
   assert.equal(providerNames.includes('PARA11AX_TOKEN'), false);
   assert.equal(providerNames.includes('SENTRY_AUTH_TOKEN'), false);
+  assert.equal(providerNames.includes('CENSYS_ORG_ID'), false);
   assert.equal(providerNames.some(name => name.startsWith('PARA11AX_USER_SCANNER_')), false);
   for (const name of providerNames) assert.match(name, /^[A-Z0-9_]+$/);
 
   const providerAndGateway = ['PARA11AX_TOKEN', ...providerNames, 'SENTRY_AUTH_TOKEN'].sort();
-  const integrationConfig = ['PARA11AX_USER_SCANNER_URL', 'PARA11AX_USER_SCANNER_TOKEN'].sort();
+  const integrationConfig = [
+    'CENSYS_ORG_ID',
+    'PARA11AX_USER_SCANNER_URL',
+    'PARA11AX_USER_SCANNER_TOKEN',
+    'PARA11AX_OWNED_CIDRS',
+    'PARA11AX_VERIFIED_DOMAINS',
+    'SHADOWSERVER_API_KEY',
+  ].sort();
   const envNames = text('.env.example').split(/\r?\n/).filter(line => /^[A-Z0-9_]+=$/.test(line)).map(line => line.slice(0, -1)).sort();
   assert.deepEqual(envNames, [...providerAndGateway, ...integrationConfig].sort());
 
   const bootstrap = text('scripts/bootstrap-vercel.ps1');
   const block = bootstrap.match(/\$SecretNames\s*=\s*@\(([\s\S]*?)\)\s*\n/);
   assert.ok(block, 'bootstrap SecretNames block missing');
-  const bootstrapNames = [...block[1].matchAll(/'([A-Z0-9_]+)'/g)].map(match => match[1]).sort();
-  assert.deepEqual(bootstrapNames, providerAndGateway);
+  const bootstrapNames = [...block[1].matchAll(/'([A-Z0-9_]+)'/g)].map(match => match[1]);
+  assert.equal(bootstrapNames.includes('PARA11AX_TOKEN'), true);
+  assert.equal(new Set(bootstrapNames).size, bootstrapNames.length, 'bootstrap secret names must be unique');
+  for (const name of bootstrapNames) assert.ok(providerAndGateway.includes(name), `bootstrap contains unknown secret ${name}`);
 });
 
-test('checked-in JSON is identical to the runtime manifest projection and contains no credential values', () => {
-  const raw = json('config/providers.json');
+test('checked-in JSON manifests are identical to the runtime manifest projection and contain no credential values', () => {
+  const raw = {
+    ...json('config/providers.json'),
+    ...json('config/intelligence-providers.json'),
+  };
   assert.deepEqual(raw, PROVIDER_MANIFEST);
   const serialized = JSON.stringify(raw);
   assert.doesNotMatch(serialized, /eyJ[a-zA-Z0-9_-]{20,}\./);

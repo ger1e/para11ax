@@ -1,7 +1,7 @@
 <!-- PARA11AX-DOC-STANDARD: GER1E/PARA11AX v1 -->
 ### Providers
 
-The executable provider registry is the source of truth for the canonical Evidence v2 enrichment fabric. The active registry contains **39 providers**. `release-manifest.json` records active adapter/parser versions, and `/api/para11ax/meta` exposes static capabilities without credential values or secret configuration state.
+The executable provider registry is the source of truth for canonical Evidence v2 **provider capabilities** and the **upstream services** they represent. The active registry contains **39 providers**. `release-manifest.json` records active adapter/parser versions, and `/api/para11ax/meta` exposes static capabilities without credential values or secret configuration state.
 
 #### Registry contract
 

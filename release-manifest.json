@@ -3,200 +3,59 @@
   "schemaVersion": "2.0",
   "sourceCommit": null,
   "providers": [
-    {
-      "name": "abuseipdb",
-      "parserVersion": "2026-08-20",
-      "active": true
-    },
-    {
-      "name": "attack-taxii",
-      "parserVersion": "2026-08-21.2",
-      "active": true
-    },
-    {
-      "name": "censys",
-      "parserVersion": "v3-2026-08-29.1",
-      "active": true
-    },
-    {
-      "name": "circl-hashlookup",
-      "parserVersion": "2026-08-22.1",
-      "active": true
-    },
-    {
-      "name": "circl-vulnerability",
-      "parserVersion": "2026-08-22.1",
-      "active": true
-    },
-    {
-      "name": "cisa-adp",
-      "parserVersion": "5.2-cisa-adp-2026-09-12.1",
-      "active": true
-    },
-    {
-      "name": "cisa-kev",
-      "parserVersion": "1",
-      "active": true
-    },
-    {
-      "name": "cloudflare-dns",
-      "parserVersion": "2026-08-29.1",
-      "active": true
-    },
-    {
-      "name": "cloudflare-radar",
-      "parserVersion": "2026-08-22.1",
-      "active": true
-    },
-    {
-      "name": "dshield",
-      "parserVersion": "2026-08-20",
-      "active": true
-    },
-    {
-      "name": "epss",
-      "parserVersion": "1",
-      "active": true
-    },
-    {
-      "name": "feodo-tracker",
-      "parserVersion": "2026-08-20",
-      "active": true
-    },
-    {
-      "name": "greynoise",
-      "parserVersion": "2026-08-22.1",
-      "active": true
-    },
-    {
-      "name": "hybrid-analysis",
-      "parserVersion": "v2.38.0-2026-08-22.1",
-      "active": true
-    },
-    {
-      "name": "ipinfo",
-      "parserVersion": "2026-08-22.1",
-      "active": true
-    },
-    {
-      "name": "malpedia",
-      "parserVersion": "2026-08-22.1",
-      "active": true
-    },
-    {
-      "name": "malwarebazaar",
-      "parserVersion": "2026-08-20",
-      "active": true
-    },
-    {
-      "name": "misp-botvrij-osint",
-      "parserVersion": "2026-08-21.2",
-      "active": true
-    },
-    {
-      "name": "misp-circl-osint",
-      "parserVersion": "2026-08-21.2",
-      "active": true
-    },
-    {
-      "name": "modat",
-      "parserVersion": "2026-08-23.1",
-      "active": true
-    },
-    {
-      "name": "nvd",
-      "parserVersion": "2.0-2026-08-20",
-      "active": true
-    },
-    {
-      "name": "openphish",
-      "parserVersion": "2026-08-20",
-      "active": true
-    },
-    {
-      "name": "osv",
-      "parserVersion": "2026-08-20",
-      "active": true
-    },
-    {
-      "name": "otx",
-      "parserVersion": "2026-08-22.1",
-      "active": true
-    },
-    {
-      "name": "pulsedive",
-      "parserVersion": "2026-08-22.1",
-      "active": true
-    },
-    {
-      "name": "ransomlook",
-      "parserVersion": "2026-08-22.1",
-      "active": true
-    },
-    {
-      "name": "ransomware-live",
-      "parserVersion": "2026-08-21.2",
-      "active": true
-    },
-    {
-      "name": "rdap",
-      "parserVersion": "2026-08-22.1",
-      "active": true
-    },
-    {
-      "name": "ripestat",
-      "parserVersion": "2026-08-21.2",
-      "active": true
-    },
-    {
-      "name": "shodan",
-      "parserVersion": "2026-08-22.1",
-      "active": true
-    },
-    {
-      "name": "spamhaus-drop",
-      "parserVersion": "2026-08-21.2",
-      "active": true
-    },
-    {
-      "name": "threatfox",
-      "parserVersion": "2026-08-22.1",
-      "active": true
-    },
-    {
-      "name": "threatminer",
-      "parserVersion": "2026-08-22.1",
-      "active": true
-    },
-    {
-      "name": "tor-exit",
-      "parserVersion": "2026-08-20",
-      "active": true
-    },
-    {
-      "name": "tweetfeed",
-      "parserVersion": "2026-08-21",
-      "active": true
-    },
-    {
-      "name": "urlhaus",
-      "parserVersion": "2026-08-20",
-      "active": true
-    },
-    {
-      "name": "urlscan",
-      "parserVersion": "2026-08-20",
-      "active": true
-    },
-    {
-      "name": "virustotal",
-      "parserVersion": "v3-2026-08-29.1",
-      "active": true
-    },
-    {
-      "name": "webamon",
-      "parserVersion": "2026-08-23.1",
-      "active": true
-    }
+    {"name":"abuseipdb","parserVersion":"2026-08-20","active":true},
+    {"name":"attack-taxii","parserVersion":"2026-08-21.2","active":true},
+    {"name":"censys","parserVersion":"v3-2026-08-29.1","active":true},
+    {"name":"censys-history","parserVersion":"v3-history-2026-09-13.1","active":true},
+    {"name":"censys-search","parserVersion":"v3-search-2026-09-13.1","active":true},
+    {"name":"chainabuse","parserVersion":"chainabuse-v0-2026-09-13.1","active":true},
+    {"name":"circl-hashlookup","parserVersion":"2026-08-22.1","active":true},
+    {"name":"circl-vulnerability","parserVersion":"2026-08-22.1","active":true},
+    {"name":"cisa-adp","parserVersion":"5.2-cisa-adp-2026-09-12.1","active":true},
+    {"name":"cisa-kev","parserVersion":"1","active":true},
+    {"name":"cloudflare-dns","parserVersion":"2026-08-29.1","active":true},
+    {"name":"cloudflare-radar","parserVersion":"2026-08-22.1","active":true},
+    {"name":"d3fend","parserVersion":"d3fend-2026-09-13.1","active":true},
+    {"name":"deps-dev","parserVersion":"v3-supply-chain-2026-09-13.1","active":true},
+    {"name":"dshield","parserVersion":"2026-08-20","active":true},
+    {"name":"epss","parserVersion":"1","active":true},
+    {"name":"feodo-tracker","parserVersion":"2026-08-20","active":true},
+    {"name":"gitguardian-hmsl","parserVersion":"gitguardian-hmsl-2026-09-13.1","active":true},
+    {"name":"greynoise","parserVersion":"2026-08-22.1","active":true},
+    {"name":"hybrid-analysis","parserVersion":"v2.38.0-2026-08-22.1","active":true},
+    {"name":"ipinfo","parserVersion":"2026-08-22.1","active":true},
+    {"name":"malpedia","parserVersion":"2026-08-22.1","active":true},
+    {"name":"malwarebazaar","parserVersion":"2026-08-20","active":true},
+    {"name":"misp-botvrij-osint","parserVersion":"2026-08-21.2","active":true},
+    {"name":"misp-circl-osint","parserVersion":"2026-08-21.2","active":true},
+    {"name":"modat","parserVersion":"2026-08-23.1","active":true},
+    {"name":"mwdb","parserVersion":"mwdb-2026-09-13.1","active":true},
+    {"name":"nvd","parserVersion":"2.0-2026-08-20","active":true},
+    {"name":"openphish","parserVersion":"2026-08-20","active":true},
+    {"name":"osv","parserVersion":"2026-08-20","active":true},
+    {"name":"otx","parserVersion":"2026-08-22.1","active":true},
+    {"name":"pulsedive","parserVersion":"2026-08-22.1","active":true},
+    {"name":"ransomlook","parserVersion":"2026-08-22.1","active":true},
+    {"name":"ransomware-live","parserVersion":"2026-08-21.2","active":true},
+    {"name":"rdap","parserVersion":"2026-08-22.1","active":true},
+    {"name":"ripestat","parserVersion":"2026-08-21.2","active":true},
+    {"name":"shadowserver","parserVersion":"shadowserver-reports-2026-09-13.1","active":true},
+    {"name":"shodan","parserVersion":"2026-08-22.1","active":true},
+    {"name":"spamhaus-drop","parserVersion":"2026-08-21.2","active":true},
+    {"name":"sslbl","parserVersion":"sslbl-ja3-2026-09-13.1","active":true},
+    {"name":"team-cymru","parserVersion":"team-cymru-whois-2026-09-14.1","active":true},
+    {"name":"threatfox","parserVersion":"2026-08-22.1","active":true},
+    {"name":"threatminer","parserVersion":"2026-08-22.1","active":true},
+    {"name":"tor-exit","parserVersion":"2026-08-20","active":true},
+    {"name":"tweetfeed","parserVersion":"2026-08-21","active":true},
+    {"name":"urlhaus","parserVersion":"2026-08-20","active":true},
+    {"name":"urlscan","parserVersion":"2026-08-20","active":true},
+    {"name":"urlscan-graph","parserVersion":"2026-09-13.1","active":true},
+    {"name":"virustotal","parserVersion":"v3-2026-08-29.1","active":true},
+    {"name":"virustotal-graph","parserVersion":"v3-2026-09-13.1","active":true},
+    {"name":"vulncheck","parserVersion":"v3-exploits-2026-09-13.1","active":true},
+    {"name":"wayback-cdx","parserVersion":"wayback-cdx-2026-09-13.1","active":true},
+    {"name":"webamon","parserVersion":"2026-08-23.1","active":true},
+    {"name":"yaraify","parserVersion":"yaraify-2026-09-13.1","active":true}
   ]
 }

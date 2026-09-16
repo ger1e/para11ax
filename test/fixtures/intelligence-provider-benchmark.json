@@ -1,0 +1,37 @@
+{
+  "duplicative": {
+    "observations": [
+      { "latencyMs": 120, "status": "observed", "uniqueFacts": 0, "uniqueGraphEdges": 0, "decisionChanging": false, "materialUniqueObservations": 0 },
+      { "latencyMs": 150, "status": "no_result", "uniqueFacts": 0, "uniqueGraphEdges": 0, "decisionChanging": false, "materialUniqueObservations": 0 },
+      { "latencyMs": 180, "status": "observed", "uniqueFacts": 0, "uniqueGraphEdges": 0, "decisionChanging": false, "materialUniqueObservations": 0 }
+    ]
+  },
+  "slowGraphYield": {
+    "observations": [
+      { "latencyMs": 2000, "status": "observed", "uniqueFacts": 1, "uniqueGraphEdges": 2, "decisionChanging": false, "materialUniqueObservations": 1 },
+      { "latencyMs": 2500, "status": "observed", "uniqueFacts": 0, "uniqueGraphEdges": 2, "decisionChanging": true, "materialUniqueObservations": 1 },
+      { "latencyMs": 3000, "status": "no_result", "uniqueFacts": 0, "uniqueGraphEdges": 0, "decisionChanging": false, "materialUniqueObservations": 0 },
+      { "latencyMs": 3500, "status": "observed", "uniqueFacts": 0, "uniqueGraphEdges": 3, "decisionChanging": true, "materialUniqueObservations": 1 },
+      { "latencyMs": 5000, "status": "observed", "uniqueFacts": 0, "uniqueGraphEdges": 3, "decisionChanging": false, "materialUniqueObservations": 1 }
+    ]
+  },
+  "baselineWorthwhile": {
+    "observations": [
+      { "latencyMs": 100, "status": "observed", "uniqueFacts": 2, "uniqueGraphEdges": 1, "decisionChanging": true, "materialUniqueObservations": 1 },
+      { "latencyMs": 200, "status": "observed", "uniqueFacts": 1, "uniqueGraphEdges": 0, "decisionChanging": false, "materialUniqueObservations": 1 },
+      { "latencyMs": 300, "status": "no_result", "uniqueFacts": 0, "uniqueGraphEdges": 0, "decisionChanging": false, "materialUniqueObservations": 0 },
+      { "latencyMs": 400, "status": "observed", "uniqueFacts": 2, "uniqueGraphEdges": 1, "decisionChanging": true, "materialUniqueObservations": 1 },
+      { "latencyMs": 500, "status": "observed", "uniqueFacts": 1, "uniqueGraphEdges": 0, "decisionChanging": false, "materialUniqueObservations": 0 }
+    ],
+    "expectedMetrics": {
+      "uniqueFacts": 6,
+      "uniqueGraphEdges": 2,
+      "latencyP50Ms": 300,
+      "latencyP95Ms": 500,
+      "errorRate": 0,
+      "noResultRate": 0.2,
+      "decisionChangingObservations": 2,
+      "materialUniqueObservationsPerCall": 0.6
+    }
+  }
+}
