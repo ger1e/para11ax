@@ -44,6 +44,7 @@ All notable repository changes should be recorded here. This project uses a ligh
 
 ##### Changed
 
+- Vercel-facing API, MCP, OAuth and production self-test routing parse `req.url` with the WHATWG `URL` API instead of invoking the platform's legacy lazy `req.query` parser. Duplicate query keys retain array semantics and single-value controls fail closed; regression coverage traps accidental `req.query` getter access.
 - Restored desktop Analyst UI initialization by removing Node-only `node:crypto`, `node:net`, and unguarded `Buffer` dependencies from the browser-reachable Mission/Domain Investigation graph. Shared IP validation, UTF-8 sizing, SHA-256 identities, and RFC-compatible UUIDv5 STIX identities now use runtime-neutral implementations, with a transitive browser-module regression gate covering the deployed entry point.
 - MCP discovery/catalog now exposes 15 grouped tools including `para11ax_intelligence`; `para11ax_domain_investigation` includes client-carried `promotion_candidates`, `promote`, `reject_promotion`, `revoke_promotion`, and derived `graph` actions without adding server-side workflow state or globally widening the MCP body limit.
 - Unified Shell now exposes the Domain Investigation promotion lifecycle and graph projection on both Web and CLI through the same volatile no-egress command adapter.
