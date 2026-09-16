@@ -89,7 +89,20 @@ route exists
 -> selected provider/worker/entitlement succeeds
 ```
 
-Public `tools/list` proves the MCP catalog and OAuth declarations, not tool authorization or credentialed dependencies. An unauthenticated `tools/call` must return the bounded MCP linking challenge. A successful OAuth-linked or direct-bearer call proves tool authorization. A successful User Scanner/Shodan/Swarm call proves only that specific bounded path and current external dependency state.
+The accepted combined Intelligence Fabric catalog is `15 tools in tools/list`. Public `tools/list` proves the MCP catalog and OAuth declarations, not tool authorization or credentialed dependencies. An unauthenticated `tools/call` must return the bounded MCP linking challenge. A successful OAuth-linked or direct-bearer call proves tool authorization. A successful User Scanner/Shodan/Swarm call proves only that specific bounded path and current external dependency state.
+
+##### ChatGPT MCP schema refresh
+
+Whenever the MCP tool inventory, tool names, or input schemas change, deploy the accepted server first, then refresh/re-register the ChatGPT custom app/plugin action schema. A healthy live `tools/list` proves the server catalog only; it does not prove that an already-loaded ChatGPT typed schema has refreshed.
+
+Before closing the change:
+
+- verify the deployed MCP `tools/list` against the accepted source SHA;
+- refresh/re-register the ChatGPT action schema after the deployment is live;
+- verify the ChatGPT action/tool list matches the live MCP catalog by tool name and count;
+- exercise each newly added or changed typed action from a fresh ChatGPT session.
+
+If the live MCP catalog is correct but ChatGPT exposes a stale subset, treat that as client/connector registration or cache drift first. Do not rewrite healthy server behavior merely to make an old client schema agree with it.
 
 #### Historical GreyNoise integration baseline — 2026-09-06
 
