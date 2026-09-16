@@ -1,4 +1,5 @@
 import rawManifest from '../../config/providers.json' with { type: 'json' };
+import rawIntelligenceManifest from '../../config/intelligence-providers.json' with { type: 'json' };
 import { EXECUTION_POLICY_VERSION } from '../core/execution-policy.js';
 
 const MAX_PROVIDERS = 64;
@@ -156,9 +157,14 @@ export function validateProviderPolicy(name, input) {
   return validatePolicy(name, input);
 }
 
-if (!rawManifest || typeof rawManifest !== 'object' || Array.isArray(rawManifest)) fail('root');
-const entries = Object.entries(rawManifest);
+for (const [label, manifest] of [['legacy', rawManifest], ['intelligence', rawIntelligenceManifest]]) {
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) fail(`${label} root`);
+}
+const legacyEntries = Object.entries(rawManifest);
+const intelligenceEntries = Object.entries(rawIntelligenceManifest);
+const entries = [...legacyEntries, ...intelligenceEntries];
 if (entries.length < 1 || entries.length > MAX_PROVIDERS) fail('provider count');
+if (new Set(entries.map(([name]) => name)).size !== entries.length) fail('duplicate provider name across manifests');
 
 export const PROVIDER_MANIFEST = Object.freeze(Object.fromEntries(entries.map(([name, policy]) => {
   if (!/^[a-z0-9-]{1,64}$/.test(name)) fail(`provider name ${name}`);

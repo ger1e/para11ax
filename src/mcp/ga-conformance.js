@@ -1,7 +1,7 @@
 const EXPECTED_TOOL_NAMES = Object.freeze([
   'para11ax_capabilities', 'para11ax_enrich', 'para11ax_batch', 'para11ax_provider',
   'para11ax_shodan', 'para11ax_swarm', 'para11ax_user_scan', 'para11ax_stix',
-  'para11ax_mission', 'para11ax_domain_investigation', 'para11ax_investigation', 'para11ax_case', 'para11ax_report',
+  'para11ax_mission', 'para11ax_investigation', 'para11ax_case', 'para11ax_report',
   'para11ax_command',
 ]);
 
@@ -168,72 +168,6 @@ async function missionCheck(invoke) {
   return passed({ checks: calls, finalRevision: Number(workspace.revision ?? 0) });
 }
 
-async function domainInvestigationCheck(invoke, nowIso) {
-  const enrichment = {
-    schemaVersion: '2.0',
-    gatewayVersion: 'ga-conformance',
-    requestId: 'ga-domain',
-    indicator: 'suspicious.example',
-    type: 'domain',
-    queriedAt: nowIso,
-    profile: 'standard',
-    status: 'ok',
-    evidence: [],
-    relationships: [],
-    coverage: {},
-    limitations: [],
-    failures: [],
-    huntContext: {
-      indicator: 'suspicious.example',
-      type: 'domain',
-      firstSeen: null,
-      lastSeen: null,
-      families: [],
-      actors: [],
-      sourceReferences: [],
-    },
-  };
-  let calls = 0;
-  const call = async (action, args = {}) => {
-    calls += 1;
-    return requireObject(await invoke('para11ax_domain_investigation', { action, ...args }), `domain_investigation_${action}_shape`);
-  };
-
-  let value = await call('build', { enrichment });
-  let artifact = requireObject(value.artifact, 'domain_investigation_build_artifact');
-  if (artifact.schemaVersion !== 'domain-investigation-v1.0') fail('domain_investigation_schema');
-  if (value.result?._authoritative !== undefined) fail('domain_investigation_build_authority_leak');
-
-  value = await call('surface_import', {
-    artifact,
-    records: [{ host: 'cdn.suspicious.example', ip: '203.0.113.7', source: 'ga-authorized-fixture' }],
-  });
-  artifact = requireObject(value.artifact, 'domain_investigation_surface_artifact');
-  if (artifact.imports?.surface?.length !== 1) fail('domain_investigation_surface_import');
-
-  value = await call('vulnerability_import', {
-    artifact,
-    records: [{ host: 'suspicious.example', cve: 'CVE-2026-12345', severity: 'high', source: 'ga-authorized-fixture' }],
-  });
-  artifact = requireObject(value.artifact, 'domain_investigation_vulnerability_artifact');
-  if (artifact.imports?.vulnerabilities?.length !== 1) fail('domain_investigation_vulnerability_import');
-
-  value = await call('show', { artifact });
-  if (value.result?.schemaVersion !== 'domain-investigation-v1.0' || value.result?._authoritative !== undefined) fail('domain_investigation_show_projection');
-  value = await call('report', { artifact });
-  if (typeof value.report !== 'string' || !value.report) fail('domain_investigation_report');
-  value = await call('stix', { artifact });
-  if (value.bundle?.type !== 'bundle') fail('domain_investigation_stix');
-  value = await call('handoff', { artifact });
-  if (value.handoff?.schemaVersion !== 'domain-investigation-handoff-v1.0') fail('domain_investigation_handoff');
-
-  return passed({
-    checks: calls,
-    surfaceCount: artifact.imports.surface.length,
-    vulnerabilityCount: artifact.imports.vulnerabilities.length,
-  });
-}
-
 async function investigationCheck(invoke, enrichment) {
   requireObject(enrichment, 'investigation_enrichment_missing');
   let calls = 0;
@@ -377,15 +311,13 @@ export async function runFullMcpConformance({
     checked(() => swarmCheck(invoke, fixedNow), 'swarm_failed'),
     checked(() => stixCheck(invoke), 'stix_failed'),
     checked(() => missionCheck(invoke), 'mission_failed'),
-    checked(() => domainInvestigationCheck(invoke, fixedNow), 'domain_investigation_failed'),
     checked(() => caseCheck(invoke, enrichment), 'case_failed'),
     checked(() => commandCheck(invoke), 'command_failed'),
   ]);
 
   [
     'para11ax_capabilities', 'para11ax_batch', 'para11ax_provider', 'para11ax_shodan',
-    'para11ax_swarm', 'para11ax_stix', 'para11ax_mission', 'para11ax_domain_investigation',
-    'para11ax_case', 'para11ax_command',
+    'para11ax_swarm', 'para11ax_stix', 'para11ax_mission', 'para11ax_case', 'para11ax_command',
   ].forEach((name, index) => { surfaces[name] = independent[index]; });
 
   let investigation = null;

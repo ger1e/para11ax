@@ -4,6 +4,7 @@ import { runProvider } from '../core/provider-runner.js';
 export const PROBE_SAMPLE_BY_TYPE = Object.freeze({
   ip: '8.8.8.8',
   domain: 'example.com',
+  email: 'nobody@example.com',
   url: 'https://example.com/',
   hash: '275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f',
   certificate: 'cert-sha256:275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f',
@@ -11,6 +12,10 @@ export const PROBE_SAMPLE_BY_TYPE = Object.freeze({
   attack: 'T1059',
   asn: 'AS15169',
   cidr: '8.8.8.0/24',
+  package: 'pkg:npm/lodash@4.17.21',
+  'tls-fingerprint': 'ja3:72a589da586844d7f0818ce684948eea',
+  'crypto-address': 'eth:0000000000000000000000000000000000000000',
+  'secret-fingerprint': `hmsl-sha256:${'0'.repeat(64)}`,
 });
 
 const STATUS_PRIORITY = Object.freeze({
