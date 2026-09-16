@@ -11,7 +11,10 @@ const EXPECTED = Object.freeze([
   ['domain-investigation', 'build'], ['domain-investigation', 'surface-import'],
   ['domain-investigation', 'vulnerability-import'], ['domain-investigation', 'show'],
   ['domain-investigation', 'report'], ['domain-investigation', 'stix'],
-  ['domain-investigation', 'handoff'], ['domain-investigation', 'clear'],
+  ['domain-investigation', 'handoff'], ['domain-investigation', 'promotion-candidates'],
+  ['domain-investigation', 'promote'], ['domain-investigation', 'reject-promotion'],
+  ['domain-investigation', 'revoke-promotion'], ['domain-investigation', 'graph'],
+  ['domain-investigation', 'clear'],
 ]);
 
 function enrichment() {
@@ -25,7 +28,13 @@ function enrichment() {
 
 const loader = async ({ kind }) => {
   if (kind === 'domain-enrichment') return JSON.stringify(enrichment());
-  if (kind === 'domain-surface') return JSON.stringify([{ host: 'cdn.suspicious.example', ip: '203.0.113.7', source: 'authorized-local-scan' }]);
+  if (kind === 'domain-surface') return JSON.stringify([{
+    host: 'suspicious.example',
+    ip: '203.0.113.7',
+    status: 'observed',
+    source: 'authorized-local-scan',
+    reference: 'https://scanner.invalid/run/surface-1',
+  }]);
   if (kind === 'domain-vulnerability') return JSON.stringify([{ host: 'suspicious.example', cve: 'CVE-2026-12345', severity: 'high', source: 'authorized-local-scan' }]);
   throw new Error(`unexpected kind ${kind}`);
 };
@@ -51,7 +60,12 @@ test('Domain Investigation build/import commands never request scanner/provider 
 });
 
 test('shared command adapter keeps volatile Domain Investigation state and preserves authority boundaries', async () => {
-  for (const name of ['domain-investigation-build', 'domain-investigation-surface-import', 'domain-investigation-vulnerability-import', 'domain-investigation-show', 'domain-investigation-report', 'domain-investigation-stix', 'domain-investigation-handoff', 'domain-investigation-clear']) {
+  for (const name of [
+    'domain-investigation-build', 'domain-investigation-surface-import', 'domain-investigation-vulnerability-import',
+    'domain-investigation-show', 'domain-investigation-report', 'domain-investigation-stix', 'domain-investigation-handoff',
+    'domain-investigation-promotion-candidates', 'domain-investigation-promote', 'domain-investigation-reject-promotion',
+    'domain-investigation-revoke-promotion', 'domain-investigation-graph', 'domain-investigation-clear',
+  ]) {
     assert.ok(WORKFLOW_HANDLERS.includes(name), `${name} must be dispatched by the shared shell adapter`);
   }
 
@@ -84,6 +98,89 @@ test('shared command adapter keeps volatile Domain Investigation state and prese
 
   const cleared = await executeMissionCommand({ handler: 'domain-investigation-clear', workspace, loadContent: loader });
   assert.equal(cleared.workspace, null);
+});
+
+test('promotion shell actions are explicit, atomic, volatile and graph projection-only', async () => {
+  let workspace = null;
+  let outcome = await executeMissionCommand({ handler: 'domain-investigation-build', args: ['--stdin'], workspace, loadContent: loader });
+  workspace = outcome.workspace;
+  outcome = await executeMissionCommand({ handler: 'domain-investigation-surface-import', args: ['--stdin'], workspace, loadContent: loader });
+  workspace = outcome.workspace;
+
+  outcome = await executeMissionCommand({ handler: 'domain-investigation-promotion-candidates', workspace, loadContent: loader });
+  workspace = outcome.workspace;
+  assert.equal(outcome.output.type, 'records');
+  assert.equal(outcome.output.value.length, 1);
+  assert.equal(outcome.output.value[0].status, 'candidate');
+  assert.equal(outcome.output.value[0].authority, undefined);
+  const candidateId = outcome.output.value[0].id;
+
+  const beforeInvalid = workspace;
+  await assert.rejects(
+    () => executeMissionCommand({
+      handler: 'domain-investigation-promote',
+      args: [JSON.stringify({ candidateId: 'missing', at: '2026-09-13T12:30:00.000Z', actorLabel: 'analyst:g', reason: 'Invalid candidate must fail atomically.' })],
+      workspace,
+      loadContent: loader,
+    }),
+    error => error?.code === 'INVALID_ARGUMENT',
+  );
+  assert.equal(workspace, beforeInvalid);
+  let shown = await executeMissionCommand({ handler: 'domain-investigation-show', workspace, loadContent: loader });
+  assert.equal(shown.output.value.promotion.events.length, 0);
+
+  outcome = await executeMissionCommand({
+    handler: 'domain-investigation-promote',
+    args: [JSON.stringify({ candidateId, at: '2026-09-13T13:00:00.000Z', actorLabel: 'analyst:g', reason: 'Validated against authorized investigation context.' })],
+    workspace,
+    loadContent: loader,
+  });
+  workspace = outcome.workspace;
+  assert.equal(outcome.output.value._authoritative, undefined);
+  assert.equal(outcome.output.value.promotion.events.at(-1).type, 'approved');
+  assert.equal(outcome.output.value.promotion.effectiveAttestations.length, 1);
+  const attestationId = outcome.output.value.promotion.effectiveAttestations[0].id;
+
+  const graph = await executeMissionCommand({ handler: 'domain-investigation-graph', workspace, loadContent: loader });
+  assert.equal(graph.output.type, 'graph');
+  assert.ok(graph.output.value.nodes.some(node => node.type === 'promotion_candidate'));
+  assert.ok(graph.output.value.nodes.some(node => node.type === 'promoted_evidence'));
+  assert.ok(graph.output.value.edges.some(edge => edge.type === 'promoted_from'));
+
+  outcome = await executeMissionCommand({
+    handler: 'domain-investigation-revoke-promotion',
+    args: [JSON.stringify({ attestationId, at: '2026-09-13T14:00:00.000Z', actorLabel: 'analyst:g', reason: 'Later validation disproved the finding.' })],
+    workspace,
+    loadContent: loader,
+  });
+  workspace = outcome.workspace;
+  assert.equal(outcome.output.value.promotion.events.length, 2);
+  assert.equal(outcome.output.value.promotion.events.at(-1).type, 'revoked');
+  assert.equal(outcome.output.value.promotion.effectiveAttestations.length, 0);
+
+  outcome = await executeMissionCommand({ handler: 'domain-investigation-clear', workspace, loadContent: loader });
+  workspace = outcome.workspace;
+  assert.equal(workspace, null);
+  await assert.rejects(
+    () => executeMissionCommand({ handler: 'domain-investigation-promotion-candidates', workspace, loadContent: loader }),
+    error => error?.code === 'INVALID_ARGUMENT',
+  );
+
+  outcome = await executeMissionCommand({ handler: 'domain-investigation-build', args: ['--stdin'], workspace, loadContent: loader });
+  workspace = outcome.workspace;
+  outcome = await executeMissionCommand({ handler: 'domain-investigation-surface-import', args: ['--stdin'], workspace, loadContent: loader });
+  workspace = outcome.workspace;
+  outcome = await executeMissionCommand({ handler: 'domain-investigation-promotion-candidates', workspace, loadContent: loader });
+  workspace = outcome.workspace;
+  const rejectCandidateId = outcome.output.value[0].id;
+  outcome = await executeMissionCommand({
+    handler: 'domain-investigation-reject-promotion',
+    args: [JSON.stringify({ candidateId: rejectCandidateId, at: '2026-09-13T13:00:00.000Z', actorLabel: 'analyst:g', reason: 'Not sufficient for promotion.' })],
+    workspace,
+    loadContent: loader,
+  });
+  assert.equal(outcome.output.value.promotion.events.at(-1).type, 'rejected');
+  assert.equal(outcome.output.value.promotion.effectiveAttestations.length, 0);
 });
 
 test('bounded local content loader accepts only explicit Domain Investigation payload kinds', async () => {

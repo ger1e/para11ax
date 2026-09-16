@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { toStixBundle } from '../src/export/stix.js';
+import { toStixBundle, uuidV5 } from '../src/export/stix.js';
 import { createApp } from '../src/app.js';
+
+test('emits standard UUIDv5 identities without runtime-specific crypto', () => {
+  assert.equal(
+    uuidV5('www.widgets.com', '6ba7b810-9dad-11d1-80b4-00c04fd430c8'),
+    '21f7f8de-8051-5b89-8680-0195ef798b6a',
+  );
+});
 
 const UUIDS = [
   '11111111-1111-4111-8111-111111111111',

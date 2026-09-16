@@ -28,6 +28,7 @@ osint
 result
 case
 mission
+domain-investigation
 investigation
 report
 export
@@ -255,6 +256,45 @@ para11ax mission import --stdin
 
 KQL is validated but never executed. ServiceNow output is a projection only: no ticket is submitted, no credential is read, and analyst approval remains mandatory. Mission commands add no provider call, model call, server-side persistence or Evidence v2 mutation. Full semantics are documented in [ANALYST-MISSION-PACK.md](ANALYST-MISSION-PACK.md).
 
+## Domain Investigation
+
+The `domain-investigation` family is shared by Web and CLI and keeps one volatile suspicious-domain workflow state. It consumes canonical domain Evidence v2 plus explicit bounded analyst imports; it does not execute providers or scanners itself.
+
+```text
+domain-investigation build <gateway-enrichment-json>
+domain-investigation build --file <path>
+domain-investigation build --stdin
+
+domain-investigation surface-import <surface-json>
+domain-investigation surface-import --file <path>
+domain-investigation surface-import --stdin
+
+domain-investigation vulnerability-import <vulnerability-json>
+domain-investigation vulnerability-import --file <path>
+domain-investigation vulnerability-import --stdin
+
+domain-investigation show
+domain-investigation report
+domain-investigation stix
+domain-investigation handoff
+domain-investigation promotion-candidates
+domain-investigation promote <approval-json>
+domain-investigation reject-promotion <decision-json>
+domain-investigation revoke-promotion <decision-json>
+domain-investigation graph
+domain-investigation clear
+```
+
+`build` requires canonical domain Evidence v2. Surface and vulnerability imports are scalar-only operator context, capped at 500 records and 2 MiB per imported set. They replace their corresponding imported set atomically and never become Evidence v2 by implication.
+
+`promotion-candidates` derives bounded zero-authority candidates from eligible imported operator artifacts. `promote`, `reject-promotion`, and `revoke-promotion` require explicit inline JSON decisions and append deterministic lifecycle events atomically. An approved candidate becomes separate `analyst_promoted` / `analyst_attestation` authority; it never becomes an Evidence v2 provider vote and never increments provider-family quorum. Invalid decisions leave the volatile artifact unchanged.
+
+Provider names are provenance labels, not independence votes. Only known `quorumEligible` provider independence groups can contribute to a `BLOCK` quorum; missing/unknown lineage remains non-quorum. `graph` projects the current provider-independence, promotion, recommendation, and provenance state into the existing deterministic Evidence Graph. That graph is explanatory output only and never feeds authority back into the workflow.
+
+Web and CLI route through the same pure command adapter. Browser state is memory-only and is cleared by disconnect/reboot. CLI state exists only inside the current process/pipeline. `show` returns a sanitized public projection without `_authoritative`; report/STIX/handoff/graph are deterministic bounded projections; `clear` drops the volatile artifact.
+
+All Domain Investigation descriptors declare `egressClass: none`, no auth requirement at the local shell layer, and no provider/scanner capability. Hosted execution remains passive. Authorized active discovery or vulnerability scanning must be performed separately outside this workflow and imported explicitly afterward. Full semantics are documented in [DOMAIN-INVESTIGATION.md](DOMAIN-INVESTIGATION.md).
+
 ## Result and evidence
 
 Result commands consume the current enrichment when invoked without pipeline input, or the typed upstream enrichment when composed in a pipeline.
@@ -415,6 +455,10 @@ The unified command fabric deliberately rejects host-shell semantics before comm
 - provider host/method/credential/policy overrides.
 - browser credential persistence or credential reflection in errors/history/output.
 - generic filesystem primitives or browser filesystem writes.
+- hosted active discovery/scanning through Domain Investigation.
+- automatic promotion of Domain Investigation operator context.
+- treating provider names or unknown lineage as independent quorum.
+- treating analyst attestations or graph edges as provider-family authority.
 
 There is no arbitrary OS shell escape hatch. Export and download behavior is represented by explicit registered commands instead of redirects.
 
@@ -458,6 +502,19 @@ Bounded GreyNoise Swarm pivots:
 swarm unique --from 2026-09-05T00:00:00Z --to 2026-09-06T00:00:00Z --field source.ip --include-counts
 swarm diff --query "classification:malicious" --source personal --target greynoise --mode source-only
 investigation capture operator
+```
+
+Domain Investigation from previously produced Evidence v2:
+
+```text
+domain-investigation build --file domain-enrichment.json
+domain-investigation surface-import --file authorized-surface.json
+domain-investigation vulnerability-import --file authorized-vulnerabilities.json
+domain-investigation promotion-candidates
+domain-investigation promote '{"candidateId":"PC-...","at":"2026-09-15T17:00:00.000Z","actorLabel":"analyst:g","reason":"Validated against authorized investigation context."}'
+domain-investigation graph
+domain-investigation report
+domain-investigation handoff
 ```
 
 Current-result investigation:

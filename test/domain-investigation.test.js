@@ -210,17 +210,19 @@ test('two independent exact malicious Evidence v2 sources can recommend BLOCK', 
   assert.deepEqual(rec.authority, ['evidence_v2']);
 });
 
-test('one direct malicious source plus independent contextual threat intelligence is only BLOCK_CANDIDATE', () => {
+test('one direct malicious source plus contextual provider intelligence remains MONITOR without operator or analyst corroboration', () => {
   const artifact = createDomainInvestigation(enrichment([
     evidence({ provider: 'virustotal', verdict: 'malicious', semanticClass: 'reputation', fingerprint: fp('6') }),
     evidence({ provider: 'otx', verdict: 'suspicious', kind: 'community_intelligence', semanticClass: 'threat_context', fingerprint: fp('7') }),
   ]));
 
   const rec = recommendation(artifact, 'suspicious.example');
-  assert.equal(rec.disposition, 'BLOCK_CANDIDATE');
-  assert.equal(rec.ruleId, 'DI-CANDIDATE-DIRECT-CONTEXT');
+  assert.equal(rec.disposition, 'MONITOR');
+  assert.equal(rec.ruleId, 'DI-MONITOR-ONE-INDEPENDENT-GROUP');
   assert.deepEqual(rec.directSources, ['virustotal']);
   assert.deepEqual(rec.contextSources, ['otx']);
+  assert.equal(rec.independence.quorumEligibleGroupCount, 1);
+  assert.deepEqual(rec.independence.quorumGroups, ['google-virustotal']);
 });
 
 test('network, exposure, Webamon and operator context never become a malicious vote by themselves', () => {

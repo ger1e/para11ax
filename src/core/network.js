@@ -1,5 +1,3 @@
-import net from 'node:net';
-
 function parseIpv4(address) {
   const parts = address.split('.');
   if (parts.length !== 4 || parts.some(part => !/^(?:0|[1-9]\d{0,2})$/.test(part))) return null;
@@ -43,10 +41,8 @@ function parseIpv6(address) {
 }
 
 export function parseIp(address) {
-  const family = net.isIP(address);
-  if (family === 4) return parseIpv4(address);
-  if (family === 6) return parseIpv6(address);
-  return null;
+  if (typeof address !== 'string') return null;
+  return parseIpv4(address) ?? parseIpv6(address);
 }
 
 function formatIpv4(value) {
