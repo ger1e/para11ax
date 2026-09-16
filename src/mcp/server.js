@@ -13,14 +13,16 @@ export { MCP_PROTOCOL_VERSION };
 
 const MAX_BODY_BYTES = 128 * 1024;
 const MAX_LARGE_BODY_BYTES = (2 * INVESTIGATION_LIMITS.bundleBytes) + (64 * 1024);
+const MAX_DOMAIN_PROMOTION_DECISION_BYTES = 8 * 1024;
 const DOMAIN_ACTIONS = Object.freeze([
   'build', 'surface_import', 'vulnerability_import', 'show', 'report', 'stix', 'handoff',
+  'promotion_candidates', 'promote', 'reject_promotion', 'revoke_promotion', 'graph',
 ]);
 
 const DOMAIN_TOOL = {
   name: 'para11ax_domain_investigation',
   title: 'PARA11AX Domain Investigation',
-  description: 'Use this when you need a passive suspicious-domain investigation with explicit client-carried state, bounded authorized operator-context imports, deterministic report/STIX/handoff output, and no hosted active scanning.',
+  description: 'Use this when you need a passive suspicious-domain investigation with explicit client-carried state, bounded authorized operator-context imports, deterministic report/STIX/handoff output, promotion lifecycle, authority graph projection, and no hosted active scanning.',
   inputSchema: Object.freeze({
     type: 'object',
     properties: Object.freeze({
@@ -28,6 +30,7 @@ const DOMAIN_TOOL = {
       artifact: Object.freeze({ type: 'object', description: 'Existing Domain Investigation v1 artifact for stateful actions.', additionalProperties: true }),
       enrichment: Object.freeze({ type: 'object', description: 'Canonical Evidence v2 domain enrichment for build.', additionalProperties: true }),
       records: Object.freeze({ type: 'array', description: 'Bounded authorized operator-context records for an import action.', items: Object.freeze({ type: 'object', additionalProperties: true }) }),
+      decision: Object.freeze({ type: 'object', description: 'Explicit analyst promotion approval, rejection, or revocation decision.', additionalProperties: true }),
     }),
     required: Object.freeze(['action']),
     additionalProperties: false,
@@ -113,6 +116,16 @@ function toolFailure(error) {
   };
 }
 
+function isObjectRecord(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function isBoundedPromotionDecision(value) {
+  if (!isObjectRecord(value)) return false;
+  try { return Buffer.byteLength(JSON.stringify(value), 'utf8') <= MAX_DOMAIN_PROMOTION_DECISION_BYTES; }
+  catch { return false; }
+}
+
 async function runDomainInvestigation(args) {
   const map = {
     build: 'domain-investigation-build',
@@ -122,26 +135,36 @@ async function runDomainInvestigation(args) {
     report: 'domain-investigation-report',
     stix: 'domain-investigation-stix',
     handoff: 'domain-investigation-handoff',
+    promotion_candidates: 'domain-investigation-promotion-candidates',
+    promote: 'domain-investigation-promote',
+    reject_promotion: 'domain-investigation-reject-promotion',
+    revoke_promotion: 'domain-investigation-revoke-promotion',
+    graph: 'domain-investigation-graph',
   };
   const handler = map[args.action];
   if (!handler) throw new Error('unsupported Domain Investigation action');
   if (args.action === 'build') {
-    if (!args.enrichment || typeof args.enrichment !== 'object' || Array.isArray(args.enrichment)) {
+    if (!isObjectRecord(args.enrichment)) {
       throw new Error('Evidence v2 enrichment required for Domain Investigation build');
     }
-  } else if (!args.artifact || typeof args.artifact !== 'object' || Array.isArray(args.artifact)) {
+  } else if (!isObjectRecord(args.artifact)) {
     throw new Error('Domain Investigation artifact required; build first');
   }
   if (args.action === 'surface_import' || args.action === 'vulnerability_import') {
     if (!Array.isArray(args.records)) throw new Error('Domain Investigation import records required');
   }
+  const decisionAction = args.action === 'promote' || args.action === 'reject_promotion' || args.action === 'revoke_promotion';
+  if (decisionAction && !isBoundedPromotionDecision(args.decision)) {
+    throw new Error('bounded Domain Investigation promotion decision required');
+  }
 
   const content = args.action === 'build'
     ? JSON.stringify(args.enrichment)
     : (args.action === 'surface_import' || args.action === 'vulnerability_import' ? JSON.stringify(args.records) : null);
+  const commandArgs = decisionAction ? [JSON.stringify(args.decision)] : [];
   const outcome = await executeDomainInvestigationCommand({
     handler,
-    args: [],
+    args: commandArgs,
     artifact: args.artifact ?? null,
     loadContent: content === null ? null : async () => content,
   });
@@ -149,6 +172,9 @@ async function runDomainInvestigation(args) {
   if (args.action === 'build' || args.action === 'surface_import' || args.action === 'vulnerability_import') {
     return { artifact: outcome.artifact, result: outcome.output.value };
   }
+  if (args.action === 'promotion_candidates') return { artifact: outcome.artifact, candidates: outcome.output.value };
+  if (decisionAction) return { artifact: outcome.artifact, result: outcome.output.value };
+  if (args.action === 'graph') return { graph: outcome.output.value };
   if (args.action === 'show') return { result: outcome.output.value };
   if (args.action === 'report') return { report: outcome.output.value };
   if (args.action === 'stix') return { bundle: outcome.output.value };
@@ -158,11 +184,14 @@ async function runDomainInvestigation(args) {
 
 function largeDomainTransition(args) {
   if (!args || !DOMAIN_ACTIONS.includes(args.action)) return false;
-  if (args.action === 'build') return Boolean(args.enrichment && typeof args.enrichment === 'object' && !Array.isArray(args.enrichment));
+  if (args.action === 'build') return isObjectRecord(args.enrichment);
   if (args.action === 'surface_import' || args.action === 'vulnerability_import') {
-    return Boolean(args.artifact && typeof args.artifact === 'object' && !Array.isArray(args.artifact) && Array.isArray(args.records));
+    return isObjectRecord(args.artifact) && Array.isArray(args.records);
   }
-  return false;
+  if (args.action === 'promote' || args.action === 'reject_promotion' || args.action === 'revoke_promotion') {
+    return isObjectRecord(args.artifact) && isBoundedPromotionDecision(args.decision);
+  }
+  return isObjectRecord(args.artifact);
 }
 
 function validationProbe(request, body) {
