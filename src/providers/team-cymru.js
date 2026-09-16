@@ -7,9 +7,11 @@ function validIpv4(value) {
   return value.split('.').every(part => Number(part) >= 0 && Number(part) <= 255);
 }
 
-function stripPre(value) {
+function extractPre(value) {
   const match = /<pre[^>]*>([\s\S]*?)<\/pre>/i.exec(value);
-  return (match?.[1] ?? value).replace(/<[^>]+>/g, '').trim();
+  const content = match?.[1] ?? value;
+  if (/<[^>]+>/.test(content)) throw new Error('provider_schema_invalid');
+  return content.trim();
 }
 
 function noResult() {
@@ -52,7 +54,7 @@ export const teamCymruProvider = Object.freeze({
   negativeCacheTtlMs: 60 * 60 * 1000,
   costClass: 'free',
   timeoutMs: 5000,
-  parserVersion: 'team-cymru-whois-2026-09-14.1',
+  parserVersion: 'team-cymru-whois-2026-09-16.1',
   async run(input, { signal, fetchImpl = fetch } = {}) {
     if (input?.type !== 'ip' || !validIpv4(input.value)) throw new Error('unsupported Team Cymru input');
     const form = new URLSearchParams({
@@ -62,7 +64,7 @@ export const teamCymruProvider = Object.freeze({
       bulk_paste: input.value,
     });
     const raw = await fetchText(form.toString(), { fetchImpl, signal });
-    const lines = stripPre(raw).split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    const lines = extractPre(raw).split(/\r?\n/).map(line => line.trim()).filter(Boolean);
     if (lines.length < 2) throw new Error('provider_schema_invalid');
     const row = lines.slice(1).find(line => line.includes('|'));
     if (!row) return noResult();
