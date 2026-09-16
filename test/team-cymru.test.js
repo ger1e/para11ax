@@ -57,3 +57,16 @@ test('Team Cymru no-match is no_result, never safe', async () => {
   });
   assert.equal(output.verdict, 'no_result');
 });
+
+test('Team Cymru rejects markup-bearing PRE content instead of sanitizing it into evidence', async () => {
+  await assert.rejects(
+    () => teamCymruProvider.run({ type: 'ip', value: '216.90.108.31' }, {
+      fetchImpl: async () => text(
+        '<PRE>AS | IP | BGP Prefix | CC | Registry | Allocated | AS Name\n23028 | 216.90.108.31 | 216.90.108.0/24 | US | arin | 1998-09-25 | <scr<script>ipt>alert(1)</script>\n</PRE>',
+        200,
+        'text/html',
+      ),
+    }),
+    /provider_schema_invalid/,
+  );
+});
