@@ -81,7 +81,7 @@ jobs:
             .status == "pass" and
             .authorization == "github_oidc" and
             .mcp.authenticated == true and
-            .mcp.toolCount == 14 and
+            .mcp.toolCount == 15 and
             .enrichment.target == "1.1.1.1" and
             .enrichment.profile == "fast" and
             .enrichment.status != "fail" and
@@ -91,7 +91,7 @@ jobs:
             (.userScanner.found | type == "number") and
             (.userScanner.errors | type == "number") and
             .conformance.status == "pass" and
-            .conformance.toolCount == 14 and
+            .conformance.toolCount == 15 and
             (.conformance.failed | length) == 0 and
             ([.conformance.surfaces[] | .status] | all(. == "pass"))
           ' "${response_file}" >/dev/null
