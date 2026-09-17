@@ -172,7 +172,7 @@ python3 -m compileall -q workers/user-scanner
 Externally meaningful canonical facts must not drift silently. Current checks cover:
 
 - all nine Evidence v2 workflow types;
-- canonical 38-provider fabric;
+- canonical 39-source upstream fabric;
 - Provider Value Scheduler v1.0 and IP scheduling invariants;
 - Evidence Schema v2 / Intelligence Kernel v1.0 / Evidence Graph v1.0 / Guidance v1.0 boundaries;
 - REST route inventory and fail-closed behavior;
