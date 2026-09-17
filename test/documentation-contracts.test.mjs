@@ -106,6 +106,27 @@ test('operations MCP acceptance stays synchronized with the canonical tool regis
   ], 'ChatGPT MCP schema refresh runbook');
 });
 
+test('production proof records are immutable snapshots rather than static current-state claims', () => {
+  const operations = read('docs/OPERATIONS.md');
+  const qa = read('docs/QA-REPORT.md');
+  assert.doesNotMatch(
+    operations,
+    /#### Current verified production baseline/,
+    'OPERATIONS must not present a version-controlled snapshot as live current state',
+  );
+  assert.match(
+    operations,
+    /#### Verified production snapshot — \d{4}-\d{2}-\d{2}/,
+    'OPERATIONS must label recorded production evidence as a dated snapshot',
+  );
+  const auditDate = /Audit record updated: (\d{4}-\d{2}-\d{2})\./.exec(qa)?.[1];
+  const snapshotDates = [...qa.matchAll(/### Production closure snapshot — (\d{4}-\d{2}-\d{2})/g)].map(match => match[1]);
+  assert.ok(auditDate, 'QA report must expose an audit-record date');
+  assert.ok(snapshotDates.length > 0, 'QA report must record at least one production closure snapshot');
+  assert.equal(auditDate, snapshotDates.at(-1), 'QA audit date must match the newest recorded production closure snapshot');
+  requireTokens(qa, ['Production MCP smoke', '15-tool MCP catalog'], 'production closure snapshot');
+});
+
 test('authoritative docs expose the current GreyNoise Swarm operator contract', () => {
   const shell = read('docs/SHELL.md');
   const swarm = read('docs/GREYNOISE-SWARM.md');
