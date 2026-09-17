@@ -33,13 +33,15 @@ test('architecture and API document all canonical workflow types', () => {
   requireTokens(api, workflowTokens(), 'API workflow contract');
 });
 
-test('README, provider docs and terminal distinguish baseline sources from expandable capability totals', () => {
+test('README, provider docs, operations and terminal distinguish baseline sources from expandable capability totals', () => {
   const readme = read('README.md');
   const providers = read('docs/PROVIDERS.md');
+  const operations = read('docs/OPERATIONS.md');
   const terminal = read('app/terminal-polish.js');
   assert.ok(capabilityCount >= 45 && capabilityCount <= 64, 'registered provider capability count outside reviewed bound');
   assert.ok(upstreamSourceCount >= baselineSourceCount, 'upstream provider-family count cannot undercut baseline fabric');
   assert.ok(readme.includes(`${baselineSourceCount} upstream APIs and feeds`), 'README baseline-source count drifted');
+  assert.ok(operations.includes(`canonical ${baselineSourceCount}-source upstream fabric`), 'OPERATIONS baseline-source count drifted');
   assert.match(providers, /provider capabilities/i, 'PROVIDERS capability language drifted');
   assert.match(providers, /upstream services/i, 'PROVIDERS upstream-service language drifted');
   assert.ok(terminal.includes(`${baselineSourceCount} SOURCES`), 'terminal must report baseline upstream sources, not capability count');
