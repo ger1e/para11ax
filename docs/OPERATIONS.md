@@ -19,7 +19,7 @@ Keep these states separate:
 
 Do not collapse these into one “production verified” claim.
 
-#### Current verified production baseline — 2026-09-11
+#### Verified production snapshot — 2026-09-11
 
 The full PARA11AX MCP control plane merged through PR #226 to protected `main` as:
 
@@ -50,7 +50,7 @@ Retain this record as historical release provenance, not as the current producti
 
 That exact SHA passed the historical hosted gates recorded in `QA-REPORT.md` (`Tooling smoke 1374` and `CodeQL 962`). It established Provider Value Scheduler v1.0 and the IP-reference Intelligence Kernel v1.0 without adding providers, hosts, dependencies, egress, credential reads, or persistence surfaces.
 
-At that historical point a Vercel **build-rate limit** prevented immediate production advancement. That event is retained because it is the canonical example of why repository/CI proof and deployment proof must stay separate. It has been superseded as the current runtime baseline by the 2026-09-11 MCP production deployment above.
+At that historical point a Vercel **build-rate limit** prevented immediate production advancement. That event is retained because it is the canonical example of why repository/CI proof and deployment proof must stay separate. The 2026-09-11 MCP production snapshot above superseded it at the time; current production remains external state and must be checked live.
 
 #### MCP control-plane operations
 
