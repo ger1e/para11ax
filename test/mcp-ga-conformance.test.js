@@ -6,9 +6,9 @@ import { runFullMcpConformance } from '../src/mcp/ga-conformance.js';
 
 const TOKEN = 'test-mcp-token';
 const TOOL_NAMES = [
-  'para11ax_capabilities', 'para11ax_enrich', 'para11ax_batch', 'para11ax_provider',
+  'para11ax_capabilities', 'para11ax_enrich', 'para11ax_intelligence', 'para11ax_batch', 'para11ax_provider',
   'para11ax_shodan', 'para11ax_swarm', 'para11ax_user_scan', 'para11ax_stix',
-  'para11ax_mission', 'para11ax_investigation', 'para11ax_case', 'para11ax_report',
+  'para11ax_mission', 'para11ax_domain_investigation', 'para11ax_investigation', 'para11ax_case', 'para11ax_report',
   'para11ax_command',
 ];
 
@@ -27,6 +27,15 @@ const ENRICHMENT = {
   type: 'ip', indicator: '1.1.1.1', queriedAt: NOW, status: 'ok',
   evidence: [{ provider: 'fixture', references: ['https://example.test/research'] }],
   relationships: [], failures: [],
+};
+const DOMAIN_ENRICHMENT = {
+  schemaVersion: 'evidence-v2.0', gatewayVersion: 'test', requestId: 'ga-domain',
+  indicator: 'suspicious.example', type: 'domain', queriedAt: NOW, profile: 'standard', status: 'ok',
+  evidence: [], relationships: [], coverage: {}, limitations: [], failures: [],
+  huntContext: {
+    indicator: 'suspicious.example', type: 'domain', firstSeen: null, lastSeen: null,
+    families: [], actors: [], sourceReferences: [],
+  },
 };
 
 function request(method, params = {}, id = 1) {
@@ -58,6 +67,15 @@ function fakeInvokeRecorder() {
       if (args.view === 'status') return { status: { gatewayVersion: '2.0.0' } };
       if (args.view === 'meta') return { meta: { gatewayVersion: '2.0.0' } };
     }
+    if (name === 'para11ax_intelligence') {
+      return {
+        intelligence: {
+          operation: 'knowledge', mode: 'knowledge', subject: { type: 'attack', value: 'T1059' },
+          providers: { selected: ['d3fend'], executed: ['d3fend'], denied: [], unavailable: [] },
+          evidence: [{ provider: 'd3fend' }], relationships: [], failures: [],
+        },
+      };
+    }
     if (name === 'para11ax_batch') return { batch: { inputCount: 2, uniqueIndicators: 2, results: [{ status: 'ok' }, { status: 'partial' }] } };
     if (name === 'para11ax_provider') return { enrichment: { ...ENRICHMENT, indicator: 'example.com', type: 'domain' } };
     if (name === 'para11ax_shodan') return { result: { plan: 'dev', queryCredits: 100 } };
@@ -69,6 +87,20 @@ function fakeInvokeRecorder() {
       const workspace = { schemaVersion: 'mission-workspace-v1.0', revision: missionRevision, hunt: { state: missionRevision >= 4 ? 'READY' : 'EMPTY' }, result: { state: missionRevision >= 6 ? 'RESULTS_PRESENT' : 'EMPTY' } };
       if (args.operation === 'export') return { workspace, output: { value: { content: JSON.stringify(workspace) } } };
       return { workspace, output: { value: {} } };
+    }
+    if (name === 'para11ax_domain_investigation') {
+      const artifact = structuredClone(args.artifact ?? {
+        schemaVersion: 'domain-investigation-v1.0',
+        target: { type: 'domain', value: DOMAIN_ENRICHMENT.indicator },
+        imports: { surface: [], vulnerabilities: [] },
+      });
+      if (args.action === 'surface_import') artifact.imports.surface = structuredClone(args.records ?? []);
+      if (args.action === 'vulnerability_import') artifact.imports.vulnerabilities = structuredClone(args.records ?? []);
+      if (args.action === 'build' || args.action === 'surface_import' || args.action === 'vulnerability_import') return { artifact, result: { schemaVersion: artifact.schemaVersion, target: artifact.target, imports: artifact.imports } };
+      if (args.action === 'show') return { result: { schemaVersion: artifact.schemaVersion, target: artifact.target, imports: artifact.imports } };
+      if (args.action === 'report') return { report: 'Domain Investigation GA report' };
+      if (args.action === 'stix') return { bundle: { type: 'bundle', id: 'bundle--domain-ga', objects: [] } };
+      if (args.action === 'handoff') return { handoff: { schemaVersion: 'domain-investigation-handoff-v1.0', target: artifact.target } };
     }
     if (name === 'para11ax_investigation') {
       if (args.operation === 'create') investigationRevision = 0;
@@ -107,7 +139,7 @@ async function toolCall(handle, name, args, id) {
   return response.body.result.structuredContent;
 }
 
-test('full GA conformance exercises all 13 MCP tools and every local stateful/report operation', async () => {
+test('full GA conformance exercises all 15 MCP tools and every local stateful/report operation', async () => {
   const { invoke, calls } = fakeInvokeRecorder();
   const result = await runFullMcpConformance({
     invoke,
@@ -126,6 +158,12 @@ test('full GA conformance exercises all 13 MCP tools and every local stateful/re
 
   const missionOps = calls.filter(call => call.name === 'para11ax_mission').map(call => call.args.operation);
   for (const op of ['new', 'show', 'profile_set', 'context_set', 'relevance', 'hunt_build', 'kql_validate', 'result_analyze', 'servicenow', 'export', 'import', 'clear']) assert.ok(missionOps.includes(op), op);
+
+  const intelligenceCalls = calls.filter(call => call.name === 'para11ax_intelligence');
+  assert.deepEqual(intelligenceCalls.map(call => call.args), [{ operation: 'knowledge', indicator: 'T1059' }]);
+
+  const domainActions = calls.filter(call => call.name === 'para11ax_domain_investigation').map(call => call.args.action);
+  for (const action of ['build', 'surface_import', 'vulnerability_import', 'show', 'report', 'stix', 'handoff']) assert.ok(domainActions.includes(action), action);
 
   const investigationOps = calls.filter(call => call.name === 'para11ax_investigation').map(call => call.args.operation);
   for (const op of ['create', 'status', 'dispatch', 'report', 'report_text', 'export', 'import']) assert.ok(investigationOps.includes(op), op);

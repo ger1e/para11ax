@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { MCP_TOOLS } from '../src/mcp/server.js';
 
 const workflow = readFileSync(new URL('../.github/workflows/production-mcp-smoke.yml', import.meta.url), 'utf8');
 
@@ -13,8 +14,8 @@ test('production MCP smoke uses GitHub OIDC and never duplicates the analyst bea
   assert.match(workflow, /EXPECTED_SHA:\s*\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /\.deploymentSha == \$sha/);
   assert.match(workflow, /\.authorization == "github_oidc"/);
-  assert.match(workflow, /\.mcp\.toolCount == 14/);
-  assert.match(workflow, /\.conformance\.toolCount == 14/);
+  assert.match(workflow, new RegExp(`\\.mcp\\.toolCount == ${MCP_TOOLS.length}`));
+  assert.match(workflow, new RegExp(`\\.conformance\\.toolCount == ${MCP_TOOLS.length}`));
   assert.match(workflow, /\.enrichment\.target == "1\.1\.1\.1"/);
   assert.match(workflow, /\.userScanner\.target == "ger1e"/);
   assert.doesNotMatch(workflow, /secrets\.PARA11AX_TOKEN/);
