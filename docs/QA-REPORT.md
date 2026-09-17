@@ -3,9 +3,29 @@
 
 ## Scope and audit baseline
 
-Audit record updated: 2026-09-09.
+Audit record updated: 2026-09-17.
 
 This report covers repository behavior, browser surfaces, deterministic intelligence runtime, specialist operator surfaces, Maltego integration, CI controls, deployment metadata, public production behavior, and static-response security boundaries. Repository source, CI, deployment metadata, live public checks, credentials, vendor account entitlements and authorized data-bearing probes remain separate proof states.
+
+### Production closure snapshot — 2026-09-17
+
+This is an immutable dated record, not a claim about current external state. Re-check GitHub and Vercel before treating it as the active production baseline.
+
+The protected-`main` documentation-corrected closure SHA was:
+
+```text
+a1caf5da534b31981c144b4c69a37947808c4161
+```
+
+Evidence recorded for that exact SHA:
+
+- Tooling smoke #2259 — PASS;
+- CodeQL #1847 — PASS across baseline compatibility, Python, and JavaScript/TypeScript;
+- Production MCP smoke #41 — PASS through GitHub OIDC against the exact deployment, including the 15-tool MCP catalog and all 15 GA conformance surfaces;
+- PARA11AX Vercel production deployment `dpl_8qe6b8wMr2YR1pswcZRrNuADUxHk` — `READY` with the exact SHA;
+- User Scanner Vercel production deployment `dpl_3oBXj4NoB9Z77Umvvie4whuAEfNm` — `READY` with the exact SHA.
+
+The authenticated production smoke also recorded eight IP evidence items with zero provider failures and a completed 510-site User Scanner pass. These values are run evidence, not permanent provider-health or future-availability guarantees.
 
 ### Preserved 2026-09-02 audited deployment baseline
 
