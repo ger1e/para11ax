@@ -36,7 +36,7 @@ jobs:
 
       - name: Setup Node.js
         id: setup_node
-        uses: actions/setup-node@ae0d4ed08881f17d1511386f5be3e62356acd4a6
+        uses: actions/setup-node@db0fb3a98ed314b69026b6e8c9be26a7e2fe65a8
         with:
           node-version-file: '.nvmrc'
           package-manager-cache: false
@@ -54,6 +54,19 @@ jobs:
         run: |
           npm ci --ignore-scripts
           npm audit --omit=dev
+
+      - name: Validate Python dependency locks
+        id: python_dependencies
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/para11ax-maltego"
+          "${RUNNER_TEMP}/para11ax-maltego/bin/python" -m pip install --disable-pip-version-check -r maltego/requirements.txt
+          "${RUNNER_TEMP}/para11ax-maltego/bin/python" -m pip check
+          "${RUNNER_TEMP}/para11ax-maltego/bin/python" -c 'import maltego_trx'
+
+          python3 -m venv "${RUNNER_TEMP}/para11ax-user-scanner"
+          "${RUNNER_TEMP}/para11ax-user-scanner/bin/python" -m pip install --disable-pip-version-check -r workers/user-scanner/requirements.txt
+          "${RUNNER_TEMP}/para11ax-user-scanner/bin/python" -m pip check
+          PYTHONPATH=workers/user-scanner "${RUNNER_TEMP}/para11ax-user-scanner/bin/python" -c 'import jwt; import worker'
 
       - name: Validate MAXX invariants and Node tests
         id: node_checks
