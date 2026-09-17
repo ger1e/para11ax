@@ -32,22 +32,22 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           HEAD_MESSAGE: ${{ github.event.head_commit.message }}
           ARCHIVE_BRANCH: archive/stale-branches-20260824
-          ARCHIVE_COMMIT: 61457a0a672b0616c02a03cf8da77b464741d65f
         run: |
           set -euo pipefail
 
           deleted=0
           preserved=0
           collapse_archive=false
+          archived_parents=()
 
           if [[ "${HEAD_MESSAGE:-}" == *"[collapse-archive]"* ]]; then
             collapse_archive=true
             echo "One-time archive-collapse mode enabled."
+            archive_commit=$(gh api "repos/$REPO/git/ref/heads/$ARCHIVE_BRANCH" --jq '.object.sha')
+            mapfile -t archived_parents < <(
+              gh api "repos/$REPO/commits/$archive_commit" --jq '.parents[].sha'
+            )
           fi
-
-          mapfile -t archived_parents < <(
-            gh api "repos/$REPO/commits/$ARCHIVE_COMMIT" --jq '.parents[].sha'
-          )
 
           is_archived_parent() {
             local candidate="$1"

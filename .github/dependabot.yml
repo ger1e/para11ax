@@ -21,3 +21,21 @@ updates:
       time: "06:15"
       timezone: "Europe/Budapest"
     open-pull-requests-limit: 5
+
+  - package-ecosystem: "pip"
+    directory: "/maltego"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:30"
+      timezone: "Europe/Budapest"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "pip"
+    directory: "/workers/user-scanner"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:45"
+      timezone: "Europe/Budapest"
+    open-pull-requests-limit: 5
