@@ -16,6 +16,8 @@ test('browser smoke advances intentional boot delays with the browser clock', ()
   const spec = readFileSync(new URL('../browser-tests/initialize.spec.mjs', import.meta.url), 'utf8');
   assert.match(spec, /await page\.clock\.install\(\)/);
   assert.match(spec, /await page\.clock\.runFor\(20_000\)/);
+  assert.match(spec, /const snapshot = await page\.evaluate/);
+  assert.doesNotMatch(spec, /const body = page\.locator/);
 });
 
 test('browser smoke command exposes desktop and reduced-motion mobile Initialize coverage', () => {

@@ -35,25 +35,29 @@ async function exerciseInitialize(page, { reducedMotion, viewportWidth }) {
   await expect(initialize).toBeDisabled();
   await page.clock.runFor(20_000);
 
-  const body = page.locator('body');
-  if (reducedMotion) await expect(body).toHaveClass(/reduced-terminal-motion/);
-  else await expect(body).not.toHaveClass(/reduced-terminal-motion/);
+  const snapshot = await page.evaluate(() => {
+    const region = document.querySelector('[role="region"][aria-label="PARA11AX interactive analyst shell"]');
+    return {
+      bootLog: document.querySelector('#boot-log')?.textContent ?? '',
+      bootStatus: document.querySelector('#boot-status')?.textContent ?? '',
+      reducedMotion: document.body.classList.contains('reduced-terminal-motion'),
+      regionVisible: Boolean(region && region.getClientRects().length),
+      shellCount: document.querySelectorAll('.unix-shell').length,
+      shellState: document.querySelector('.shell-session-state')?.textContent ?? '',
+      workspaceHidden: document.querySelector('#workspace')?.hidden,
+    };
+  });
 
-  await expect(page.locator('#boot-log')).toContainText('pxsvc[provider-registry]: 39 sources registered');
-  await expect.poll(async () => ({
-    bootStatus: await page.locator('#boot-status').textContent(),
-    runtimeFailures: [...failures],
-    shellCount: await page.locator('.unix-shell').count(),
-    workspaceHidden: await page.locator('#workspace').evaluate(node => node.hidden),
-  })).toEqual({
+  expect({ ...snapshot, runtimeFailures: [...failures] }).toEqual({
+    bootLog: expect.stringContaining('pxsvc[provider-registry]: 39 sources registered'),
     bootStatus: 'pxsvcd: Gateway Terminal active',
+    reducedMotion,
+    regionVisible: true,
     runtimeFailures: [],
     shellCount: 1,
+    shellState: expect.stringContaining('AUTH:DOWN'),
     workspaceHidden: false,
   });
-  await expect(page.getByRole('region', { name: 'PARA11AX interactive analyst shell' })).toBeVisible();
-  await expect(page.locator('.shell-session-state')).toContainText('AUTH:DOWN');
-  expect(failures).toEqual([]);
 }
 
 test('Initialize reaches the Gateway Terminal in normal motion', async ({ page }) => {
