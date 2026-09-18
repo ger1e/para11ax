@@ -86,6 +86,7 @@ export function mountAnalystShell({
 
   const root = document.createElement('section');
   root.className = 'unix-shell';
+  root.setAttribute('role', 'region');
   root.setAttribute('aria-label', 'PARA11AX interactive analyst shell');
 
   const status = document.createElement('header');

@@ -38,6 +38,17 @@ async function exerciseInitialize(page, { reducedMotion, viewportWidth }) {
   else await expect(body).not.toHaveClass(/reduced-terminal-motion/);
 
   await expect(page.locator('#boot-log')).toContainText('pxsvc[provider-registry]: 39 sources registered');
+  await expect.poll(async () => ({
+    bootStatus: await page.locator('#boot-status').textContent(),
+    runtimeFailures: [...failures],
+    shellCount: await page.locator('.unix-shell').count(),
+    workspaceHidden: await page.locator('#workspace').evaluate(node => node.hidden),
+  })).toEqual({
+    bootStatus: 'pxsvcd: Gateway Terminal active',
+    runtimeFailures: [],
+    shellCount: 1,
+    workspaceHidden: false,
+  });
   await expect(page.getByRole('region', { name: 'PARA11AX interactive analyst shell' })).toBeVisible();
   await expect(page.locator('.shell-session-state')).toContainText('AUTH:DOWN');
   expect(failures).toEqual([]);

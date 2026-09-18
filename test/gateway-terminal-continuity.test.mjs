@@ -37,6 +37,12 @@ test('terminal runtime keeps Pepe boot-only and does not restore boot artifacts 
   assert.doesNotMatch(entry, /bootLog\.replaceChildren\(\)[\s\S]{0,400}stage === ['"]boot-line['"]/, 'boot lines must remain visible during the boot sequence itself');
 });
 
+test('active analyst shell is an explicitly named accessibility region', async () => {
+  const shell = await read('app/shell-ui.js');
+  assert.match(shell, /root\.setAttribute\(['"]role['"],\s*['"]region['"]\)/);
+  assert.match(shell, /root\.setAttribute\(['"]aria-label['"],\s*['"]PARA11AX interactive analyst shell['"]\)/);
+});
+
 test('backspace cue is not suppressed by character typing throttle', async () => {
   let clock = 1000;
   const audio = createAudioEngine({ AudioContextCtor: FakeAudioContext, now: () => clock });
