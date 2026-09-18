@@ -1,0 +1,42 @@
+[
+  {
+    "id": "DR-001",
+    "caseClass": "positive",
+    "scenario": "Suspicious device-code or adversary-in-the-middle sign-in is followed by unauthorized authentication-method addition, anomalous Microsoft Graph activity, cloud-content collection, and mailbox access behavior.",
+    "requiredTelemetry": ["sign_in", "authentication_method_audit", "graph_activity", "cloud_content_activity", "mailbox_activity"],
+    "expectedOutcome": "DETECT",
+    "expectedBehavior": "Escalate the coherent identity-persistence and cloud-collection sequence when sufficient independent telemetry is present."
+  },
+  {
+    "id": "DR-002",
+    "caseClass": "negative",
+    "scenario": "Approved administrator performs an expected interactive sign-in and sanctioned administrative activity with no unauthorized authentication-method change, anomalous Graph burst, or unusual cloud-content collection.",
+    "requiredTelemetry": ["sign_in", "administrative_activity", "authentication_method_audit", "graph_activity"],
+    "expectedOutcome": "NO_ALERT",
+    "expectedBehavior": "Preserve visibility without treating ordinary approved administration as malicious evidence."
+  },
+  {
+    "id": "DR-003",
+    "caseClass": "fp",
+    "scenario": "Approved remote-management or WinRM activity overlaps with intrusion tradecraft but has no suspicious staging, persistence, credential theft, tunneling, ransomware preparation, or anomalous account behavior.",
+    "requiredTelemetry": ["process_ancestry", "remote_management_execution", "logon_activity", "network_activity", "file_activity"],
+    "expectedOutcome": "TUNE",
+    "expectedBehavior": "Tune on behavioral discriminators and approved context rather than globally suppressing the administration tool."
+  },
+  {
+    "id": "DR-004",
+    "caseClass": "boundary",
+    "scenario": "A user is socially engineered into executing browser-resident JavaScript or a userscript flow that retrieves attacker-controlled instructions through an otherwise legitimate web service without necessarily spawning a distinctive child process.",
+    "requiredTelemetry": ["browser_or_extension_activity", "web_or_network_activity", "downstream_endpoint_activity"],
+    "expectedOutcome": "REVIEW",
+    "expectedBehavior": "Require explicit observability, correlate available browser, network, lure, and downstream execution evidence, and avoid inventing endpoint coverage."
+  },
+  {
+    "id": "DR-005",
+    "caseClass": "telemetry_missing",
+    "scenario": "The hypothesis depends on browser, identity, email, or network evidence that is not retained, licensed, collected, or otherwise observable in the target environment.",
+    "requiredTelemetry": ["telemetry_capability_check"],
+    "expectedOutcome": "CANNOT_OBSERVE",
+    "expectedBehavior": "Do not convert a zero-result query into clean or benign evidence when a required evidence surface is unavailable."
+  }
+]
