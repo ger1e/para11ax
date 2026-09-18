@@ -43,6 +43,31 @@ test('active analyst shell is an explicitly named accessibility region', async (
   assert.match(shell, /root\.setAttribute\(['"]aria-label['"],\s*['"]PARA11AX interactive analyst shell['"]\)/);
 });
 
+test('active visual boot never waits for audio unlock settlement', async () => {
+  const stages = [];
+  let enableCalls = 0;
+  const boot = createPara11axBootSequence({
+    audio: {
+      enable: () => {
+        enableCalls += 1;
+        return new Promise(() => {});
+      },
+      play: () => {},
+      stopAll: () => {},
+    },
+    sleep: async () => {},
+    onStage: name => stages.push(name),
+  });
+
+  const result = await Promise.race([
+    boot.start(),
+    new Promise(resolve => setTimeout(() => resolve('audio-timeout'), 100)),
+  ]);
+  assert.equal(result, true);
+  assert.equal(enableCalls, 1);
+  assert.equal(stages.at(-1), 'ready');
+});
+
 test('backspace cue is not suppressed by character typing throttle', async () => {
   let clock = 1000;
   const audio = createAudioEngine({ AudioContextCtor: FakeAudioContext, now: () => clock });

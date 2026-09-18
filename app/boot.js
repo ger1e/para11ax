@@ -50,7 +50,9 @@ export function createPara11axBootSequence({
   let done = false;
   let skipped = false;
 
-  const safeEnable = async () => { try { await audio?.enable?.(); } catch {} };
+  const safeEnable = () => {
+    try { void Promise.resolve(audio?.enable?.()).catch(() => {}); } catch {}
+  };
   const safePlay = name => { try { audio?.play?.(name); } catch {} };
   const safeStop = () => { try { audio?.stopAll?.(); } catch {} };
   const wait = async ms => { await sleep(ms); return !done; };
@@ -66,7 +68,7 @@ export function createPara11axBootSequence({
     async start() {
       if (started || done) return false;
       started = true;
-      await safeEnable();
+      safeEnable();
       if (reducedMotion) onStage('reduced');
 
       onStage('power');
@@ -96,7 +98,7 @@ export function createPara11axBootSequence({
       if (done) return false;
       if (!started) {
         started = true;
-        await safeEnable();
+        safeEnable();
       }
       safeStop();
       skipped = true;
