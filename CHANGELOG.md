@@ -44,6 +44,7 @@ All notable repository changes should be recorded here. This project uses a ligh
 
 ##### Changed
 
+- User-facing boot output, final-brand footer normalization, and tracked architecture artwork now follow the canonical 39 upstream source-family count, with manifest-derived parity coverage preventing retired 37/38 labels from returning.
 - Python dependency maintenance now covers both committed requirements surfaces through weekly Dependabot checks; the isolated User Scanner worker is pinned to `user-scanner==1.5.1.3` and `PyJWT[crypto]==2.14.0`.
 - Branch hygiene resolves the current archive tip at execution time, allowing guarded archive-first cleanup without a stale hard-coded archive commit.
 - Restored desktop Analyst UI initialization by removing Node-only `node:crypto`, `node:net`, and unguarded `Buffer` dependencies from the browser-reachable Mission/Domain Investigation graph. Shared IP validation, UTF-8 sizing, SHA-256 identities, and RFC-compatible UUIDv5 STIX identities now use runtime-neutral implementations, with a transitive browser-module regression gate covering the deployed entry point.

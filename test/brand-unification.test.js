@@ -143,8 +143,8 @@ test('README diagrams use normalized geometry and current provider count', () =>
     assert.doesNotMatch(svg, /data-radar=["']ppi["']/i, `${path} must not add another README radar`);
     assert.doesNotMatch(svg, /sentinel|helmet|visor|shield|#00E5FF|#F6C945|#39FF88/i, `${path} contains legacy branding`);
   }
-  assert.match(architecture, /38\s+FIXED\s+SOURCES/i);
-  assert.doesNotMatch(architecture, /37\s+FIXED\s+SOURCES/i);
+  assert.match(architecture, /39\s+FIXED\s+SOURCES/i);
+  assert.doesNotMatch(architecture, /(?:37|38)\s+FIXED\s+SOURCES/i);
 });
 
 test('banner SVGs stay visually minimal', () => {
