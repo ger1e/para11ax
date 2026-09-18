@@ -125,7 +125,17 @@ export function mountAnalystShell({
   container.hidden = false;
 
   const focusInput = () => input.focus({ preventScroll: true });
-  const scrollBottom = () => { scrollback.scrollTop = scrollback.scrollHeight; };
+  let scrollPending = false;
+  const scrollBottom = () => {
+    if (scrollPending) return;
+    scrollPending = true;
+    const apply = () => {
+      scrollPending = false;
+      scrollback.scrollTop = Number.MAX_SAFE_INTEGER;
+    };
+    if (typeof globalThis.requestAnimationFrame === 'function') globalThis.requestAnimationFrame(apply);
+    else queueMicrotask(apply);
+  };
   const appendLine = (text = '', tone = '') => {
     const line = document.createElement('div');
     line.className = `shell-line${tone ? ` shell-${tone}` : ''}`;
@@ -503,7 +513,8 @@ export function mountAnalystShell({
   appendLine('CTI Enrichment // session unauthenticated', 'muted');
   appendLine("type 'help' for commands; run 'login' to authenticate", 'cyan');
   updatePrompt();
-  focusInput();
+  if (typeof globalThis.requestAnimationFrame === 'function') globalThis.requestAnimationFrame(focusInput);
+  else queueMicrotask(focusInput);
 
   return Object.freeze({
     focus: focusInput,

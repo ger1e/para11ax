@@ -19,6 +19,11 @@ test('browser smoke uses the rendered skip control for a deterministic shell han
   assert.match(spec, /await skip\.click\(\)/);
   assert.match(spec, /const snapshot = await page\.evaluate/);
   assert.doesNotMatch(spec, /page\.clock/);
+
+  const shell = readFileSync(new URL('../app/shell-ui.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(shell, /scrollTop = scrollback\.scrollHeight/);
+  assert.match(shell, /scrollTop = Number\.MAX_SAFE_INTEGER/);
+  assert.match(shell, /requestAnimationFrame\(focusInput\)/);
 });
 
 test('browser smoke command exposes desktop and reduced-motion mobile Initialize coverage', () => {
