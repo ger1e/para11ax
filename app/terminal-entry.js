@@ -138,14 +138,23 @@ function renderPepeCanvas() {
 
   const lines = pepe.textContent.split('\n');
   const longest = Math.max(1, ...lines.map(line => line.length));
-  const fontSize = Math.max(3, Math.min(7, width / (longest * .62), height / (lines.length + 1)));
-  const lineHeight = fontSize;
-  const left = Math.max(0, (width - longest * fontSize * .62) / 2);
-  context.font = `${fontSize}px monospace`;
-  context.textBaseline = 'top';
+  const cell = Math.max(1, Math.min(width / longest, height / (lines.length * 2)));
+  const dot = Math.max(.45, cell * .34);
+  const left = Math.max(0, (width - longest * cell) / 2);
+  const dots = [[0, 0, 0], [1, 0, 1], [2, 0, 2], [3, 1, 0], [4, 1, 1], [5, 1, 2], [6, 0, 3], [7, 1, 3]];
   context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--terminal-phosphor').trim() || '#39ff14';
   context.globalAlpha = .84;
-  lines.forEach((line, index) => context.fillText(line, left, index * lineHeight));
+  context.beginPath();
+  lines.forEach((line, row) => {
+    for (let column = 0; column < line.length; column += 1) {
+      const bits = line.codePointAt(column) - 0x2800;
+      if (bits < 0 || bits > 0xff) continue;
+      for (const [bit, x, y] of dots) {
+        if (bits & (1 << bit)) context.rect(left + column * cell + x * cell * .46, row * cell * 2 + y * cell * .46, dot, dot);
+      }
+    }
+  });
+  context.fill();
   pepeCanvas.dataset.rendered = 'true';
 }
 

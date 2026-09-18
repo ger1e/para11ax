@@ -54,6 +54,9 @@ test('Pepe boot reveal avoids unbounded per-glyph paint effects', async () => {
   assert.match(html, /id="pepe-canvas"[^>]*boot-pepe-canvas/);
   assert.match(entry, /function renderPepeCanvas\(\)/);
   assert.match(entry, /pepeCanvas\.getContext\('2d'\)/);
+  assert.match(entry, /codePointAt\(column\) - 0x2800/);
+  assert.match(entry, /context\.rect\(/);
+  assert.doesNotMatch(entry, /fillText\(/);
   assert.match(base, /\.boot-pepe-source\{display:none!important\}/);
   assert.match(base, /\.boot-pepe\{[^}]*text-shadow:none;[^}]*contain:layout paint style/);
   assert.doesNotMatch(base, /@keyframes pepe-(?:resolve|glitch)\{[^}]*(?:clip-path|filter|text-shadow)/);
