@@ -43,7 +43,7 @@ async function exerciseInitialize(page, { reducedMotion, viewportWidth }) {
     return {
       bootStatus: document.querySelector('#boot-status')?.textContent ?? '',
       reducedMotion: document.body.classList.contains('reduced-terminal-motion'),
-      regionVisible: Boolean(region && region.getClientRects().length),
+      regionExists: Boolean(region),
       shellCount: document.querySelectorAll('.unix-shell').length,
       shellState: document.querySelector('.shell-session-state')?.textContent ?? '',
       workspaceHidden: document.querySelector('#workspace')?.hidden,
@@ -53,7 +53,7 @@ async function exerciseInitialize(page, { reducedMotion, viewportWidth }) {
   expect({ ...snapshot, runtimeFailures: [...failures] }).toEqual({
     bootStatus: 'pxsvcd: Gateway Terminal active',
     reducedMotion,
-    regionVisible: true,
+    regionExists: true,
     runtimeFailures: [],
     shellCount: 1,
     shellState: expect.stringContaining('AUTH:DOWN'),

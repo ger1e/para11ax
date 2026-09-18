@@ -133,8 +133,7 @@ export function mountAnalystShell({
       scrollPending = false;
       scrollback.scrollTop = Number.MAX_SAFE_INTEGER;
     };
-    if (typeof globalThis.requestAnimationFrame === 'function') globalThis.requestAnimationFrame(apply);
-    else queueMicrotask(apply);
+    globalThis.setTimeout(apply, 0);
   };
   const appendLine = (text = '', tone = '') => {
     const line = document.createElement('div');
@@ -513,8 +512,7 @@ export function mountAnalystShell({
   appendLine('CTI Enrichment // session unauthenticated', 'muted');
   appendLine("type 'help' for commands; run 'login' to authenticate", 'cyan');
   updatePrompt();
-  if (typeof globalThis.requestAnimationFrame === 'function') globalThis.requestAnimationFrame(focusInput);
-  else queueMicrotask(focusInput);
+  globalThis.setTimeout(focusInput, 1000);
 
   return Object.freeze({
     focus: focusInput,
