@@ -44,6 +44,7 @@ All notable repository changes should be recorded here. This project uses a ligh
 
 ##### Changed
 
+- Required Tooling smoke now runs the real production-routed Analyst UI in pinned Chromium, covering desktop normal motion and mobile reduced motion from `INITIALIZE` through the 39-source boot line to the unauthenticated Gateway Terminal while rejecting browser/module console failures.
 - User-facing boot output, final-brand footer normalization, and tracked architecture artwork now follow the canonical 39 upstream source-family count, with manifest-derived parity coverage preventing retired 37/38 labels from returning.
 - Python dependency maintenance now covers both committed requirements surfaces through weekly Dependabot checks; the isolated User Scanner worker is pinned to `user-scanner==1.5.1.3` and `PyJWT[crypto]==2.14.0`.
 - Branch hygiene resolves the current archive tip at execution time, allowing guarded archive-first cleanup without a stale hard-coded archive commit.

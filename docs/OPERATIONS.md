@@ -158,6 +158,8 @@ git fetch origin
 git checkout main
 git pull --ff-only
 npm run check
+npx playwright install --with-deps chromium
+npm run test:browser
 cd maltego
 python3 -m unittest discover -s tests -v
 cd ..
@@ -165,7 +167,7 @@ python3 -m compileall -q maltego
 python3 -m compileall -q workers/user-scanner
 ```
 
-`npm run check` includes repository invariants, public-release audit, full Node tests and executable documentation-contract checks.
+`npm run check` includes repository invariants, public-release audit, full Node tests and executable documentation-contract checks. `npm run test:browser` separately serves the exact Vercel app rewrites and requires both desktop/normal-motion and mobile/reduced-motion Chromium Initialize flows to reach the unauthenticated Gateway Terminal with the canonical source count and no page, console, script or stylesheet errors.
 
 #### Documentation contract maintenance
 
@@ -189,7 +191,7 @@ When a canonical source changes, update the relevant documentation and drift tes
 
 #### Hosted CI and deployment boundary
 
-This public repository runs one bounded Ubuntu `Tooling smoke` job for pull requests targeting `main`, pushes to `main`, and manual dispatch. CodeQL runs separately for JavaScript/TypeScript and Python analysis.
+This public repository runs one bounded Ubuntu `Tooling smoke` job for pull requests targeting `main`, pushes to `main`, and manual dispatch. The required job installs pinned Chromium and runs the browser Initialize smoke matrix after the repository/Node gates. CodeQL runs separately for JavaScript/TypeScript and Python analysis.
 
 Vercel Git deployment is narrower than CI. A protected verified merge to `main` is not production acceptance by itself. Accept production only when deployment metadata reports that exact `main` SHA in `READY` state. A quota/build-rate limit or rejection is a deployment failure state, not a code/test failure and not permission to pretend the previous deployment contains the new code.
 
