@@ -52,6 +52,6 @@ test('production terminal keeps one compact PPI lockup, CRT glass, and the Natur
   for (const canonical of ['#020403', '#39FF14', '#F7FFF6', '#8DA391', '#FF2438']) {
     assert.match(brandJs, new RegExp(canonical, 'i'));
   }
-  assert.match(boot, /provider-registry\]: 38 sources registered/);
-  assert.doesNotMatch(boot, /provider-registry\]: 37 sources registered/);
+  assert.match(boot, /provider-registry\]: 39 sources registered/);
+  assert.doesNotMatch(boot, /provider-registry\]: (?:37|38) sources registered/);
 });

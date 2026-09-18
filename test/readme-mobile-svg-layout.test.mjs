@@ -6,7 +6,7 @@ const read = path => readFileSync(path, 'utf8');
 
 test('request-path provider row keeps parser label clear of source count', () => {
   const svg = read('assets/brand/para11ax-readme-architecture-v4.svg');
-  assert.match(svg, /38 FIXED SOURCES<\/text><text x="300" y="70"/i);
+  assert.match(svg, /39 FIXED SOURCES<\/text><text x="300" y="70"/i);
 });
 
 test('semantic vulnerability axes use separate rows instead of one collision-prone line', () => {

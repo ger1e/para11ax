@@ -1,4 +1,4 @@
-const SOURCE_COUNT = '38';
+const SOURCE_COUNT = '39';
 const CANONICAL_PALETTE = [
   'void       #020403  terminal background',
   'phosphor   #39FF14  primary radar / verified state',
@@ -18,8 +18,8 @@ function scrubLegacyBootArt() {
 
 function normalizeSourceCount(root = document) {
   for (const node of root.querySelectorAll?.('.shell-footer-center,.shell-footer-mobile') || []) {
-    if (node.textContent.includes('37 SOURCES')) node.textContent = node.textContent.replace('37 SOURCES', `${SOURCE_COUNT} SOURCES`);
-    if (node.textContent.includes('37 SRC')) node.textContent = node.textContent.replace('37 SRC', `${SOURCE_COUNT} SRC`);
+    node.textContent = node.textContent.replace(/\b\d{1,3} SOURCES\b/, `${SOURCE_COUNT} SOURCES`);
+    node.textContent = node.textContent.replace(/\b\d{1,3} SRC\b/, `${SOURCE_COUNT} SRC`);
   }
 }
 

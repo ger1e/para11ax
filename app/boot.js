@@ -27,7 +27,7 @@ export const PARA11AX_BOOT_LINES = Object.freeze([
   '[    0.416994] pxsvc[risk-axis]: CVSS isolated [ OK ]',
   '[    0.441862] pxsvc[stix-2.1]: serializer ready [ OK ]',
   '[    0.468220] pxsvc[export]: JSON channel ready [ OK ]',
-  '[    0.489668] pxsvc[provider-registry]: 38 sources registered [ OK ]',
+  '[    0.489668] pxsvc[provider-registry]: 39 sources registered [ OK ]',
   '[    0.512990] pxsvc[provider-registry]: arbitrary override disabled [ OK ]',
   '[    0.538221] pxsvc[active-scan]: disabled by policy [ OK ]',
   '[    0.563114] pxsvc[auth]: bearer storage volatile [ OK ]',
