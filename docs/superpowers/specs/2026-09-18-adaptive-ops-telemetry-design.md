@@ -69,7 +69,7 @@ Add public/generic controlled fixtures under `test/fixtures/detection-regression
 - negative benign/admin behavior;
 - false-positive overlap with legitimate RMM/admin activity;
 - browser-resident ClickFix/userscript boundary behavior;
-- missing required telemetry with expected `CANNOT OBSERVE`.
+- missing required telemetry with expected `CANNOT_OBSERVE`.
 
 Fixtures define scenario, expected telemetry and expected analytical result. They contain no client names, internal hosts, users, incident evidence or customer-specific indicators.
 
@@ -105,3 +105,7 @@ TDD sequence after repository discovery:
 The current internal telemetry + eval subsystem is the measurement substrate. External observability tooling is admitted only after production measurements identify an unresolved dimension the internal substrate cannot economically supply, such as distributed tracing across multiple services, sustained failure diagnosis, long-retention querying or user/product analytics with a concrete decision owner.
 
 The normal integration gate remains approximately 2% unique decision gain plus a distinct evidence/action plane. Until that evidence exists, adding a vendor SDK would increase attack surface and operational entropy without demonstrated value.
+
+---
+
+<p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
