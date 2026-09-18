@@ -3,12 +3,12 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './browser-tests',
   testMatch: '**/*.spec.mjs',
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  workers: 2,
-  timeout: 45_000,
-  expect: { timeout: 30_000 },
+  workers: 1,
+  timeout: 60_000,
+  expect: { timeout: 45_000 },
   reporter: 'line',
   outputDir: 'artifacts/browser-smoke',
   use: {

@@ -2,6 +2,15 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
+import browserConfig from '../playwright.config.mjs';
+
+test('browser smoke serializes full audiovisual boots within a bounded timeout', () => {
+  assert.equal(browserConfig.fullyParallel, false);
+  assert.equal(browserConfig.workers, 1);
+  assert.equal(browserConfig.timeout, 60_000);
+  assert.equal(browserConfig.expect?.timeout, 45_000);
+});
+
 test('browser smoke command exposes desktop and reduced-motion mobile Initialize coverage', () => {
   const result = spawnSync('npm', ['run', 'test:browser', '--', '--list'], {
     cwd: new URL('..', import.meta.url),
