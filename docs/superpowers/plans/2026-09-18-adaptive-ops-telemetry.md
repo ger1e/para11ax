@@ -91,3 +91,7 @@ Update current operations/architecture documentation only where it owns runtime 
 5. Confirm current source-family contract remains 39.
 6. Squash merge only after required checks pass.
 7. Re-fetch protected main and verify the merged revision and current documentation.
+
+---
+
+<p align="center"><sub>PΛRΛ11ΛX // PER ASPERA AD ASTRA</sub></p>
