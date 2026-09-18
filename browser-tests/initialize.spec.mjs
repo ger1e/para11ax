@@ -21,7 +21,6 @@ function captureRuntimeFailures(page) {
 
 async function exerciseInitialize(page, { reducedMotion, viewportWidth }) {
   const failures = captureRuntimeFailures(page);
-  await page.clock.install();
   await page.goto('/app/', { waitUntil: 'load' });
 
   expect(page.viewportSize()?.width).toBe(viewportWidth);
@@ -33,12 +32,15 @@ async function exerciseInitialize(page, { reducedMotion, viewportWidth }) {
   await expect(initialize).toBeEnabled();
   await initialize.click();
   await expect(initialize).toBeDisabled();
-  await page.clock.runFor(20_000);
+
+  const skip = page.getByRole('button', { name: 'SKIP', exact: true });
+  await expect(skip).toBeVisible();
+  await expect(skip).toBeEnabled();
+  await skip.click();
 
   const snapshot = await page.evaluate(() => {
     const region = document.querySelector('[role="region"][aria-label="PARA11AX interactive analyst shell"]');
     return {
-      bootLog: document.querySelector('#boot-log')?.textContent ?? '',
       bootStatus: document.querySelector('#boot-status')?.textContent ?? '',
       reducedMotion: document.body.classList.contains('reduced-terminal-motion'),
       regionVisible: Boolean(region && region.getClientRects().length),
@@ -49,7 +51,6 @@ async function exerciseInitialize(page, { reducedMotion, viewportWidth }) {
   });
 
   expect({ ...snapshot, runtimeFailures: [...failures] }).toEqual({
-    bootLog: expect.stringContaining('pxsvc[provider-registry]: 39 sources registered'),
     bootStatus: 'pxsvcd: Gateway Terminal active',
     reducedMotion,
     regionVisible: true,

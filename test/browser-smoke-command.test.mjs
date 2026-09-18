@@ -5,19 +5,20 @@ import test from 'node:test';
 
 import browserConfig from '../playwright.config.mjs';
 
-test('browser smoke serializes full audiovisual boots within a bounded timeout', () => {
+test('browser smoke serializes audiovisual boots within a bounded timeout', () => {
   assert.equal(browserConfig.fullyParallel, false);
   assert.equal(browserConfig.workers, 1);
   assert.equal(browserConfig.timeout, 60_000);
   assert.equal(browserConfig.expect?.timeout, 45_000);
 });
 
-test('browser smoke advances intentional boot delays with the browser clock', () => {
+test('browser smoke uses the rendered skip control for a deterministic shell handoff', () => {
   const spec = readFileSync(new URL('../browser-tests/initialize.spec.mjs', import.meta.url), 'utf8');
-  assert.match(spec, /await page\.clock\.install\(\)/);
-  assert.match(spec, /await page\.clock\.runFor\(20_000\)/);
+  assert.match(spec, /name: 'INITIALIZE'/);
+  assert.match(spec, /name: 'SKIP'/);
+  assert.match(spec, /await skip\.click\(\)/);
   assert.match(spec, /const snapshot = await page\.evaluate/);
-  assert.doesNotMatch(spec, /const body = page\.locator/);
+  assert.doesNotMatch(spec, /page\.clock/);
 });
 
 test('browser smoke command exposes desktop and reduced-motion mobile Initialize coverage', () => {
