@@ -21,6 +21,7 @@ function captureRuntimeFailures(page) {
 
 async function exerciseInitialize(page, { reducedMotion, viewportWidth }) {
   const failures = captureRuntimeFailures(page);
+  await page.clock.install();
   await page.goto('/app/', { waitUntil: 'load' });
 
   expect(page.viewportSize()?.width).toBe(viewportWidth);
@@ -32,6 +33,7 @@ async function exerciseInitialize(page, { reducedMotion, viewportWidth }) {
   await expect(initialize).toBeEnabled();
   await initialize.click();
   await expect(initialize).toBeDisabled();
+  await page.clock.runFor(20_000);
 
   const body = page.locator('body');
   if (reducedMotion) await expect(body).toHaveClass(/reduced-terminal-motion/);

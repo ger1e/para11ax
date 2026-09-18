@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import browserConfig from '../playwright.config.mjs';
@@ -9,6 +10,12 @@ test('browser smoke serializes full audiovisual boots within a bounded timeout',
   assert.equal(browserConfig.workers, 1);
   assert.equal(browserConfig.timeout, 60_000);
   assert.equal(browserConfig.expect?.timeout, 45_000);
+});
+
+test('browser smoke advances intentional boot delays with the browser clock', () => {
+  const spec = readFileSync(new URL('../browser-tests/initialize.spec.mjs', import.meta.url), 'utf8');
+  assert.match(spec, /await page\.clock\.install\(\)/);
+  assert.match(spec, /await page\.clock\.runFor\(20_000\)/);
 });
 
 test('browser smoke command exposes desktop and reduced-motion mobile Initialize coverage', () => {
