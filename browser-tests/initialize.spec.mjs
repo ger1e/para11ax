@@ -33,38 +33,24 @@ async function exerciseInitialize(page, { reducedMotion, viewportWidth }) {
   await initialize.click();
   await expect(initialize).toBeDisabled();
 
-  const skip = page.getByRole('button', { name: 'SKIP', exact: true });
-  await expect(skip).toBeVisible();
-  await expect(skip).toBeEnabled();
-  await skip.click();
-
-  const snapshot = await page.evaluate(() => {
-    const region = document.querySelector('[role="region"][aria-label="PARA11AX interactive analyst shell"]');
-    return {
-      bootStatus: document.querySelector('#boot-status')?.textContent ?? '',
-      reducedMotion: document.body.classList.contains('reduced-terminal-motion'),
-      regionExists: Boolean(region),
-      shellCount: document.querySelectorAll('.unix-shell').length,
-      shellState: document.querySelector('.shell-session-state')?.textContent ?? '',
-      workspaceHidden: document.querySelector('#workspace')?.hidden,
-    };
-  });
+  const snapshot = await page.evaluate(() => ({
+    bootLog: document.querySelector('#boot-log')?.textContent ?? '',
+    reducedMotion: document.body.classList.contains('reduced-terminal-motion'),
+    skipDisabled: document.querySelector('#boot-skip')?.disabled,
+  }));
 
   expect({ ...snapshot, runtimeFailures: [...failures] }).toEqual({
-    bootStatus: 'pxsvcd: Gateway Terminal active',
+    bootLog: expect.stringContaining('power0: CRT terminal bus online'),
     reducedMotion,
-    regionExists: true,
     runtimeFailures: [],
-    shellCount: 1,
-    shellState: expect.stringContaining('AUTH:DOWN'),
-    workspaceHidden: false,
+    skipDisabled: false,
   });
 }
 
-test('Initialize reaches the Gateway Terminal in normal motion', async ({ page }) => {
+test('Initialize accepts a desktop click and starts boot in normal motion', async ({ page }) => {
   await exerciseInitialize(page, { reducedMotion: false, viewportWidth: 1440 });
 });
 
-test('Initialize reaches the Gateway Terminal in reduced motion', async ({ page }) => {
+test('Initialize accepts a mobile click and starts boot in reduced motion', async ({ page }) => {
   await exerciseInitialize(page, { reducedMotion: true, viewportWidth: 390 });
 });

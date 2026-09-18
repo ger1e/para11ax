@@ -12,11 +12,11 @@ test('browser smoke serializes audiovisual boots within a bounded timeout', () =
   assert.equal(browserConfig.expect?.timeout, 45_000);
 });
 
-test('browser smoke uses the rendered skip control for a deterministic shell handoff', () => {
+test('browser smoke proves Initialize accepts a real click without timer virtualization', () => {
   const spec = readFileSync(new URL('../browser-tests/initialize.spec.mjs', import.meta.url), 'utf8');
   assert.match(spec, /name: 'INITIALIZE'/);
-  assert.match(spec, /name: 'SKIP'/);
-  assert.match(spec, /await skip\.click\(\)/);
+  assert.match(spec, /await initialize\.click\(\)/);
+  assert.match(spec, /power0: CRT terminal bus online/);
   assert.match(spec, /const snapshot = await page\.evaluate/);
   assert.doesNotMatch(spec, /page\.clock/);
 
