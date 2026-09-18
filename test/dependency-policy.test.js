@@ -4,17 +4,19 @@ import { readFileSync } from 'node:fs';
 
 const text = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const json = path => JSON.parse(text(path));
+const approvedDevDependencies = Object.freeze({ '@playwright/test': '1.63.0' });
 
-test('npm dependency state is locked even when the runtime dependency set is empty', () => {
+test('npm dependency state keeps runtime empty and pins only the browser QA toolchain', () => {
   const pkg = json('package.json');
   const lock = json('package-lock.json');
   assert.equal(lock.lockfileVersion, 3);
   assert.equal(lock.name, pkg.name);
   assert.equal(lock.version, pkg.version);
   assert.deepEqual(pkg.dependencies ?? {}, {});
-  assert.deepEqual(pkg.devDependencies ?? {}, {});
+  assert.deepEqual(pkg.devDependencies ?? {}, approvedDevDependencies);
   assert.deepEqual(lock.packages?.['']?.dependencies ?? {}, {});
-  assert.deepEqual(lock.packages?.['']?.devDependencies ?? {}, {});
+  assert.deepEqual(lock.packages?.['']?.devDependencies ?? {}, approvedDevDependencies);
+  assert.equal(lock.packages?.['node_modules/@playwright/test']?.version, '1.63.0');
 });
 
 test('CI performs deterministic install and a real npm audit against the committed lockfile', () => {

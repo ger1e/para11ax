@@ -65,11 +65,12 @@ test('portable mission exports contain data only and no secret-shaped keys', asy
   assert.doesNotMatch(artifact.content, /bearer\s+[a-z0-9._~-]+/i);
 });
 
-test('mission workspace adds no npm dependency surface', () => {
+test('mission workspace keeps runtime dependencies empty and preserves the browser QA allowlist', () => {
   const pkg = JSON.parse(text('package.json'));
   const lock = JSON.parse(text('package-lock.json'));
+  const approvedDevDependencies = { '@playwright/test': '1.63.0' };
   assert.deepEqual(pkg.dependencies ?? {}, {});
-  assert.deepEqual(pkg.devDependencies ?? {}, {});
+  assert.deepEqual(pkg.devDependencies ?? {}, approvedDevDependencies);
   assert.deepEqual(lock.packages?.['']?.dependencies ?? {}, {});
-  assert.deepEqual(lock.packages?.['']?.devDependencies ?? {}, {});
+  assert.deepEqual(lock.packages?.['']?.devDependencies ?? {}, approvedDevDependencies);
 });

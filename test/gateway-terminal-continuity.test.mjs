@@ -37,6 +37,58 @@ test('terminal runtime keeps Pepe boot-only and does not restore boot artifacts 
   assert.doesNotMatch(entry, /bootLog\.replaceChildren\(\)[\s\S]{0,400}stage === ['"]boot-line['"]/, 'boot lines must remain visible during the boot sequence itself');
 });
 
+test('active analyst shell is an explicitly named accessibility region', async () => {
+  const shell = await read('app/shell-ui.js');
+  assert.match(shell, /root\.setAttribute\(['"]role['"],\s*['"]region['"]\)/);
+  assert.match(shell, /root\.setAttribute\(['"]aria-label['"],\s*['"]PARA11AX interactive analyst shell['"]\)/);
+});
+
+
+test('Pepe boot reveal avoids unbounded per-glyph paint effects', async () => {
+  const html = await read('app/index.html');
+  const entry = await read('app/terminal-entry.js');
+  const base = await read('app/app-base.css');
+  const deck = await read('app/analyst-deck.css');
+  const shell = await read('app/shell.css');
+  assert.match(html, /id="pepe-ascii"[^>]*boot-pepe-source/);
+  assert.match(html, /id="pepe-canvas"[^>]*boot-pepe-canvas/);
+  assert.match(entry, /function renderPepeCanvas\(\)/);
+  assert.match(entry, /pepeCanvas\.getContext\('2d'\)/);
+  assert.match(entry, /codePointAt\(column\) - 0x2800/);
+  assert.match(entry, /context\.rect\(/);
+  assert.doesNotMatch(entry, /fillText\(/);
+  assert.match(base, /\.boot-pepe-source\{display:none!important\}/);
+  assert.match(base, /\.boot-pepe\{[^}]*text-shadow:none;[^}]*contain:layout paint style/);
+  assert.doesNotMatch(base, /@keyframes pepe-(?:resolve|glitch)\{[^}]*(?:clip-path|filter|text-shadow)/);
+  assert.match(deck, /\.boot-pepe\{[^}]*text-shadow:none!important/);
+  assert.doesNotMatch(shell, /\.glitch-pepe \.boot-pepe\{[^}]*px-glitch-(?:tear|chroma)/);
+});
+
+test('active visual boot never waits for audio unlock settlement', async () => {
+  const stages = [];
+  let enableCalls = 0;
+  const boot = createPara11axBootSequence({
+    audio: {
+      enable: () => {
+        enableCalls += 1;
+        return new Promise(() => {});
+      },
+      play: () => {},
+      stopAll: () => {},
+    },
+    sleep: async () => {},
+    onStage: name => stages.push(name),
+  });
+
+  const result = await Promise.race([
+    boot.start(),
+    new Promise(resolve => setTimeout(() => resolve('audio-timeout'), 100)),
+  ]);
+  assert.equal(result, true);
+  assert.equal(enableCalls, 1);
+  assert.equal(stages.at(-1), 'ready');
+});
+
 test('backspace cue is not suppressed by character typing throttle', async () => {
   let clock = 1000;
   const audio = createAudioEngine({ AudioContextCtor: FakeAudioContext, now: () => clock });

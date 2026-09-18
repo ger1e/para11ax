@@ -61,11 +61,13 @@ npm run verify:repo
 npm run lint:shell
 npm run check
 npm test
+npx playwright install --with-deps chromium
+npm run test:browser
 cd maltego && python3 -m unittest discover -s tests -v
 cd .. && python3 -m compileall -q maltego
 ```
 
-`npm run check` includes documentation-contract tests. If one fails after a canonical contract change, fix the documentation/source mismatch; do not weaken an accurate assertion merely to preserve stale text.
+`npm run check` includes documentation-contract tests. `npm run test:browser` serves the production Vercel app rewrites locally and exercises the complete Initialize flow in desktop/normal-motion and mobile/reduced-motion Chromium contexts. Install the pinned Chromium runtime once per clean environment. If a documentation contract fails after a canonical change, fix the documentation/source mismatch; do not weaken an accurate assertion merely to preserve stale text.
 
 #### Scheduler change requirements
 

@@ -25,6 +25,7 @@ const bootSkip = byId('boot-skip');
 const bootStatus = byId('boot-status');
 const bootLog = byId('boot-log');
 const pepe = byId('pepe-ascii');
+const pepeCanvas = byId('pepe-canvas');
 const workspace = byId('workspace');
 const accessPanel = byId('access-panel');
 const bootScreen = bootPanel.querySelector('.boot-screen');
@@ -118,6 +119,45 @@ function createBootGlobe() {
 const bootGlobe = createBootGlobe();
 void bootGlobe;
 
+function renderPepeCanvas() {
+  const width = Math.max(1, Math.floor(bootScreen.clientWidth));
+  const height = Math.max(1, Math.floor(bootScreen.clientHeight - 43));
+  const ratio = Math.min(Number(globalThis.devicePixelRatio) || 1, 2);
+  const pixelWidth = Math.max(1, Math.floor(width * ratio));
+  const pixelHeight = Math.max(1, Math.floor(height * ratio));
+  if (pepeCanvas.width === pixelWidth && pepeCanvas.height === pixelHeight && pepeCanvas.dataset.rendered === 'true') return;
+
+  pepeCanvas.width = pixelWidth;
+  pepeCanvas.height = pixelHeight;
+  pepeCanvas.style.width = `${width}px`;
+  pepeCanvas.style.height = `${height}px`;
+  const context = pepeCanvas.getContext('2d');
+  if (!context) return;
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.clearRect(0, 0, width, height);
+
+  const lines = pepe.textContent.split('\n');
+  const longest = Math.max(1, ...lines.map(line => line.length));
+  const cell = Math.max(1, Math.min(width / longest, height / (lines.length * 2)));
+  const dot = Math.max(.45, cell * .34);
+  const left = Math.max(0, (width - longest * cell) / 2);
+  const dots = [[0, 0, 0], [1, 0, 1], [2, 0, 2], [3, 1, 0], [4, 1, 1], [5, 1, 2], [6, 0, 3], [7, 1, 3]];
+  context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--terminal-phosphor').trim() || '#39ff14';
+  context.globalAlpha = .84;
+  context.beginPath();
+  lines.forEach((line, row) => {
+    for (let column = 0; column < line.length; column += 1) {
+      const bits = line.codePointAt(column) - 0x2800;
+      if (bits < 0 || bits > 0xff) continue;
+      for (const [bit, x, y] of dots) {
+        if (bits & (1 << bit)) context.rect(left + column * cell + x * cell * .46, row * cell * 2 + y * cell * .46, dot, dot);
+      }
+    }
+  });
+  context.fill();
+  pepeCanvas.dataset.rendered = 'true';
+}
+
 function clearBootClasses() {
   document.body.classList.remove(
     'boot-powering', 'boot-modem', 'boot-pepe-visible', 'boot-glitch',
@@ -139,6 +179,7 @@ function resetBootSurface() {
   bootStatus.textContent = 'STANDBY // USER INPUT REQUIRED';
   bootLog.replaceChildren();
   pepe.hidden = true;
+  pepeCanvas.hidden = true;
   bootInitialize.disabled = false;
   bootSkip.disabled = false;
   bootLineStarted = false;
@@ -233,6 +274,8 @@ function renderBootStage(stage, payload) {
     document.body.classList.add('boot-pepe-visible', 'boot-glitch');
     bootStatus.textContent = 'firmware0: signature verified';
     pepe.hidden = false;
+    renderPepeCanvas();
+    pepeCanvas.hidden = false;
     triggerGlitch(bootPanel, 'glitch-pepe', 260);
     return;
   }
@@ -240,6 +283,7 @@ function renderBootStage(stage, payload) {
     document.body.classList.remove('boot-pepe-visible', 'boot-glitch');
     document.body.classList.add('boot-scanning');
     pepe.hidden = true;
+    pepeCanvas.hidden = true;
     bootStatus.textContent = 'pxsvcd: gateway.target reached';
     appendTarget(payload);
     triggerGlitch(bootPanel, 'glitch-lock', 420);

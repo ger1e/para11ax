@@ -116,6 +116,10 @@ The implementation and documentation must agree that:
 - no new network, credential/environment, persistence or dependency surface exists;
 - no LLM, runtime learning or universal maliciousness score exists.
 
+### Browser Initialize CI contract
+
+Required Tooling smoke serves the same `/app/app.js` and `/app/app.css` rewrites used by Vercel and runs pinned Chromium against two complete user paths: desktop with normal motion and a 390px mobile viewport with reduced motion. Both paths must accept `INITIALIZE`, render the canonical `39 sources registered` boot line, reach the unauthenticated Gateway Terminal, and emit no page, console, script or stylesheet failures. Visual boot must begin without waiting for browser audio-unlock settlement; audio activation remains a best-effort side effect of the synchronous user gesture.
+
 ## Findings and dispositions
 
 ### QA-001 — architecture omitted the certificate workflow

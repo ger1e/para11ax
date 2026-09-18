@@ -86,6 +86,7 @@ export function mountAnalystShell({
 
   const root = document.createElement('section');
   root.className = 'unix-shell';
+  root.setAttribute('role', 'region');
   root.setAttribute('aria-label', 'PARA11AX interactive analyst shell');
 
   const status = document.createElement('header');
@@ -124,7 +125,16 @@ export function mountAnalystShell({
   container.hidden = false;
 
   const focusInput = () => input.focus({ preventScroll: true });
-  const scrollBottom = () => { scrollback.scrollTop = scrollback.scrollHeight; };
+  let scrollPending = false;
+  const scrollBottom = () => {
+    if (scrollPending) return;
+    scrollPending = true;
+    const apply = () => {
+      scrollPending = false;
+      scrollback.scrollTop = Number.MAX_SAFE_INTEGER;
+    };
+    globalThis.setTimeout(apply, 0);
+  };
   const appendLine = (text = '', tone = '') => {
     const line = document.createElement('div');
     line.className = `shell-line${tone ? ` shell-${tone}` : ''}`;
@@ -502,7 +512,7 @@ export function mountAnalystShell({
   appendLine('CTI Enrichment // session unauthenticated', 'muted');
   appendLine("type 'help' for commands; run 'login' to authenticate", 'cyan');
   updatePrompt();
-  focusInput();
+  globalThis.setTimeout(focusInput, 1000);
 
   return Object.freeze({
     focus: focusInput,

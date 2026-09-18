@@ -311,7 +311,7 @@ PARA11AX has **39 configured sources** (upstream APIs and feeds) in the canonica
 <strong>EGRESS</strong> — exact declared provider hosts; Kernel/Scheduler add no new egress; Shodan shell uses exact `https://api.shodan.io`; Swarm uses exact `https://api.greynoise.io`; User Scanner uses its configured worker only<br/>
 <strong>SECRETS</strong> — `SHODAN_API_KEY`, `GREYNOISE_API_KEY` and all provider/worker credentials remain server-side; MCP does not expose environment-secret values<br/>
 <strong>STATE</strong> — operator utilities do not silently mutate Evidence v2 or Intelligence Kernel state; MCP mission/Domain Investigation/investigation/case state is explicit state-in/state-out, not hidden server persistence<br/>
-<strong>CI</strong> — protected `main` requires Tooling smoke; CodeQL runs alongside it<br/>
+<strong>CI</strong> — protected `main` requires Tooling smoke, including desktop/mobile Chromium Initialize coverage; CodeQL runs alongside it<br/>
 <strong>DEPLOY</strong> — repository/CI proof and production deployment proof remain separate; see Operations/QA for exact current state</sub>
 
 <sub><strong>INVESTIGATION WORKSPACE V2</strong> — one deterministic lifecycle connects scope, pinned observables, Evidence v2 capture, explicit operator-context capture, relevance, hunt construction, conservative KQL validation, bounded result import, explicit analyst disposition, reporting, and ServiceNow-ready projection. Browser persistence is local; MCP uses explicit portable state. Start with `investigation new "title"`, inspect with `investigation status`, or use `para11ax_investigation` remotely.</sub>
