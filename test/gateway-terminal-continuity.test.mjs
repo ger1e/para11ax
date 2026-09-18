@@ -43,6 +43,17 @@ test('active analyst shell is an explicitly named accessibility region', async (
   assert.match(shell, /root\.setAttribute\(['"]aria-label['"],\s*['"]PARA11AX interactive analyst shell['"]\)/);
 });
 
+
+test('Pepe boot reveal avoids unbounded per-glyph paint effects', async () => {
+  const base = await read('app/app-base.css');
+  const deck = await read('app/analyst-deck.css');
+  const shell = await read('app/shell.css');
+  assert.match(base, /\.boot-pepe\{[^}]*text-shadow:none;[^}]*contain:layout paint style/);
+  assert.doesNotMatch(base, /@keyframes pepe-(?:resolve|glitch)\{[^}]*(?:clip-path|filter|text-shadow)/);
+  assert.match(deck, /\.boot-pepe\{[^}]*text-shadow:none!important/);
+  assert.doesNotMatch(shell, /\.glitch-pepe \.boot-pepe\{[^}]*px-glitch-(?:tear|chroma)/);
+});
+
 test('active visual boot never waits for audio unlock settlement', async () => {
   const stages = [];
   let enableCalls = 0;
