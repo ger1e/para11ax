@@ -36,7 +36,7 @@ jobs:
 
       - name: Setup Node.js
         id: setup_node
-        uses: actions/setup-node@db0fb3a98ed314b69026b6e8c9be26a7e2fe65a8
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: '.nvmrc'
           package-manager-cache: false
