@@ -92,7 +92,7 @@ export function createBootSequence({
     async start() {
       if (started || done) return false;
       started = true;
-      await safeEnable();
+      void safeEnable(); // Audio must never gate terminal initialization.
 
       if (reducedMotion) {
         onStage('reduced');
@@ -128,7 +128,7 @@ export function createBootSequence({
       if (done) return false;
       if (!started) {
         started = true;
-        await safeEnable();
+        void safeEnable();
       }
       safeStop();
       skipped = true;
@@ -310,17 +310,27 @@ function bootstrap() {
   const reducedMotion = Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
   const boot = createBootSequence({ audio, reducedMotion, onStage: renderBootStage });
 
-  bootInitialize.addEventListener('click', () => {
-    bootInitialize.disabled = true;
-    void boot.start().then((ran) => {
-      bootSkip.disabled = true;
-      if (ran) revealAccess();
-    });
-  });
-  bootSkip.addEventListener('click', () => {
+  // The animation is cosmetic. Never let a stalled timer, audio promise, or
+  // rendering error prevent access to the authenticated terminal.
+  let bootWatchdog = null;
+  const finishBoot = () => {
+    if (bootWatchdog !== null) clearTimeout(bootWatchdog);
+    bootWatchdog = null;
     bootInitialize.disabled = true;
     bootSkip.disabled = true;
-    void boot.skip().then((ran) => { if (ran) revealAccess(); });
+    revealAccess();
+  };
+  bootInitialize.addEventListener('click', () => {
+    bootInitialize.disabled = true;
+    bootWatchdog = setTimeout(finishBoot, 9000);
+    void boot.start().then((ran) => {
+      if (ran) finishBoot();
+    }).catch(finishBoot);
+  });
+  bootSkip.addEventListener('click', () => {
+    // Skip is an emergency escape hatch, even while INITIALIZE is running.
+    finishBoot();
+    void boot.skip().catch(() => {});
   });
 
   function setBusy(value) {
