@@ -33,7 +33,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@db0fb3a98ed314b69026b6e8c9be26a7e2fe65a8
+        uses: actions/setup-node@101b3474143230c3562bd21f0b3c3f8254784571
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
@@ -102,7 +102,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@db0fb3a98ed314b69026b6e8c9be26a7e2fe65a8
+        uses: actions/setup-node@101b3474143230c3562bd21f0b3c3f8254784571
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
