@@ -1,5 +1,5 @@
 const media = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
-const reduced = Boolean(media?.matches);
+const reduced = () => Boolean(media?.matches);
 const CURSOR_HREF = '/site-cursor.css';
 const MOTION_HREF = '/landing-radar-motion.css';
 const DESKTOP_FIT_HREF = '/landing-desktop-fit.css';
@@ -43,10 +43,13 @@ let glitchTimer = null;
 let resetTimer = null;
 
 function scheduleGlitch() {
-  if (reduced || !hero) return;
+  if (reduced() || !hero || document.hidden || glitchTimer !== null || resetTimer !== null) return;
   glitchTimer = globalThis.setTimeout(() => {
+    glitchTimer = null;
+    if (reduced() || document.hidden) return;
     hero.classList.add('is-glitching');
     resetTimer = globalThis.setTimeout(() => {
+      resetTimer = null;
       hero.classList.remove('is-glitching');
       scheduleGlitch();
     }, 280);
@@ -68,7 +71,8 @@ media?.addEventListener?.('change', event => {
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) revealAll();
+  if (document.hidden) clearMotionTimers();
+  else { revealAll(); scheduleGlitch(); }
 });
 
 export {

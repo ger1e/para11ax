@@ -142,7 +142,7 @@ export function buildOverview(envelope) {
 export function buildEvidence(envelope) {
   return (envelope.evidence || []).map((item) => {
     const kind = item.observation?.kind || 'unknown';
-    const semanticClass = CONTEXT.has(kind) ? 'context' : CLAIM.has(kind) ? 'claim' : 'evidence';
+    const semanticClass = CONTEXT.has(kind) ? 'context' : CLAIM.has(kind) || item.provider === 'otx' || item.provider === 'abuseipdb' ? 'claim' : 'evidence';
     return {
       provider: item.provider,
       kind,
@@ -152,7 +152,7 @@ export function buildEvidence(envelope) {
       confidence: item.observation?.confidence ?? null,
       firstSeen: item.observation?.firstSeen ?? null,
       lastSeen: item.observation?.lastSeen ?? null,
-      attributeFacts: toFactRows(item.observation?.attributes ?? {}),
+      attributeFacts: toFactRows(item.observation?.attributes ?? {}, { limit: 96 }),
       tags: (item.observation?.tags ?? []).map(value => scalar(value) ?? String(value)),
       malwareFamily: item.observation?.malwareFamily ?? null,
       actorFacts: item.observation?.actor ? toFactRows(item.observation.actor) : [],
@@ -632,6 +632,16 @@ export function buildIpAnalystReport({ overview, evidence, correlation, relation
     ...limitationValues.map((value, index) => ({ label: `LIMITATION ${index + 1}`, value })),
   ];
 
+  const communityFacts = cards.flatMap(card => (card.attributeFacts || [])
+    .filter(fact => /^COMMUNITY /.test(fact.label) && meaningfulFact(fact))
+    .map(fact => ({ ...fact, sources: [card.provider] })));
+  if (communityFacts.length) sections.push({ id: 'community-context', title: 'COMMUNITY CONTEXT / UNVERIFIED', summary: 'Source-reported community claims are not independent evidence or confirmed malware attribution. Coverage is limited to returned records.', facts: communityFacts, items: [] });
+  const additionalFacts = cards.flatMap(card => (card.attributeFacts || [])
+    .filter(fact => /^(REPORTED MALWARE FAMILIES|CONFLICTING FAMILY LABELS|REPORTED ASSOCIATIONS|OMITTED ASSOCIATIONS|VENDOR SUGGESTED THREAT LABEL|VENDOR POPULAR THREAT)/.test(fact.label) && meaningfulFact(fact))
+    .map(fact => ({ ...fact, sources: [card.provider] })));
+  if (additionalFacts.length) sections.push({ id: 'reported-classifications', title: 'SOURCE-REPORTED CLASSIFICATIONS', summary: 'Provider and engine labels may differ; they are not independent attribution confirmations.', facts: additionalFacts, items: [] });
+  const sourceUrls = [...new Set(cards.flatMap(card => card.references || []).filter(value => typeof value === 'string' && /^https?:\/\//i.test(value)))].sort();
+  if (sourceUrls.length) sections.push({ id: 'source-references', title: 'SOURCE REFERENCES', facts: sourceUrls.map((value, index) => ({ label: 'SOURCE ' + (index + 1), value })), items: [] });
   const assessment = buildIpAssessment({ overview, evidence: cards, correlation: correlation || {}, sections, intelligence });
   return {
     title: `IP INTELLIGENCE REPORT // ${overview.indicator}`,

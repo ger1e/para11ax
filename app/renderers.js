@@ -1,4 +1,4 @@
-import { buildIpAnalystReport } from './view-model.js';
+import { buildIpAnalystReport, renderIpAnalystReportText } from './view-model.js';
 
 if (typeof document !== 'undefined' && !document.querySelector('link[href="/app/analyst-facts.css"]')) {
   const styles = document.createElement('link');
@@ -38,7 +38,20 @@ function appendFacts(target, facts, empty = '') {
   const grid = el('dl', 'fact-grid');
   for (const fact of facts) {
     const row = el('div', 'fact-row');
-    row.append(el('dt', 'fact-label', fact.label), el('dd', 'fact-value', displayFactValue(fact)));
+    const value = el('dd', 'fact-value', displayFactValue(fact));
+    if (/^SOURCE \d+$/.test(fact.label) && typeof fact.value === 'string') {
+      try {
+        const url = new URL(fact.value);
+        if (url.protocol === 'https:' && !url.username && !url.password) {
+          const anchor = el('a', 'reference', fact.value);
+          anchor.href = url.href;
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
+          value.replaceChildren(anchor);
+        }
+      } catch {}
+    }
+    row.append(el('dt', 'fact-label', fact.label), value);
     grid.append(row);
   }
   target.append(grid);
@@ -240,6 +253,181 @@ function compactFailureLine(failure) {
   return article;
 }
 
+
+// Scene NFO presentation: original CP437-inspired typography, no dependency.
+const NFO_WIDTH = 76;
+const NFO_GLYPHS = {
+  P: ['11110','10001','11110','10000','10000'],
+  A: ['01110','10001','11111','10001','10001'],
+  R: ['11110','10001','11110','10100','10010'],
+  '1': ['00100','01100','00100','00100','01110'],
+  X: ['10001','01010','00100','01010','10001'],
+};
+const NFO_LOGO = Array.from({length: 5}, (_, row) =>
+  [...'PARA11AX'].map(char => NFO_GLYPHS[char][row].replace(/1/g, '█').replace(/0/g, ' ')).join(' '));
+function cleanNfo(value) {
+  return String(value ?? '').replace(/\r\n?/g, '\n')
+    .replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ');
+}
+function nfoCenter(value) {
+  return ' '.repeat(Math.max(0, Math.floor((NFO_WIDTH - value.length) / 2))) + value;
+}
+function nfoRule(title, index) {
+  const label = ' ▄▄[ ' + String(index).padStart(2, '0') + ' :: ' + cleanNfo(title).slice(0, 51) + ' ]';
+  return label + '▄'.repeat(Math.max(2, NFO_WIDTH - label.length - 2)) + '▀ ';
+}
+function nfoWrap(line) {
+  if (/^\s*SOURCE \d+: https?:\/\//i.test(line)) return [line.trimStart()];
+  const indent = ' '.repeat(Math.min(6, line.match(/^\s*/)?.[0].length || 0));
+  const words = line.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [''];
+  const rows = [];
+  let row = indent;
+  for (const word of words) {
+    if (row.trim() && row.length + word.length + 1 > NFO_WIDTH - 4) {
+      rows.push(row); row = indent + '  ' + word;
+    } else row += (row.trim() ? ' ' : '') + word;
+  }
+  rows.push(row);
+  return rows;
+}
+export function formatNfoReport(reportText, references = []) {
+  const trusted = new Set(references);
+  const lines = cleanNfo(reportText).trimEnd().split('\n').map(line => {
+    const source = line.match(/^\s*SOURCE \d+: (https?:\/\/\S+)$/i);
+    if (source && trusted.has(source[1]) && nfoPortal(source[1])) return line;
+    // Only verified source-reference lines retain live URLs in the copyable report.
+    return line.replace(/https?:\/\/[^\s<>"']+/gi, value => {
+      try {
+        const parsed = new URL(value);
+        if (parsed.username || parsed.password || [...parsed.searchParams.keys()].some(sensitiveNfoParameter)) return '[REDACTED URL]';
+      } catch { /* preserve as defanged text */ }
+      return value.replace(/^http/i, 'hxxp');
+    });
+  });
+  const rule = ' ░▒▓' + '▀'.repeat(NFO_WIDTH - 8) + '▓▒░ ';
+  const out = [rule, '', ...NFO_LOGO.map(nfoCenter), '',
+    nfoCenter('T H R E A T   I N T E L L I G E N C E'),
+    nfoCenter('P E R   A S P E R A   A D   A S T R A'), '', rule, ''];
+  let section = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() && /^-{3,}$/.test(lines[i + 1] || '')) {
+      out.push(nfoRule(lines[i].trim(), ++section), ''); i++; continue;
+    }
+    for (const row of nfoWrap(lines[i])) out.push(row ? '    ' + row : '');
+  }
+  out.push('', ' ░▒▓' + '▄'.repeat(NFO_WIDTH - 8) + '▓▒░ ',
+    nfoCenter(':: END OF INTELLIGENCE TRANSMISSION ::'), '');
+  return out.join('\n');
+}
+const NFO_PORTALS = ['virustotal.com','abuseipdb.com','abuse.ch','alienvault.com',
+  'greynoise.io','shodan.io','censys.io','censys.com','pulsedive.com','urlscan.io',
+  'hybrid-analysis.com','malpedia.caad.fkie.fraunhofer.de','circl.lu','nist.gov',
+  'cisa.gov','first.org','mitre.org','osv.dev','ipinfo.io','ripe.net','cloudflare.com',
+  'threatminer.org','spamhaus.org','dshield.org','ransomlook.io','ransomware.live',
+  'torproject.org','webamon.com','shadowserver.org','team-cymru.com','vulncheck.com',
+  'deps.dev','archive.org','chainabuse.com','gitguardian.com','openphish.com'];
+function sensitiveNfoParameter(key) {
+  return /(?:^|[_-])(?:key|token|auth|secret|password|signature|credential)(?:$|[_-])|^(?:apikey|accesstoken|authorization)$/i.test(key);
+}
+function nfoPortal(value) {
+  try {
+    const u = new URL(value);
+    return u.protocol === 'https:' && !u.username && !u.password &&
+      NFO_PORTALS.some(host => u.hostname === host || u.hostname.endsWith('.' + host))
+      && ![...u.searchParams.keys()].some(sensitiveNfoParameter)
+      ? u : null;
+  } catch { return null; }
+}
+function nfoReferences(cards) {
+  return [...new Set(cards.flatMap(card => (card.references || []).map(ref =>
+    typeof ref === 'string' ? ref : ref?.url)).filter(ref => typeof ref === 'string' && /^https?:\/\//i.test(ref)))];
+}
+function nfoSection(title, lines) {
+  return [title, '-'.repeat(title.length), ...(lines.length ? lines : ['No records returned.']), ''];
+}
+function genericNfoText({overview, evidence, correlation, relationships, coverage}) {
+  const facts = rows => (rows || []).map(fact => '  ' + fact.label + ': ' + displayFactValue(fact));
+  const records = rows => (rows || []).flatMap(item => [item.title || 'RECORD', ...facts(item.facts)]);
+  return [
+    String(overview.type || 'observable').toUpperCase() + ' INTELLIGENCE REPORT // ' + overview.indicator,
+    'STATUS: ' + String(overview.status || 'unknown').toUpperCase(),
+    'PROFILE: ' + String(overview.profile || 'unknown').toUpperCase(),
+    'DURATION: ' + (overview.durationMs ?? 'unknown') + ' ms', '',
+    ...nfoSection('ASSESSMENT', ['COVERAGE: ' + overview.coverage, ...facts([
+      {label:'FRESHNESS',value:overview.freshness}, {label:'HUNTABILITY',value:overview.huntability?.level},
+      {label:'DISPOSITION',value:overview.decision?.disposition}, {label:'CONFIDENCE',value:overview.decision?.confidence},
+    ]), ...(overview.limitations || [])]),
+    ...nfoSection('PROVIDER INTELLIGENCE', evidence.flatMap(card => [
+      card.provider + ' // ' + card.kind + ' // ' + (card.verdict ?? 'unknown'),
+      '  SEMANTIC CLASS: ' + card.semanticClass, ...(card.semanticNote ? ['  ' + card.semanticNote] : []),
+      ...facts([['CONFIDENCE',card.confidence],['FIRST SEEN',card.firstSeen],['LAST SEEN',card.lastSeen],
+        ['MALWARE',card.malwareFamily],['TAGS',(card.tags || []).join(', ')]]
+        .filter(([,v]) => v !== null && v !== undefined && v !== '').map(([label,value]) => ({label,value}))),
+      ...facts(card.actorFacts), ...facts(card.attributeFacts), '',
+    ])),
+    ...nfoSection('CORROBORATION', records(correlation.corroboration)),
+    ...nfoSection('CONTRADICTIONS', records(correlation.contradictions)),
+    ...nfoSection('VULNERABILITY RISK', Object.entries(correlation.riskAxes || {}).flatMap(([key,axis]) =>
+      [key.toUpperCase() + ': ' + axis.display, ...facts(axis.facts)])),
+    ...nfoSection('RELATIONSHIPS', records(relationships)),
+    ...nfoSection('SOURCE REFERENCES', nfoReferences(evidence).map((ref,i) => 'SOURCE ' + (i+1) + ': ' + ref)),
+    ...nfoSection('PROVIDER COVERAGE', [coverage.summaryText || overview.coverage, ...(coverage.failures || []).flatMap(f =>
+      [f.provider + ': ' + f.label, '  ' + f.summary, ...facts(f.details)])]),
+  ].join('\n');
+}
+function nfoPanel(reportText, references) {
+  const ascii = el('details', 'brief-section ip-ascii-report');
+  ascii.open = true;
+  const copy = el('button', 'report-copy', 'COPY NFO REPORT');
+  copy.type = 'button';
+  copy.setAttribute('aria-label', 'Copy complete NFO intelligence report');
+  const summary = el('summary', 'view-label', 'NFO / INTELLIGENCE TRANSMISSION');
+  const pre = el('pre', 'shell-pre');
+  pre.style.whiteSpace = 'pre';
+  pre.style.overflowX = 'auto';
+  pre.style.maxWidth = '100%';
+  pre.style.minWidth = '0';
+  pre.style.fontFamily = 'ui-monospace, SFMono-Regular, Consolas, monospace';
+  pre.style.lineHeight = '1.2';
+  pre.style.fontVariantLigatures = 'none';
+  pre.tabIndex = 0;
+  const trusted = new Set(references);
+  const framed = formatNfoReport(reportText, references);
+  const output = [];
+  for (const line of framed.split('\n')) {
+    const match = line.match(/^\s*SOURCE \d+: (https?:\/\/\S+)/i);
+    const url = match && trusted.has(match[1]) ? nfoPortal(match[1]) : null;
+    if (url) {
+      const at = line.indexOf(match[1]);
+      const a = el('a', 'reference', match[1]);
+      a.href = url.href; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      pre.append(document.createTextNode(line.slice(0, at)), a, document.createTextNode(line.slice(at + match[1].length) + '\n'));
+    } else {
+      pre.append(document.createTextNode(line + '\n'));
+    }
+    output.push(line);
+  }
+  const status = el('span', 'signal-meta', '');
+  status.setAttribute('role', 'status');
+  copy.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(output.join('\n'));
+      status.textContent = ' [ COPIED ]';
+    } catch {
+      ascii.open = true;
+      const range = document.createRange(); range.selectNodeContents(pre);
+      const selection = globalThis.getSelection?.();
+      selection?.removeAllRanges(); selection?.addRange(range);
+      status.textContent = selection ? ' [ SELECTED / CTRL+C ]' : ' [ COPY UNAVAILABLE / SELECT TEXT ]';
+    }
+  });
+  const toolbar = el('div', 'nfo-toolbar');
+  toolbar.append(copy, status);
+  ascii.append(summary, pre);
+  return {toolbar, ascii};
+}
+
 function ipReportContent(models) {
   const report = buildIpAnalystReport(models);
   const root = el('section', 'analyst-brief ip-intelligence-report');
@@ -248,7 +436,9 @@ function ipReportContent(models) {
   const heading = el('header', 'brief-section ip-report-header');
   heading.append(el('h1', 'fact-title ip-report-title', report.title || 'IP INTELLIGENCE REPORT'));
   heading.append(el('p', 'coverage-line', `${String(report.status || 'unknown').toUpperCase()} · PROFILE ${String(report.profile || 'unknown').toUpperCase()} · ${report.durationMs ?? '—'} ms`));
-  root.append(heading);
+  const nfo = nfoPanel(renderIpAnalystReportText(report), nfoReferences(models.evidence));
+  heading.append(nfo.toolbar);
+  root.append(heading, nfo.ascii);
 
   const assessment = el('section', 'brief-section ip-report-assessment ip-at-a-glance');
   assessment.append(sectionLabel('EXECUTIVE ASSESSMENT'));
@@ -341,6 +531,8 @@ export function renderBrief(target, { overview, evidence, correlation, relations
   }
 
   const brief = el('section', 'analyst-brief');
+  const nfo = nfoPanel(genericNfoText({ overview, evidence, correlation, relationships, coverage }), nfoReferences(evidence));
+  brief.append(nfo.toolbar, nfo.ascii);
 
   const summarySection = el('section', 'brief-section brief-summary');
   summarySection.append(sectionLabel('SUMMARY'), overviewContent(overview));

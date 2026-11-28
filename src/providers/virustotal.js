@@ -187,8 +187,66 @@ function certificateResult(input, raw) {
   };
 }
 
+
+const COMMUNITY_PAGE_LIMIT = 20;
+
+function safeCommunityText(value) {
+  return typeof value === 'string'
+    ? value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ')
+      .replace(/\bhttps?:\/\//gi, match => match.toLowerCase().startsWith('https') ? 'hxxps://' : 'hxxp://')
+      .replace(/\s+/g, ' ').trim().slice(0, 600)
+    : '';
+}
+
+function voteCount(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
+function guiReference(input, raw) {
+  const type = { ip: 'ip-address', domain: 'domain', hash: 'file', url: 'url' }[input.type];
+  const id = input.type === 'url' ? raw?.data?.id : input.value;
+  if (!type || typeof id !== 'string' || (input.type === 'url' && !/^[a-f0-9]{64}$/i.test(id))) {
+    return 'https://www.virustotal.com/gui/home/search';
+  }
+  return 'https://www.virustotal.com/gui/' + type + '/' + encodeURIComponent(id);
+}
+
+async function communityContext(input, context, key) {
+  if (context.env?.VIRUSTOTAL_COMMUNITY_COMMENTS !== 'true') return { status: 'disabled' };
+  try {
+    const signals = [AbortSignal.timeout(2000), ...(context.signal ? [context.signal] : [])];
+    const raw = await fetchJson('https://www.virustotal.com/api/v3/' + vtPath(input) + '/comments?limit=' + COMMUNITY_PAGE_LIMIT, {
+      ...context, signal: AbortSignal.any(signals), method: 'GET',
+      headers: { 'x-apikey': key }, maxBytes: 500_000,
+    });
+    if (!Array.isArray(raw?.data)) return { status: 'invalid_response' };
+    const seen = new Set();
+    const entries = [];
+    for (const item of raw.data.slice(0, COMMUNITY_PAGE_LIMIT)) {
+      const a = item?.attributes;
+      const text = safeCommunityText(a?.text);
+      if (item?.type !== 'comment' || !text || seen.has(text)) continue;
+      const votes = a.votes ?? {};
+      if (voteCount(votes.abuse) > 0) continue;
+      seen.add(text);
+      entries.push({ text, positive: voteCount(votes.positive), negative: voteCount(votes.negative), date: Number.isSafeInteger(a.date) ? a.date : 0 });
+    }
+    entries.sort((a,b) => (b.positive - b.negative) - (a.positive - a.negative) || b.positive - a.positive || b.date - a.date || a.text.localeCompare(b.text));
+    const top = entries[0];
+    return {
+      status: top ? 'reported_unverified' : 'no_eligible_comments',
+      scope: 'first_page_only',
+      inspected: Math.min(raw.data.length, COMMUNITY_PAGE_LIMIT),
+      morePages: Boolean(raw.links?.next),
+      ...(top ? { topComment: top.text, positiveVotes: top.positive, negativeVotes: top.negative, date: isoFromUnix(top.date || null) } : {}),
+    };
+  } catch (error) {
+    return { status: error?.status ? 'http_' + error.status : 'unavailable' };
+  }
+}
+
 export const virustotalProvider = Object.freeze({
-  name: 'virustotal', types: ['ip', 'domain', 'url', 'hash', 'certificate'], requiredEnv: 'VIRUSTOTAL_API_KEY', cacheTtlMs: 21600000, negativeCacheTtlMs: 3600000, costClass: 'scarce', timeoutMs: 7000, parserVersion: 'v3-2026-08-29.1',
+  name: 'virustotal', types: ['ip', 'domain', 'url', 'hash', 'certificate'], requiredEnv: 'VIRUSTOTAL_API_KEY', cacheTtlMs: 21600000, negativeCacheTtlMs: 3600000, costClass: 'scarce', timeoutMs: 7000, parserVersion: 'v3-2026-11-28.1',
   coverageObservationTypesByType: COVERAGE_OBSERVATION_TYPES,
   async run(input, context = {}) {
     const key = requireEnv(context, 'VIRUSTOTAL_API_KEY');
@@ -207,6 +265,8 @@ export const virustotalProvider = Object.freeze({
     if (input.type === 'certificate') return certificateResult(input, raw);
     const a = raw?.data?.attributes ?? {};
     const stats = a.last_analysis_stats ?? {};
+    const community = await communityContext(input, context, key);
+    const classification = a.popular_threat_classification;
     return {
       observationType: 'multi_engine_reputation',
       verdict: vtVerdict(stats),
@@ -217,9 +277,16 @@ export const virustotalProvider = Object.freeze({
         lastAnalysisStats: stats,
         typeDescription: a.type_description ?? null,
         meaningfulName: a.meaningful_name ?? null,
+        community,
+        ...(classification && typeof classification === 'object' ? { vendorSuggestedThreatLabel: classification.suggested_threat_label ?? null, vendorPopularThreatNames: classification.popular_threat_name ?? [], vendorPopularThreatCategories: classification.popular_threat_category ?? [] } : {}),
+        totalVotes: a.total_votes ?? {},
+        asn: a.asn ?? null,
+        asName: a.as_owner ?? null,
+        country: a.country ?? null,
+        network: a.network ?? null,
       },
       relationships: [],
-      references: ['https://www.virustotal.com/gui/home/search'],
+      references: [guiReference(input, raw)],
     };
   },
 });
