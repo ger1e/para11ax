@@ -1,4 +1,4 @@
-import { buildIpAnalystReport } from './view-model.js';
+import { buildIpAnalystReport, renderIpAnalystReportText } from './view-model.js';
 
 if (typeof document !== 'undefined' && !document.querySelector('link[href="/app/analyst-facts.css"]')) {
   const styles = document.createElement('link');
@@ -38,7 +38,20 @@ function appendFacts(target, facts, empty = '') {
   const grid = el('dl', 'fact-grid');
   for (const fact of facts) {
     const row = el('div', 'fact-row');
-    row.append(el('dt', 'fact-label', fact.label), el('dd', 'fact-value', displayFactValue(fact)));
+    const value = el('dd', 'fact-value', displayFactValue(fact));
+    if (/^SOURCE \d+$/.test(fact.label) && typeof fact.value === 'string') {
+      try {
+        const url = new URL(fact.value);
+        if (url.protocol === 'https:' && !url.username && !url.password) {
+          const anchor = el('a', 'reference', fact.value);
+          anchor.href = url.href;
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
+          value.replaceChildren(anchor);
+        }
+      } catch {}
+    }
+    row.append(el('dt', 'fact-label', fact.label), value);
     grid.append(row);
   }
   target.append(grid);
@@ -248,7 +261,38 @@ function ipReportContent(models) {
   const heading = el('header', 'brief-section ip-report-header');
   heading.append(el('h1', 'fact-title ip-report-title', report.title || 'IP INTELLIGENCE REPORT'));
   heading.append(el('p', 'coverage-line', `${String(report.status || 'unknown').toUpperCase()} · PROFILE ${String(report.profile || 'unknown').toUpperCase()} · ${report.durationMs ?? '—'} ms`));
-  root.append(heading);
+  const reportText = renderIpAnalystReportText(report);
+  const ascii = el('details', 'brief-section ip-ascii-report');
+  const copy = el('button', 'report-copy', 'COPY ASCII REPORT');
+  copy.type = 'button';
+  const summary = el('summary', 'view-label', 'ASCII REPORT / NFO VIEW');
+  const pre = el('pre', 'shell-pre');
+  const borderWidth = 90;
+  const border = '+' + '-'.repeat(borderWidth + 2) + '+';
+  const wrapped = reportText.trimEnd().split('\n').flatMap(line => {
+    if (!line) return [''];
+    if (/^SOURCE \d+: https?:\/\//.test(line)) return [line];
+    const words = line.split(/\s+/);
+    const rows = [];
+    let current = '';
+    for (const word of words) {
+      if (current && current.length + word.length + 1 > borderWidth) { rows.push(current); current = ''; }
+      current += (current ? ' ' : '') + word;
+    }
+    if (current) rows.push(current);
+    return rows;
+  });
+  const width = Math.max(borderWidth, ...wrapped.map(line => line.length));
+  const edge = width === borderWidth ? border : '+' + '-'.repeat(width + 2) + '+';
+  const framed = [edge, ...wrapped.map(line => '| ' + line.padEnd(width) + ' |'), edge].join('\n');
+  pre.textContent = framed;
+  copy.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(framed); copy.textContent = 'COPIED'; }
+    catch { copy.textContent = 'COPY FAILED / SELECT TEXT'; }
+  });
+  heading.append(copy);
+  ascii.append(summary, pre);
+  root.append(heading, ascii);
 
   const assessment = el('section', 'brief-section ip-report-assessment ip-at-a-glance');
   assessment.append(sectionLabel('EXECUTIVE ASSESSMENT'));
