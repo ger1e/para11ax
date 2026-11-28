@@ -17,6 +17,24 @@ export const threatfoxProvider = Object.freeze({
     });
     const rows = Array.isArray(raw?.data) ? raw.data : [];
     const first = rows[0] ?? {};
+    // Keep competing feed assertions separate; multiple rows are not independent sources.
+    const clean = value => typeof value === 'string'
+      ? value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ').trim().slice(0, 160) || null : null;
+    const family = row => clean(row?.malware_printable) ?? clean(row?.malware);
+    const families = [...new Set(rows.map(family).filter(Boolean))].sort();
+    const associations = rows.slice(0, 8).map(row => ({
+      recordId: /^\d{1,20}$/.test(String(row?.id ?? '')) ? String(row.id) : null,
+      family: family(row),
+      alias: clean(row?.malware_alias),
+      threatType: clean(row?.threat_type),
+      confidence: row?.confidence_level != null && Number.isFinite(Number(row.confidence_level))
+        ? Number(row.confidence_level) : null,
+      firstSeen: clean(row?.first_seen),
+      lastSeen: clean(row?.last_seen),
+    }));
+    const sourceRefs = associations.filter(row => row.recordId)
+      .map(row => 'https://threatfox.abuse.ch/ioc/' + row.recordId + '/');
+
     const rels = rows.map(row => relation(
       row?.ioc_type?.includes('ip') ? 'ip'
         : row?.ioc_type?.includes('domain') ? 'domain'
@@ -32,14 +50,18 @@ export const threatfoxProvider = Object.freeze({
       firstSeen: first?.first_seen ?? null,
       lastSeen: first?.last_seen ?? null,
       tags: compact(rows.flatMap(row => Array.isArray(row?.tags) ? row.tags : [])),
-      malwareFamily: first?.malware_printable ?? first?.malware ?? null,
+      malwareFamily: families.length === 1 ? families[0] : null,
       attributes: {
         queryStatus: raw?.query_status ?? null,
         threatType: first?.threat_type ?? null,
         resultCount: rows.length,
+        reportedMalwareFamilies: families.slice(0, 25),
+        conflictingFamilyLabels: families.length > 1,
+        reportedAssociations: associations,
+        omittedAssociations: Math.max(0, rows.length - associations.length),
       },
       relationships: rels,
-      references: ['https://threatfox.abuse.ch/'],
+      references: [...new Set(['https://threatfox.abuse.ch/', ...sourceRefs])],
     };
   },
 });
