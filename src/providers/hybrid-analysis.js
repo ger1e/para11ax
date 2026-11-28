@@ -27,7 +27,7 @@ export const hybridAnalysisProvider = Object.freeze({
   negativeCacheTtlMs: 3600000,
   costClass: 'scarce',
   timeoutMs: 10000,
-  parserVersion: 'v2.38.0-2026-08-22.1',
+  parserVersion: 'v2.38.0-2026-11-28.1',
   async run(input, context = {}) {
     const key = requireEnv(context, 'HYBRID_ANALYSIS_API_KEY');
     const url = `${API_ROOT}/search/hash?hash=${encodeURIComponent(input.value)}`;
@@ -44,6 +44,7 @@ export const hybridAnalysisProvider = Object.freeze({
     }
 
     const reports = reportRows(raw);
+    const families = [...new Set(reports.map(report => typeof report?.vx_family === 'string' ? report.vx_family.trim().slice(0,160) : '').filter(Boolean))].sort();
     const verdicts = reports.map(report => String(report?.verdict ?? '').toLowerCase());
     const verdict = verdicts.includes('malicious')
       ? 'malicious'
@@ -60,20 +61,24 @@ export const hybridAnalysisProvider = Object.freeze({
     return {
       observationType: 'sandbox_report_index',
       verdict,
-      malwareFamily: reports.map(report => report?.vx_family).find(Boolean) ?? null,
+      malwareFamily: families.length === 1 ? families[0] : null,
       attributes: {
         reportCount: reports.length,
+        reportedMalwareFamilies: families.slice(0,25),
+        conflictingFamilyLabels: families.length > 1,
+        sandboxVerdicts: [...new Set(verdicts.filter(Boolean))].sort(),
+        omittedReports: Math.max(0, reports.length - 20),
         reports: reports.slice(0, 20).map(report => ({
           id: report?.id ?? null,
           environmentId: report?.environment_id ?? null,
           state: report?.state ?? null,
           verdict: report?.verdict ?? null,
-          threatScore: Number.isFinite(Number(report?.threat_score)) ? Number(report.threat_score) : null,
+          threatScore: report?.threat_score != null && Number.isFinite(Number(report.threat_score)) ? Number(report.threat_score) : null,
           family: report?.vx_family ?? null,
         })),
       },
       relationships: compact(hashes.map(hash => relation('hash', hash, 'related_sha256'))),
-      references: ['https://hybrid-analysis.com/'],
+      references: ['https://hybrid-analysis.com/', ...[...new Set(hashes.filter(hash => typeof hash === 'string' && /^[a-f0-9]{64}$/i.test(hash)))].slice(0,8).map(hash => 'https://hybrid-analysis.com/sample/' + hash.toLowerCase())],
     };
   },
 });
