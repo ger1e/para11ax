@@ -291,8 +291,20 @@ function nfoWrap(line) {
   rows.push(row);
   return rows;
 }
-export function formatNfoReport(reportText) {
-  const lines = cleanNfo(reportText).trimEnd().split('\n');
+export function formatNfoReport(reportText, references = []) {
+  const trusted = new Set(references);
+  const lines = cleanNfo(reportText).trimEnd().split('\n').map(line => {
+    const source = line.match(/^\s*SOURCE \d+: (https?:\/\/\S+)$/i);
+    if (source && trusted.has(source[1]) && nfoPortal(source[1])) return line;
+    // Only verified source-reference lines retain live URLs in the copyable report.
+    return line.replace(/https?:\/\/[^\s<>"']+/gi, value => {
+      try {
+        const parsed = new URL(value);
+        if (parsed.username || parsed.password || [...parsed.searchParams.keys()].some(sensitiveNfoParameter)) return '[REDACTED URL]';
+      } catch { /* preserve as defanged text */ }
+      return value.replace(/^http/i, 'hxxp');
+    });
+  });
   const rule = ' ░▒▓' + '▀'.repeat(NFO_WIDTH - 8) + '▓▒░ ';
   const out = [rule, '', ...NFO_LOGO.map(nfoCenter), '',
     nfoCenter('T H R E A T   I N T E L L I G E N C E'),
@@ -315,12 +327,15 @@ const NFO_PORTALS = ['virustotal.com','abuseipdb.com','abuse.ch','alienvault.com
   'threatminer.org','spamhaus.org','dshield.org','ransomlook.io','ransomware.live',
   'torproject.org','webamon.com','shadowserver.org','team-cymru.com','vulncheck.com',
   'deps.dev','archive.org','chainabuse.com','gitguardian.com','openphish.com'];
+function sensitiveNfoParameter(key) {
+  return /(?:^|[_-])(?:key|token|auth|secret|password|signature|credential)(?:$|[_-])|^(?:apikey|accesstoken|authorization)$/i.test(key);
+}
 function nfoPortal(value) {
   try {
     const u = new URL(value);
     return u.protocol === 'https:' && !u.username && !u.password &&
       NFO_PORTALS.some(host => u.hostname === host || u.hostname.endsWith('.' + host))
-      && ![...u.searchParams.keys()].some(key => /^(key|api[_-]?key|token|auth|secret|password)$/i.test(key))
+      && ![...u.searchParams.keys()].some(sensitiveNfoParameter)
       ? u : null;
   } catch { return null; }
 }
@@ -372,10 +387,13 @@ function nfoPanel(reportText, references) {
   pre.style.whiteSpace = 'pre';
   pre.style.overflowX = 'auto';
   pre.style.maxWidth = '100%';
+  pre.style.minWidth = '0';
+  pre.style.fontFamily = 'ui-monospace, SFMono-Regular, Consolas, monospace';
+  pre.style.lineHeight = '1.2';
   pre.style.fontVariantLigatures = 'none';
   pre.tabIndex = 0;
   const trusted = new Set(references);
-  const framed = formatNfoReport(reportText);
+  const framed = formatNfoReport(reportText, references);
   const output = [];
   for (const line of framed.split('\n')) {
     const match = line.match(/^\s*SOURCE \d+: (https?:\/\/\S+)/i);
@@ -401,7 +419,7 @@ function nfoPanel(reportText, references) {
       const range = document.createRange(); range.selectNodeContents(pre);
       const selection = globalThis.getSelection?.();
       selection?.removeAllRanges(); selection?.addRange(range);
-      status.textContent = ' [ SELECTED / CTRL+C ]';
+      status.textContent = selection ? ' [ SELECTED / CTRL+C ]' : ' [ COPY UNAVAILABLE / SELECT TEXT ]';
     }
   });
   const toolbar = el('div', 'nfo-toolbar');
