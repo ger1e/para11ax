@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { hybridAnalysisProvider } from '../src/providers/hybrid-analysis.js';
+import { malwarebazaarProvider } from '../src/providers/malwarebazaar.js';
+import { urlhausProvider } from '../src/providers/urlhaus.js';
 import { threatfoxProvider } from '../src/providers/threatfox.js';
 import { otxProvider } from '../src/providers/otx.js';
 import { abuseipdbProvider } from '../src/providers/abuseipdb.js';
@@ -44,4 +47,42 @@ test('AbuseIPDB verbose reports preserve counts, sanitize comments and omit repo
   assert.equal(result.attributes.communityRecentReports[0].comment,'[REDACTED]');
   assert.ok(!JSON.stringify(result).includes('reporterId'));
   assert.equal(result.verdict,'malicious');
+});
+
+test('Hybrid Analysis retains conflicting family labels without assigning one', async () => {
+  const hash = 'b'.repeat(64);
+  const result = await hybridAnalysisProvider.run({type:'hash',value:hash},{
+    env:{HYBRID_ANALYSIS_API_KEY:'test-key'},fetchImpl:async()=>response([
+      {sha256:hash,vx_family:'Family A',verdict:'malicious',threat_score:null},
+      {sha256:hash,vx_family:'Family B',verdict:'suspicious',threat_score:50}
+    ])
+  });
+  assert.equal(result.malwareFamily,null);
+  assert.deepEqual(result.attributes.reportedMalwareFamilies,['Family A','Family B']);
+  assert.equal(result.attributes.conflictingFamilyLabels,true);
+  assert.equal(result.attributes.reports[0].threatScore,null);
+  assert.ok(result.references.includes('https://hybrid-analysis.com/sample/'+hash));
+});
+
+test('MalwareBazaar preserves bounded vendor classifications and sample provenance', async () => {
+  const hash = 'c'.repeat(64);
+  const result = await malwarebazaarProvider.run({type:'hash',value:hash},{
+    env:{ABUSECH_API_KEY:'test-key'},fetchImpl:async()=>response({query_status:'ok',data:[{
+      sha256_hash:hash,signature:'Family A',file_type_mime:'application/octet-stream',
+      vendor_intel:{Example:{verdict:'malicious',malware_family:'Family A'}}
+    }]})
+  });
+  assert.equal(result.attributes.mimeType,'application/octet-stream');
+  assert.equal(result.attributes.vendorClassifications[0].classification,'Family A');
+  assert.ok(result.references.includes('https://bazaar.abuse.ch/sample/'+hash+'/'));
+});
+
+test('URLhaus reports payload signatures separately from URL verdict', async () => {
+  const result = await urlhausProvider.run({type:'url',value:'https://example.invalid/test'},{
+    env:{ABUSECH_API_KEY:'test-key'},fetchImpl:async()=>response({query_status:'ok',id:'12345',
+      payloads:[{signature:'Family A'},{signature:'Family B'}]})
+  });
+  assert.deepEqual(result.attributes.reportedPayloadSignatures,['Family A','Family B']);
+  assert.equal(result.malwareFamily,undefined);
+  assert.ok(result.references.includes('https://urlhaus.abuse.ch/url/12345/'));
 });
