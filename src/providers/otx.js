@@ -22,7 +22,7 @@ function noResult(type, value) {
 }
 
 export const otxProvider = Object.freeze({
-  name: 'otx', types: ['ip', 'domain', 'url', 'hash', 'cve'], requiredEnv: 'OTX_API_KEY', cacheTtlMs: 21600000, negativeCacheTtlMs: 3600000, costClass: 'free', timeoutMs: 12000, parserVersion: '2026-08-23.1',
+  name: 'otx', types: ['ip', 'domain', 'url', 'hash', 'cve'], requiredEnv: 'OTX_API_KEY', cacheTtlMs: 21600000, negativeCacheTtlMs: 3600000, costClass: 'free', timeoutMs: 12000, parserVersion: '2026-11-28.1',
   async run(input, context = {}) {
     const key = requireEnv(context, 'OTX_API_KEY');
     const type = slug(input.type, input.value);
@@ -36,7 +36,7 @@ export const otxProvider = Object.freeze({
     }
     const pulses = Array.isArray(raw?.pulse_info?.pulses) ? raw.pulse_info.pulses : [];
     const clean = (value, max = 160) => typeof value === 'string'
-      ? value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/https?:\/\//gi, 'hxxps://').trim().slice(0, max) || null : null;
+      ? value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/https?:\/\/\S+/gi, '[URL omitted]').replace(/\b(?:password|passwd|token|api[_-]?key|authorization|secret)\s*[:=]\s*\S+/gi, '[REDACTED]').trim().slice(0, max) || null : null;
     const names = value => (Array.isArray(value) ? value : [])
       .map(item => clean(typeof item === 'string' ? item : item?.name ?? item?.display_name ?? item?.id))
       .filter(Boolean).slice(0, 12);
