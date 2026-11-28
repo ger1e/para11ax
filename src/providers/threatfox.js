@@ -2,7 +2,7 @@ import { fetchJson } from '../core/fetch-json.js';
 import { compact, relation, requireEnv } from './helpers.js';
 
 export const threatfoxProvider = Object.freeze({
-  name: 'threatfox', types: ['ip', 'domain', 'url', 'hash'], methods: ['POST'], requiredEnv: 'ABUSECH_API_KEY', cacheTtlMs: 3600000, negativeCacheTtlMs: 1800000, costClass: 'free', timeoutMs: 7000, parserVersion: '2026-08-22.1',
+  name: 'threatfox', types: ['ip', 'domain', 'url', 'hash'], methods: ['POST'], requiredEnv: 'ABUSECH_API_KEY', cacheTtlMs: 3600000, negativeCacheTtlMs: 1800000, costClass: 'free', timeoutMs: 7000, parserVersion: '2026-11-28.1',
   async run(input, context = {}) {
     const key = requireEnv(context, 'ABUSECH_API_KEY');
     const body = input.type === 'hash'
@@ -46,7 +46,7 @@ export const threatfoxProvider = Object.freeze({
     return {
       observationType: 'threat_intelligence',
       verdict: rows.length ? 'associated' : 'no_association',
-      confidence: Number.isFinite(Number(first?.confidence_level)) ? Number(first.confidence_level) : null,
+      confidence: families.length <= 1 && first?.confidence_level != null && Number.isFinite(Number(first.confidence_level)) ? Number(first.confidence_level) : null,
       firstSeen: first?.first_seen ?? null,
       lastSeen: first?.last_seen ?? null,
       tags: compact(rows.flatMap(row => Array.isArray(row?.tags) ? row.tags : [])),
