@@ -19,7 +19,9 @@ const expectedVersions = Object.freeze({
   pulsedive: '2026-08-22.1',
   'circl-hashlookup': '2026-08-22.1',
   malpedia: '2026-08-22.1',
-  'hybrid-analysis': 'v2.38.0-2026-08-22.1',
+  'hybrid-analysis': 'v2.38.0-2026-11-28.1',
+  malwarebazaar: '2026-11-28.1',
+  urlhaus: '2026-11-28.1',
   'circl-vulnerability': '2026-08-22.1',
   ransomlook: '2026-08-22.1',
 });
