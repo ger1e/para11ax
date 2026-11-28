@@ -1,7 +1,7 @@
 import { fetchJson } from '../core/fetch-json.js';
 import { compact, relation, requireEnv } from './helpers.js';
 export const abuseipdbProvider = Object.freeze({
-  name: 'abuseipdb', types: ['ip'], requiredEnv: 'ABUSEIPDB_API_KEY', cacheTtlMs: 21600000, negativeCacheTtlMs: 3600000, costClass: 'free', timeoutMs: 5000, parserVersion: '2026-08-20',
+  name: 'abuseipdb', types: ['ip'], requiredEnv: 'ABUSEIPDB_API_KEY', cacheTtlMs: 21600000, negativeCacheTtlMs: 3600000, costClass: 'free', timeoutMs: 5000, parserVersion: '2026-11-28.1',
   async run(input, context = {}) {
     const key = requireEnv(context, 'ABUSEIPDB_API_KEY'); const url = `https://api.abuseipdb.com/api/v2/check?ipAddress=${encodeURIComponent(input.value)}&maxAgeInDays=90&verbose`;
     const raw = await fetchJson(url, { ...context, headers: { Key: key, Accept: 'application/json' } }); const d = raw?.data ?? {};
