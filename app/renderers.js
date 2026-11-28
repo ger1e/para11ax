@@ -285,7 +285,26 @@ function ipReportContent(models) {
   const width = Math.max(borderWidth, ...wrapped.map(line => line.length));
   const edge = width === borderWidth ? border : '+' + '-'.repeat(width + 2) + '+';
   const framed = [edge, ...wrapped.map(line => '| ' + line.padEnd(width) + ' |'), edge].join('\n');
-  pre.textContent = framed;
+  const trustedSources = new Set(report.sections.filter(section => section.id === 'source-references').flatMap(section => section.facts.map(fact => fact.value)));
+  for (const line of framed.split('\n')) {
+    const match = line.match(/^\| SOURCE \d+: (https:\/\/\S+)/);
+    let linked = false;
+    if (match && trustedSources.has(match[1])) {
+      try {
+        const url = new URL(match[1]);
+        if (url.protocol === 'https:' && !url.username && !url.password) {
+          const start = line.indexOf(match[1]);
+          const anchor = el('a', 'reference', match[1]);
+          anchor.href = url.href;
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
+          pre.append(document.createTextNode(line.slice(0, start)), anchor, document.createTextNode(line.slice(start + match[1].length) + '\n'));
+          linked = true;
+        }
+      } catch {}
+    }
+    if (!linked) pre.append(document.createTextNode(line + '\n'));
+  }
   copy.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(framed); copy.textContent = 'COPIED'; }
     catch { copy.textContent = 'COPY FAILED / SELECT TEXT'; }
