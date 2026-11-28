@@ -111,8 +111,11 @@ test('IP enrichment compiles into one ordered deterministic analyst report', () 
   assert.deepEqual(report.sections.map(section => section.id), [
     'identity', 'registration-routing', 'geo-network', 'exposure', 'reputation-abuse',
     'malware-c2-ransomware', 'tor-scanner', 'related-infrastructure',
-    'correlation', 'temporal-context', 'attack-behavior', 'analyst-actions', 'huntability', 'coverage',
+    'correlation', 'temporal-context', 'attack-behavior', 'analyst-actions', 'huntability', 'coverage', 'source-references',
   ]);
+  const sources = report.sections.find(section => section.id === 'source-references');
+  assert.equal(sources.facts.length, 8);
+  assert.ok(sources.facts.some(fact => fact.value === 'https://ipinfo.io/'));
   assert.equal(report.assessment.state, 'ACTIONABLE THREAT EVIDENCE');
   assert.match(report.assessment.summary, /AS15169/i);
   assert.match(report.assessment.summary, /Google LLC/i);
