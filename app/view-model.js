@@ -632,6 +632,13 @@ export function buildIpAnalystReport({ overview, evidence, correlation, relation
     ...limitationValues.map((value, index) => ({ label: `LIMITATION ${index + 1}`, value })),
   ];
 
+  const communityCards = cards.filter(card => card.provider === 'virustotal');
+  if (communityCards.length) {
+    const communityFacts = communityCards.flatMap(card => (card.attributeFacts || []).filter(fact => /^COMMUNITY /.test(fact.label) && meaningfulFact(fact)).map(fact => ({ ...fact, sources: ['virustotal'] })));
+    if (communityFacts.length) sections.push({ id: 'community-context', title: 'COMMUNITY CONTEXT / UNVERIFIED', summary: 'Community comments are third-party claims, not independent evidence or confirmed malware attribution. Ranking is limited to the retrieved page.', facts: communityFacts, items: [] });
+  }
+  const sourceUrls = [...new Set(cards.flatMap(card => card.references || []).filter(value => typeof value === 'string' && /^https?:\/\//i.test(value)))].sort();
+  if (sourceUrls.length) sections.push({ id: 'source-references', title: 'SOURCE REFERENCES', facts: sourceUrls.map((value, index) => ({ label: 'SOURCE ' + (index + 1), value })), items: [] });
   const assessment = buildIpAssessment({ overview, evidence: cards, correlation: correlation || {}, sections, intelligence });
   return {
     title: `IP INTELLIGENCE REPORT // ${overview.indicator}`,
